@@ -111,7 +111,7 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | RA/Dec coordinate grid and labels | Available | **Complete** | Derived from solved WCS and cached per solution. |
 | Field-center marker | Available | **Complete** | Drawn in the common solved-image coordinate space. |
 | Hide all overlays | Available | **Complete** | One accessible action without losing catalog filter preferences. |
-| Overlay transforms during pan/zoom | Available | **Complete** | Image-space geometry follows the same pan/zoom transform as the bitmap. |
+| Overlay transforms during pan/zoom | Available | **Partial** | Image-space anchors track the bitmap, but marker glyphs, stroke widths, label text, and halos currently change size with zoom. Keep those screen-space sizes constant while contours and object extents remain image-scaled. |
 | Catalog-aware palette and restrained styling | Available | **Complete** | Matches the semantic macOS palette with readable haloed labels. |
 | Satellite overlays | Planned | **Deferred** | Requires time span, observer, element epoch, and explicit provenance. |
 
