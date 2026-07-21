@@ -5,6 +5,7 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+    xmlns:local="using:Seiza.App"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
     mc:Ignorable="d">
 
@@ -105,6 +106,33 @@
             <AppBarSeparator />
 
             <AppBarButton
+                x:Name="RgbStretchButton"
+                IsEnabled="False"
+                Label="RGB stretch"
+                ToolTipService.ToolTip="RGB stretch is available for color FITS images">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE790;" />
+                </AppBarButton.Icon>
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <ToggleMenuFlyoutItem
+                            x:Name="AutoRgbStretchItem"
+                            Click="RgbStretch_Click"
+                            IsChecked="True"
+                            Text="Auto" />
+                        <ToggleMenuFlyoutItem
+                            x:Name="LinkedAutoRgbStretchItem"
+                            Click="RgbStretch_Click"
+                            Text="Linked Auto" />
+                        <ToggleMenuFlyoutItem
+                            x:Name="LinearRgbStretchItem"
+                            Click="RgbStretch_Click"
+                            Text="Linear" />
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
+            </AppBarButton>
+
+            <AppBarButton
                 x:Name="SolveButton"
                 Click="Solve_Click"
                 IsEnabled="False"
@@ -174,6 +202,19 @@
             <AppBarSeparator />
 
             <AppBarButton
+                x:Name="InspectorButton"
+                Click="Inspector_Click"
+                IsEnabled="{x:Bind ViewModel.HasImage, Mode=OneWay}"
+                Label="Inspector"
+                ToolTipService.ToolTip="Show image details, FITS headers, and plate-solve information">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE700;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarSeparator />
+
+            <AppBarButton
                 Click="CatalogSettings_Click"
                 Label="Catalogs"
                 ToolTipService.ToolTip="Catalog settings">
@@ -194,8 +235,47 @@
             </AppBarButton>
         </CommandBar>
 
-        <Grid
+        <SplitView
+            x:Name="WorkspaceSplitView"
             Grid.Row="1"
+            DisplayMode="Inline"
+            IsPaneOpen="False"
+            OpenPaneLength="380"
+            PanePlacement="Right">
+            <SplitView.Pane>
+                <Border
+                    Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1,0,0,0">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Padding="16,12,8,8">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock
+                                VerticalAlignment="Center"
+                                Style="{StaticResource TitleTextBlockStyle}"
+                                Text="Inspector" />
+                            <Button
+                                Grid.Column="1"
+                                AutomationProperties.Name="Close inspector"
+                                Click="CloseInspector_Click"
+                                Style="{StaticResource SubtleButtonStyle}"
+                                ToolTipService.ToolTip="Close inspector">
+                                <FontIcon Glyph="&#xE711;" />
+                            </Button>
+                        </Grid>
+                        <local:ImageInspector x:Name="InspectorControl" Grid.Row="1" />
+                    </Grid>
+                </Border>
+            </SplitView.Pane>
+            <SplitView.Content>
+        <Grid
             AllowDrop="True"
             Background="#FF080A0F"
             DragOver="Viewport_DragOver"
@@ -313,6 +393,8 @@
                 </StackPanel>
             </Border>
         </Grid>
+            </SplitView.Content>
+        </SplitView>
 
         <Grid
             Grid.Row="2"

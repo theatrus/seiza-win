@@ -8,8 +8,8 @@ merely because its Rust implementation exists.
 ## Baseline
 
 - macOS reference: `main` at
-  [`5c6f3ca`](https://github.com/theatrus/seiza-mac/commit/5c6f3cab1808cffcd9d9a1e9c54ff3cd1faa4343)
-- Windows reference: current solve/export parity branch
+  [`88b7d3a`](https://github.com/theatrus/seiza-mac/commit/88b7d3a23c6b6230c94899af115d9b605e4330d1)
+- Windows reference: current inspection-parity branch
 - Last audited: 2026-07-21
 
 Update this baseline and the affected rows whenever the macOS app gains a
@@ -41,11 +41,11 @@ test exist.
 | Cached preview while full resolution loads | Available | **Planned** | Never blank an already available preview during a full render. |
 | Mono FITS autostretch | Available | **Complete** | Runtime-tested against telescope FITS data. |
 | Planar RGB and Bayer/OSC rendering | Available | **Partial** | Core path exists; add representative RGB and Bayer fixtures and visual QA. |
-| Auto, Linked Auto, and Linear RGB modes | Available | **Core ready** | Expose the existing ABI mode in the toolbar and include it in cache/render identity. |
+| Auto, Linked Auto, and Linear RGB modes | Available | **Complete** | Toolbar selection and inspector state are runtime-tested on a 4,138 x 5,263 planar-RGB FITS image. |
 | Fit, pan, wheel zoom, and toolbar zoom | Available | **Complete** | — |
 | Pointer-anchored pinch/touch zoom | Available | **Planned** | Add native manipulation handling without rerendering pixels. |
 | Image dimensions, format, and color-kind status | Available | **Complete** | — |
-| Image statistics and FITS header inspector | Available | **Core ready** | Metadata is already decoded; add a native inspector pane with searchable/copyable headers. |
+| Image statistics and FITS header inspector | Available | **Complete** | Native right-side inspector includes all statistics plus searchable, selectable, and copyable FITS headers. |
 | Detailed loading and native error states | Available | **Complete** | — |
 | Export stretched image without overlays | Available | **Complete** | Runtime-tested at the full 6,248 x 4,176 source resolution. |
 | Export with visible overlays | Available | **Complete** | Uses the same Win2D renderer and layer state as the live viewport. |
@@ -98,7 +98,7 @@ one Win2D drawing path between the live viewport and full-resolution export.
 
 | Layer or behavior | macOS 0.2.0 | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
-| Overlay availability, unavailable reasons, and counts | Available | **Partial** | Counts and disabled states are complete; add an on-demand view of the core's detailed reason strings. |
+| Overlay availability, unavailable reasons, and counts | Available | **Complete** | Counts and disabled states remain in the overlay menu; detailed core reasons are selectable in the inspector. |
 | Named stars | Available | **Complete** | Catalog palette, markers, and labels share the macOS defaults. |
 | Field stars with magnitude | Available | **Complete** | Magnitude-aware restrained markers, off by default. |
 | Deep-sky objects | Available | **Complete** | Markers, catalog color, labels, and independent filters. |
@@ -149,7 +149,7 @@ These remain tracked even though they are not macOS 0.2.0 release features:
    protection, solution summary, and Settings remediation.
 3. **Complete: Overlay/export vertical slice** — common coordinate transform,
    layer menu, grid/center, catalog layers, and clean/composited export.
-4. **Next: Inspection parity** — metadata inspector, RGB modes, thumbnails/cache, and
-   preview-while-loading.
+4. **In progress: Inspection parity** — metadata inspector and RGB modes are complete;
+   next are the thumbnail drawer/cache and preview-while-loading pipeline.
 5. **Windows integration** — multi-window activation, file associations,
    Explorer components, signed packaging, and release automation.

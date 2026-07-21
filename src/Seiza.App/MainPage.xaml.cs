@@ -26,6 +26,7 @@ public sealed partial class MainPage : Page, IDisposable
     private CanvasBitmap? _bitmap;
     private CancellationTokenSource? _loadCancellation;
     private CancellationTokenSource? _solveCancellation;
+    private ImageMetadata? _currentMetadata;
     private SolveOverlayRenderer? _overlayRenderer;
     private string? _currentPath;
     private Vector2 _offset;
@@ -38,6 +39,8 @@ public sealed partial class MainPage : Page, IDisposable
     private int _loadGeneration;
     private bool _isDragging;
     private bool _isFitToWindow = true;
+    private bool _isInspectorOpen;
+    private RgbStretchMode _rgbStretchMode = RgbStretchMode.Auto;
 
     public MainPageViewModel ViewModel { get; } = new();
 
@@ -96,6 +99,52 @@ public sealed partial class MainPage : Page, IDisposable
     private void ZoomOut_Click(object sender, RoutedEventArgs e) =>
         ZoomAt(new Vector2((float)ImageCanvas.ActualWidth / 2, (float)ImageCanvas.ActualHeight / 2), 0.8f);
 
+    private async void RgbStretch_Click(object sender, RoutedEventArgs e)
+    {
+        RgbStretchMode? requestedMode = sender switch
+        {
+            var item when ReferenceEquals(item, AutoRgbStretchItem) => RgbStretchMode.Auto,
+            var item when ReferenceEquals(item, LinkedAutoRgbStretchItem) => RgbStretchMode.LinkedAuto,
+            var item when ReferenceEquals(item, LinearRgbStretchItem) => RgbStretchMode.Linear,
+            _ => null,
+        };
+        if (requestedMode is null)
+        {
+            SyncRgbStretchControls();
+            return;
+        }
+
+        RgbStretchMode previousMode = _rgbStretchMode;
+        _rgbStretchMode = requestedMode.Value;
+        SyncRgbStretchControls();
+        UpdateVisualState();
+        if (previousMode == _rgbStretchMode || _currentPath is null)
+        {
+            return;
+        }
+
+        RgbStretchMode activeRequest = _rgbStretchMode;
+        bool succeeded = await LoadImageAsync(_currentPath, preserveSolution: true);
+        if (!succeeded && _rgbStretchMode == activeRequest)
+        {
+            _rgbStretchMode = previousMode;
+            SyncRgbStretchControls();
+            UpdateVisualState();
+        }
+    }
+
+    private void Inspector_Click(object sender, RoutedEventArgs e)
+    {
+        _isInspectorOpen = !_isInspectorOpen;
+        UpdateVisualState();
+    }
+
+    private void CloseInspector_Click(object sender, RoutedEventArgs e)
+    {
+        _isInspectorOpen = false;
+        UpdateVisualState();
+    }
+
     private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
         App.ShowCatalogSettings();
 
@@ -112,7 +161,9 @@ public sealed partial class MainPage : Page, IDisposable
         int generation = _loadGeneration;
         string path = _currentPath;
         _overlayRenderer = null;
+        _isInspectorOpen = true;
         ViewModel.BeginSolving();
+        InspectorControl.BeginSolve();
         ImageCanvas.Invalidate();
 
         try
@@ -130,6 +181,7 @@ public sealed partial class MainPage : Page, IDisposable
 
             _overlayRenderer = new SolveOverlayRenderer(result, _sourceWidth, _sourceHeight);
             ViewModel.CompleteSolve(result);
+            InspectorControl.ShowSolveResult(result);
             ApplyOverlayAvailability(result);
             ImageCanvas.Invalidate();
         }
@@ -140,6 +192,7 @@ public sealed partial class MainPage : Page, IDisposable
                 string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
             {
                 ViewModel.FailSolve(exception.Message, true);
+                InspectorControl.ShowSolveFailure(exception.Message, true);
             }
         }
         catch (OperationCanceledException)
@@ -152,7 +205,9 @@ public sealed partial class MainPage : Page, IDisposable
                 generation == _loadGeneration &&
                 string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
             {
-                ViewModel.FailSolve(DescribeException(exception), false);
+                string message = DescribeException(exception);
+                ViewModel.FailSolve(message, false);
+                InspectorControl.ShowSolveFailure(message, false);
             }
         }
         finally
@@ -381,9 +436,17 @@ public sealed partial class MainPage : Page, IDisposable
         UpdateNavigationState();
     }
 
-    private async Task LoadImageAsync(string path)
+    private async Task<bool> LoadImageAsync(string path, bool preserveSolution = false)
     {
-        ResetSolveForImageChange();
+        if (!preserveSolution || ViewModel.IsSolving)
+        {
+            ResetSolveForImageChange();
+        }
+        if (!preserveSolution)
+        {
+            _currentMetadata = null;
+            InspectorControl.ClearMetadata();
+        }
         _loadCancellation?.Cancel();
         _loadCancellation?.Dispose();
         _loadCancellation = new CancellationTokenSource();
@@ -393,11 +456,14 @@ public sealed partial class MainPage : Page, IDisposable
 
         try
         {
-            RenderedImageData image = await ImageRenderService.RenderAsync(path, cancellationToken);
+            RenderedImageData image = await ImageRenderService.RenderAsync(
+                path,
+                _rgbStretchMode,
+                cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (generation != _loadGeneration)
             {
-                return;
+                return false;
             }
 
             CanvasBitmap nextBitmap = CanvasBitmap.CreateFromBytes(
@@ -414,6 +480,8 @@ public sealed partial class MainPage : Page, IDisposable
             _sourceWidth = image.Width;
             _sourceHeight = image.Height;
             _currentPath = path;
+            _currentMetadata = image.Metadata;
+            InspectorControl.ShowMetadata(image.Metadata, _rgbStretchMode);
             ViewModel.CompleteLoading(path, image.Metadata);
             if (App.Window is MainWindow window)
             {
@@ -421,14 +489,20 @@ public sealed partial class MainPage : Page, IDisposable
             }
 
             FitImageToWindow();
+            return true;
         }
         catch (OperationCanceledException)
         {
             // A newer load superseded this one.
+            return false;
         }
-        catch (Exception exception) when (generation == _loadGeneration)
+        catch (Exception exception)
         {
-            ViewModel.FailLoading(DescribeException(exception));
+            if (generation == _loadGeneration)
+            {
+                ViewModel.FailLoading(DescribeException(exception));
+            }
+            return false;
         }
     }
 
@@ -600,6 +674,20 @@ public sealed partial class MainPage : Page, IDisposable
             ViewModel.HasSolution &&
             _overlayOptions.HasVisibleOverlays &&
             !ViewModel.IsExporting;
+        bool supportsRgbStretch = SupportsRgbStretch(_currentMetadata);
+        RgbStretchButton.IsEnabled = supportsRgbStretch && !ViewModel.IsLoading;
+        RgbStretchButton.Label = supportsRgbStretch
+            ? $"RGB: {_rgbStretchMode.Title()}"
+            : "RGB stretch";
+        ToolTipService.SetToolTip(
+            RgbStretchButton,
+            supportsRgbStretch
+                ? $"RGB stretch: {_rgbStretchMode.Title()}. {_rgbStretchMode.Help()}"
+                : "RGB stretch is available for color FITS images");
+        WorkspaceSplitView.IsPaneOpen = _isInspectorOpen && ViewModel.HasImage;
+        InspectorButton.Label = WorkspaceSplitView.IsPaneOpen
+            ? "Hide inspector"
+            : "Inspector";
     }
 
     private void ResetSolveForImageChange()
@@ -607,7 +695,15 @@ public sealed partial class MainPage : Page, IDisposable
         _solveCancellation?.Cancel();
         _overlayRenderer = null;
         ViewModel.ResetSolve();
+        InspectorControl.ResetSolve();
         ImageCanvas.Invalidate();
+    }
+
+    private void SyncRgbStretchControls()
+    {
+        AutoRgbStretchItem.IsChecked = _rgbStretchMode == RgbStretchMode.Auto;
+        LinkedAutoRgbStretchItem.IsChecked = _rgbStretchMode == RgbStretchMode.LinkedAuto;
+        LinearRgbStretchItem.IsChecked = _rgbStretchMode == RgbStretchMode.Linear;
     }
 
     private void SyncOverlayControls()
@@ -681,6 +777,9 @@ public sealed partial class MainPage : Page, IDisposable
             ? $"{type} ({code})"
             : $"{type} ({code}): {exception.Message}";
     }
+
+    private static bool SupportsRgbStretch(ImageMetadata? metadata) =>
+        metadata?.ColorKind is "planar-rgb" or "bayer";
 
     private void Viewport_DragOver(object sender, DragEventArgs e)
     {
