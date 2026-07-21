@@ -1,6 +1,7 @@
 use image::DynamicImage;
 use seiza::blind::{BlindIndex, BlindParams, solve_blind};
 use seiza::catalog::{StarCatalog, tiles::TileCatalog};
+use seiza::downloads::{CachePolicy, CatalogManager, CatalogSet, Dataset, DownloadEvent};
 use seiza::minor_bodies::{MinorBodyCatalog, MinorBodyKind};
 use seiza::objects::{
     GeometryData, GeometryQuality, GeometryRole, ObjectCatalog, ObjectGeometry, ObjectKind,
@@ -12,13 +13,245 @@ use seiza_fits::{FitsImage, HeaderValue, RgbImage16, Statistics, StretchParams};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
 use std::collections::{BTreeMap, HashMap};
-use std::ffi::{CStr, CString, c_char};
+use std::ffi::{CStr, CString, c_char, c_void};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::ptr;
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::time::Instant;
 
 static VERSION: &[u8] = concat!(env!("CARGO_PKG_VERSION"), "\0").as_bytes();
+
+pub type SeizaCatalogSetupProgressCallback =
+    Option<unsafe extern "C" fn(*const c_char, *mut c_void)>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+enum CatalogSetupPreset {
+    StandardBlind = 0,
+    DeepestBlind = 1,
+    All = 2,
+}
+
+impl CatalogSetupPreset {
+    fn from_raw(value: u32) -> Result<Self, String> {
+        match value {
+            0 => Ok(Self::StandardBlind),
+            1 => Ok(Self::DeepestBlind),
+            2 => Ok(Self::All),
+            _ => Err(format!("unsupported catalog setup preset: {value}")),
+        }
+    }
+
+    fn datasets(self) -> &'static [Dataset] {
+        match self {
+            Self::StandardBlind => &[
+                Dataset::Objects,
+                Dataset::MinorBodies,
+                Dataset::Transients,
+                Dataset::StarsDeepGaia17,
+                Dataset::BlindGaia16,
+            ],
+            Self::DeepestBlind => &[
+                Dataset::Objects,
+                Dataset::MinorBodies,
+                Dataset::Transients,
+                Dataset::StarsDeepGaia20,
+                Dataset::BlindGaia16,
+            ],
+            Self::All => &[
+                Dataset::Objects,
+                Dataset::MinorBodies,
+                Dataset::Transients,
+                Dataset::StarsLiteTycho2,
+                Dataset::StarsLiteTycho2Identifiers,
+                Dataset::StarsGaia,
+                Dataset::StarsDeepGaia17,
+                Dataset::StarsDeepGaia20,
+                Dataset::BlindGaia16,
+            ],
+        }
+    }
+
+    fn selection(self) -> Result<CatalogSet, String> {
+        CatalogSet::from_names(
+            self.datasets()
+                .iter()
+                .map(|dataset| dataset.file_name().to_string()),
+        )
+        .map_err(|error| error.to_string())
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogComponentStatus {
+    available: bool,
+    path: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogStatusResponse {
+    directory: String,
+    ready_for_solving: bool,
+    ready_for_overlays: bool,
+    star_catalog: CatalogComponentStatus,
+    blind_index: CatalogComponentStatus,
+    objects: CatalogComponentStatus,
+    transients: CatalogComponentStatus,
+    minor_bodies: CatalogComponentStatus,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogSetupProgressResponse {
+    phase: &'static str,
+    message: String,
+    file_name: Option<String>,
+    files_completed: usize,
+    files_total: usize,
+    bytes_completed: Option<u64>,
+    bytes_total: Option<u64>,
+    written_bytes: Option<u64>,
+}
+
+#[derive(Clone)]
+struct CatalogSetupReporter {
+    callback: SeizaCatalogSetupProgressCallback,
+    context: usize,
+    files_total: usize,
+    installed_files: Arc<AtomicUsize>,
+}
+
+impl CatalogSetupReporter {
+    fn report(&self, event: CatalogSetupProgressResponse) {
+        let Some(callback) = self.callback else {
+            return;
+        };
+        let Ok(json) = serde_json::to_string(&event) else {
+            return;
+        };
+        let Ok(json) = CString::new(json) else {
+            return;
+        };
+        unsafe { callback(json.as_ptr(), self.context as *mut c_void) };
+    }
+
+    fn simple(&self, phase: &'static str, message: impl Into<String>) {
+        self.report(CatalogSetupProgressResponse {
+            phase,
+            message: message.into(),
+            file_name: None,
+            files_completed: 0,
+            files_total: self.files_total,
+            bytes_completed: None,
+            bytes_total: None,
+            written_bytes: None,
+        });
+    }
+
+    fn download_event(&self, event: DownloadEvent) {
+        match event {
+            DownloadEvent::FetchingManifest { .. } => {
+                self.simple("manifest", "Checking the Seiza catalog manifest…")
+            }
+            DownloadEvent::UsingCachedManifest { version, stale } => self.simple(
+                "manifest",
+                if stale {
+                    format!("Using cached catalog manifest {version} while offline")
+                } else {
+                    format!("Using catalog manifest {version}")
+                },
+            ),
+            DownloadEvent::CacheHit { name, .. } => self.report(CatalogSetupProgressResponse {
+                phase: "preparing",
+                message: format!("Found {name} in the download cache"),
+                file_name: Some(name),
+                files_completed: 0,
+                files_total: self.files_total,
+                bytes_completed: None,
+                bytes_total: None,
+                written_bytes: None,
+            }),
+            DownloadEvent::DownloadStarted { name, bytes } => {
+                self.report(CatalogSetupProgressResponse {
+                    phase: "downloading",
+                    message: format!("Downloading {name}"),
+                    file_name: Some(name),
+                    files_completed: 0,
+                    files_total: self.files_total,
+                    bytes_completed: Some(0),
+                    bytes_total: Some(bytes),
+                    written_bytes: Some(0),
+                })
+            }
+            DownloadEvent::DownloadProgress {
+                name,
+                downloaded,
+                total,
+                written,
+            } => self.report(CatalogSetupProgressResponse {
+                phase: "downloading",
+                message: format!("Downloading {name}"),
+                file_name: Some(name),
+                files_completed: 0,
+                files_total: self.files_total,
+                bytes_completed: Some(downloaded),
+                bytes_total: Some(total),
+                written_bytes: Some(written),
+            }),
+            DownloadEvent::DownloadComplete { name, .. } => {
+                self.report(CatalogSetupProgressResponse {
+                    phase: "preparing",
+                    message: format!("Downloaded {name}"),
+                    file_name: Some(name),
+                    files_completed: 0,
+                    files_total: self.files_total,
+                    bytes_completed: None,
+                    bytes_total: None,
+                    written_bytes: None,
+                })
+            }
+            DownloadEvent::Verifying { name } => self.report(CatalogSetupProgressResponse {
+                phase: "verifying",
+                message: format!("Verifying SHA-256 for {name}"),
+                file_name: Some(name),
+                files_completed: 0,
+                files_total: self.files_total,
+                bytes_completed: None,
+                bytes_total: None,
+                written_bytes: None,
+            }),
+            DownloadEvent::Installing { name, .. } => self.report(CatalogSetupProgressResponse {
+                phase: "installing",
+                message: format!("Installing {name}"),
+                file_name: Some(name),
+                files_completed: self.installed_files.load(Ordering::Relaxed),
+                files_total: self.files_total,
+                bytes_completed: None,
+                bytes_total: None,
+                written_bytes: None,
+            }),
+            DownloadEvent::InstallComplete { name, .. } => {
+                let completed = self.installed_files.fetch_add(1, Ordering::Relaxed) + 1;
+                self.report(CatalogSetupProgressResponse {
+                    phase: "installing",
+                    message: format!("Installed {name}"),
+                    file_name: Some(name),
+                    files_completed: completed,
+                    files_total: self.files_total,
+                    bytes_completed: None,
+                    bytes_total: None,
+                    written_bytes: None,
+                })
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -152,6 +385,65 @@ struct SipResponse {
 #[unsafe(no_mangle)]
 pub extern "C" fn seiza_core_version() -> *const c_char {
     VERSION.as_ptr().cast()
+}
+
+#[unsafe(no_mangle)]
+/// Returns catalog readiness and resolved component paths as JSON.
+///
+/// # Safety
+/// `catalog_directory` may be null or a valid NUL-terminated string. When
+/// non-null, `error_out` must point to writable storage for one pointer.
+pub unsafe extern "C" fn seiza_catalog_status_json(
+    catalog_directory: *const c_char,
+    error_out: *mut *mut c_char,
+) -> *mut c_char {
+    clear_error(error_out);
+    ffi_result(error_out, || {
+        let catalog_directory = optional_path(catalog_directory)?;
+        let status = catalog_status(catalog_directory.as_deref());
+        let json = serde_json::to_string(&status).map_err(|error| error.to_string())?;
+        CString::new(json)
+            .map(CString::into_raw)
+            .map_err(|_| "catalog status contains a NUL byte".to_string())
+    })
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+/// Downloads and installs a solver-ready Seiza catalog preset.
+///
+/// Preset `0` is the standard G≤17 blind-solving package, `1` is the optional
+/// G≤20 package, and `2` installs every published catalog. The call is
+/// synchronous and must run off the UI thread. Progress JSON is valid only for
+/// the duration of each callback.
+///
+/// # Safety
+/// `catalog_directory` may be null or a valid NUL-terminated string. `context`
+/// is passed through untouched to `progress`. When non-null, `error_out` must
+/// point to writable storage for one pointer.
+pub unsafe extern "C" fn seiza_catalog_setup(
+    catalog_directory: *const c_char,
+    preset: u32,
+    progress: SeizaCatalogSetupProgressCallback,
+    context: *mut c_void,
+    error_out: *mut *mut c_char,
+) -> bool {
+    clear_error(error_out);
+    ffi_result(error_out, || {
+        let catalog_directory = optional_path(catalog_directory)?;
+        let preset = CatalogSetupPreset::from_raw(preset)?;
+        run_catalog_setup(
+            catalog_directory.as_deref(),
+            preset,
+            CatalogSetupReporter {
+                callback: progress,
+                context: context as usize,
+                files_total: preset.datasets().len(),
+                installed_files: Arc::new(AtomicUsize::new(0)),
+            },
+        )
+    })
+    .is_some()
 }
 
 #[unsafe(no_mangle)]
@@ -1162,6 +1454,112 @@ fn statistics_json(statistics: &Statistics) -> Value {
     })
 }
 
+fn catalog_status(catalog_directory: Option<&Path>) -> CatalogStatusResponse {
+    let directory = catalog_directory
+        .map(Path::to_path_buf)
+        .unwrap_or_else(seiza::data_paths::default_catalog_dir);
+    let star_catalog = component_status(seiza::data_paths::star_data(catalog_directory));
+    let blind_index = optional_component_status(seiza::data_paths::blind_index(catalog_directory));
+    let objects = component_status(seiza::data_paths::objects(catalog_directory));
+    let transients = component_status(seiza::data_paths::transients(catalog_directory));
+    let minor_bodies = component_status(seiza::data_paths::minor_bodies(catalog_directory));
+    CatalogStatusResponse {
+        directory: directory.to_string_lossy().into_owned(),
+        ready_for_solving: star_catalog.available && blind_index.available,
+        ready_for_overlays: objects.available && transients.available && minor_bodies.available,
+        star_catalog,
+        blind_index,
+        objects,
+        transients,
+        minor_bodies,
+    }
+}
+
+fn component_status<E: std::fmt::Display>(result: Result<PathBuf, E>) -> CatalogComponentStatus {
+    match result {
+        Ok(path) => CatalogComponentStatus {
+            available: true,
+            path: Some(path.to_string_lossy().into_owned()),
+        },
+        Err(_) => CatalogComponentStatus {
+            available: false,
+            path: None,
+        },
+    }
+}
+
+fn optional_component_status<E: std::fmt::Display>(
+    result: Result<Option<PathBuf>, E>,
+) -> CatalogComponentStatus {
+    match result {
+        Ok(Some(path)) => CatalogComponentStatus {
+            available: true,
+            path: Some(path.to_string_lossy().into_owned()),
+        },
+        Ok(None) | Err(_) => CatalogComponentStatus {
+            available: false,
+            path: None,
+        },
+    }
+}
+
+fn run_catalog_setup(
+    catalog_directory: Option<&Path>,
+    preset: CatalogSetupPreset,
+    reporter: CatalogSetupReporter,
+) -> Result<(), String> {
+    let output = catalog_directory
+        .map(Path::to_path_buf)
+        .unwrap_or_else(seiza::data_paths::default_catalog_dir);
+    reporter.simple(
+        "preparing",
+        format!("Preparing catalog setup in {}", output.display()),
+    );
+    let selection = preset.selection()?;
+    let manager = CatalogManager::builder()
+        .policy(CachePolicy::ForceRefresh)
+        .build()
+        .map_err(|error| error.to_string())?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| format!("failed to start the catalog download runtime: {error}"))?;
+    let workflow_reporter = reporter.clone();
+    let setup_output = output.clone();
+    runtime
+        .block_on(async move {
+            let download_reporter = workflow_reporter.clone();
+            let bundle = manager
+                .ensure_with(&selection, move |event| {
+                    download_reporter.download_event(event)
+                })
+                .await?;
+            let verify_reporter = workflow_reporter.clone();
+            bundle
+                .verify_with(move |event| verify_reporter.download_event(event))
+                .await?;
+            let install_reporter = workflow_reporter;
+            bundle
+                .materialize_with(&setup_output, move |event| {
+                    install_reporter.download_event(event)
+                })
+                .await?;
+            Ok::<(), seiza::downloads::Error>(())
+        })
+        .map_err(|error| error.to_string())?;
+    reporter.report(CatalogSetupProgressResponse {
+        phase: "complete",
+        message: format!("Catalogs are ready in {}", output.display()),
+        file_name: None,
+        files_completed: reporter.files_total,
+        files_total: reporter.files_total,
+        bytes_completed: None,
+        bytes_total: None,
+        written_bytes: None,
+    });
+    Ok(())
+}
+
 fn required_path(value: *const c_char, name: &str) -> Result<PathBuf, String> {
     optional_path(value)?.ok_or_else(|| format!("{name} is required"))
 }
@@ -1331,6 +1729,91 @@ mod tests {
         assert_eq!(RgbStretchMode::from_raw(1), Ok(RgbStretchMode::LinkedAuto));
         assert_eq!(RgbStretchMode::from_raw(2), Ok(RgbStretchMode::Linear));
         assert!(RgbStretchMode::from_raw(3).is_err());
+    }
+
+    #[test]
+    fn catalog_setup_presets_include_solver_and_overlay_data() {
+        let standard = CatalogSetupPreset::StandardBlind.datasets();
+        assert!(standard.contains(&Dataset::StarsDeepGaia17));
+        assert!(standard.contains(&Dataset::BlindGaia16));
+        assert!(standard.contains(&Dataset::Objects));
+        assert!(standard.contains(&Dataset::Transients));
+        assert!(standard.contains(&Dataset::MinorBodies));
+
+        let deepest = CatalogSetupPreset::DeepestBlind.datasets();
+        assert!(deepest.contains(&Dataset::StarsDeepGaia20));
+        assert!(!deepest.contains(&Dataset::StarsDeepGaia17));
+
+        let all = CatalogSetupPreset::All.datasets();
+        assert!(all.len() > standard.len());
+        assert!(all.contains(&Dataset::StarsLiteTycho2Identifiers));
+    }
+
+    #[test]
+    fn catalog_status_requires_a_star_catalog_and_blind_index() {
+        let directory = tempfile::tempdir().unwrap();
+        for name in [
+            "stars-deep-gaia17.bin",
+            "objects.bin",
+            "transients.bin",
+            "minor-bodies.bin",
+        ] {
+            std::fs::write(directory.path().join(name), []).unwrap();
+        }
+
+        let incomplete = catalog_status(Some(directory.path()));
+        assert!(!incomplete.ready_for_solving);
+        assert!(incomplete.ready_for_overlays);
+
+        std::fs::write(directory.path().join("blind-gaia16.idx"), []).unwrap();
+        let ready = catalog_status(Some(directory.path()));
+        assert!(ready.ready_for_solving);
+        assert!(ready.ready_for_overlays);
+        assert!(
+            ready
+                .star_catalog
+                .path
+                .unwrap()
+                .ends_with("stars-deep-gaia17.bin")
+        );
+    }
+
+    #[test]
+    fn catalog_setup_translates_upstream_install_progress() {
+        unsafe extern "C" fn capture(json: *const c_char, context: *mut c_void) {
+            let json = unsafe { CStr::from_ptr(json) }.to_str().unwrap();
+            let events = unsafe { &*context.cast::<std::sync::Mutex<Vec<Value>>>() };
+            events
+                .lock()
+                .unwrap()
+                .push(serde_json::from_str(json).unwrap());
+        }
+
+        let events = std::sync::Mutex::new(Vec::<Value>::new());
+        let reporter = CatalogSetupReporter {
+            callback: Some(capture),
+            context: (&events as *const std::sync::Mutex<Vec<Value>>) as usize,
+            files_total: 2,
+            installed_files: Arc::new(AtomicUsize::new(0)),
+        };
+        reporter.download_event(DownloadEvent::Verifying {
+            name: "objects.bin".into(),
+        });
+        reporter.download_event(DownloadEvent::Installing {
+            name: "objects.bin".into(),
+            path: PathBuf::from("objects.bin"),
+        });
+        reporter.download_event(DownloadEvent::InstallComplete {
+            name: "objects.bin".into(),
+            path: PathBuf::from("objects.bin"),
+        });
+
+        let events = events.lock().unwrap();
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0]["phase"], "verifying");
+        assert_eq!(events[0]["message"], "Verifying SHA-256 for objects.bin");
+        assert_eq!(events[1]["phase"], "installing");
+        assert_eq!(events[2]["filesCompleted"], 1);
     }
 
     #[test]

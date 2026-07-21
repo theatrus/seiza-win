@@ -36,7 +36,7 @@ jobs:
         run: .\scripts\build-rust.ps1 -Test
 
       - name: Restore WinUI app
-        run: dotnet restore Seiza.slnx -r win-x64
+        run: dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
 
-      - name: Build WinUI app
-        run: dotnet build Seiza.slnx --no-restore
+      - name: Build WinUI app (Release)
+        run: dotnet build Seiza.slnx -c Release --no-restore

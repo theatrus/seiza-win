@@ -10,11 +10,13 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-seiza = "0.11.2"
-seiza-fits = "0.1.6"
+# Keep shared Seiza workspace crates on the same reviewed upstream commit.
+seiza = { git = "https://github.com/theatrus/seiza.git", rev = "755e712b958447686cd05fc91c6925d0ae106854", features = ["downloads"] }
+seiza-fits = { git = "https://github.com/theatrus/seiza.git", rev = "755e712b958447686cd05fc91c6925d0ae106854" }
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tokio = { version = "1", features = ["net", "rt", "time"] }
 
 [dev-dependencies]
 tempfile = "3"

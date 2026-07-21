@@ -89,6 +89,9 @@ public sealed partial class MainPage : Page, IDisposable
     private void ZoomOut_Click(object sender, RoutedEventArgs e) =>
         ZoomAt(new Vector2((float)ImageCanvas.ActualWidth / 2, (float)ImageCanvas.ActualHeight / 2), 0.8f);
 
+    private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
+        App.ShowCatalogSettings();
+
     private async Task OpenImageAndDiscoverSiblingsAsync(string path)
     {
         IReadOnlyList<string> siblings = [path];

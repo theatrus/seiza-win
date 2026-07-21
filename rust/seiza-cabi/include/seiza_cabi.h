@@ -10,8 +10,20 @@ extern "C" {
 #endif
 
 typedef struct SeizaRenderedImage SeizaRenderedImage;
+typedef void (*SeizaCatalogSetupProgressCallback)(const char *json, void *context);
 
 const char *seiza_core_version(void);
+
+char *seiza_catalog_status_json(
+    const char *catalog_directory,
+    char **error_out);
+
+bool seiza_catalog_setup(
+    const char *catalog_directory,
+    uint32_t preset,
+    SeizaCatalogSetupProgressCallback progress,
+    void *context,
+    char **error_out);
 
 SeizaRenderedImage *seiza_rendered_image_open(
     const char *path,
