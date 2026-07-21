@@ -1,9 +1,7 @@
 use image::DynamicImage;
 use seiza::blind::{BlindIndex, BlindParams, solve_blind};
 use seiza::catalog::{StarCatalog, tiles::TileCatalog};
-use seiza::downloads::{
-    CachePolicy, CatalogBundle, CatalogManager, CatalogSet, Dataset, DownloadEvent,
-};
+use seiza::downloads::{CachePolicy, CatalogManager, CatalogSet, Dataset, DownloadEvent};
 use seiza::minor_bodies::{MinorBodyCatalog, MinorBodyKind};
 use seiza::objects::{
     GeometryData, GeometryQuality, GeometryRole, ObjectCatalog, ObjectGeometry, ObjectKind,
@@ -14,21 +12,18 @@ use seiza::{DetectBackend, DetectConfig, detect_stars, detect_stars_luma_f32};
 use seiza_fits::{FitsImage, HeaderValue, RgbImage16, Statistics, StretchParams};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
-use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
 use std::ffi::{CStr, CString, c_char, c_void};
-use std::fs::{self, File, OpenOptions};
-use std::io::{BufReader, BufWriter, Read, Write};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::ptr;
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::{
+    Arc,
+    atomic::{AtomicUsize, Ordering},
+};
 use std::time::Instant;
 
 static VERSION: &[u8] = concat!(env!("CARGO_PKG_VERSION"), "\0").as_bytes();
-const COPY_BUFFER_BYTES: usize = 1024 * 1024;
-const PROGRESS_INTERVAL_BYTES: u64 = 16 * 1024 * 1024;
-static SETUP_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
 
 pub type SeizaCatalogSetupProgressCallback =
     Option<unsafe extern "C" fn(*const c_char, *mut c_void)>;
@@ -124,11 +119,12 @@ struct CatalogSetupProgressResponse {
     written_bytes: Option<u64>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone)]
 struct CatalogSetupReporter {
     callback: SeizaCatalogSetupProgressCallback,
     context: usize,
     files_total: usize,
+    installed_files: Arc<AtomicUsize>,
 }
 
 impl CatalogSetupReporter {
@@ -214,6 +210,39 @@ impl CatalogSetupReporter {
                     message: format!("Downloaded {name}"),
                     file_name: Some(name),
                     files_completed: 0,
+                    files_total: self.files_total,
+                    bytes_completed: None,
+                    bytes_total: None,
+                    written_bytes: None,
+                })
+            }
+            DownloadEvent::Verifying { name } => self.report(CatalogSetupProgressResponse {
+                phase: "verifying",
+                message: format!("Verifying SHA-256 for {name}"),
+                file_name: Some(name),
+                files_completed: 0,
+                files_total: self.files_total,
+                bytes_completed: None,
+                bytes_total: None,
+                written_bytes: None,
+            }),
+            DownloadEvent::Installing { name, .. } => self.report(CatalogSetupProgressResponse {
+                phase: "installing",
+                message: format!("Installing {name}"),
+                file_name: Some(name),
+                files_completed: self.installed_files.load(Ordering::Relaxed),
+                files_total: self.files_total,
+                bytes_completed: None,
+                bytes_total: None,
+                written_bytes: None,
+            }),
+            DownloadEvent::InstallComplete { name, .. } => {
+                let completed = self.installed_files.fetch_add(1, Ordering::Relaxed) + 1;
+                self.report(CatalogSetupProgressResponse {
+                    phase: "installing",
+                    message: format!("Installed {name}"),
+                    file_name: Some(name),
+                    files_completed: completed,
                     files_total: self.files_total,
                     bytes_completed: None,
                     bytes_total: None,
@@ -410,6 +439,7 @@ pub unsafe extern "C" fn seiza_catalog_setup(
                 callback: progress,
                 context: context as usize,
                 files_total: preset.datasets().len(),
+                installed_files: Arc::new(AtomicUsize::new(0)),
             },
         )
     })
@@ -1494,16 +1524,29 @@ fn run_catalog_setup(
         .enable_all()
         .build()
         .map_err(|error| format!("failed to start the catalog download runtime: {error}"))?;
-    let download_reporter = reporter;
-    let bundle = runtime.block_on(async move {
-        manager
-            .ensure_with(&selection, move |event| {
-                download_reporter.download_event(event)
-            })
-            .await
-    });
-    let bundle = bundle.map_err(|error| error.to_string())?;
-    materialize_catalog_bundle(&bundle, &output, reporter)?;
+    let workflow_reporter = reporter.clone();
+    let setup_output = output.clone();
+    runtime
+        .block_on(async move {
+            let download_reporter = workflow_reporter.clone();
+            let bundle = manager
+                .ensure_with(&selection, move |event| {
+                    download_reporter.download_event(event)
+                })
+                .await?;
+            let verify_reporter = workflow_reporter.clone();
+            bundle
+                .verify_with(move |event| verify_reporter.download_event(event))
+                .await?;
+            let install_reporter = workflow_reporter;
+            bundle
+                .materialize_with(&setup_output, move |event| {
+                    install_reporter.download_event(event)
+                })
+                .await?;
+            Ok::<(), seiza::downloads::Error>(())
+        })
+        .map_err(|error| error.to_string())?;
     reporter.report(CatalogSetupProgressResponse {
         phase: "complete",
         message: format!("Catalogs are ready in {}", output.display()),
@@ -1515,222 +1558,6 @@ fn run_catalog_setup(
         written_bytes: None,
     });
     Ok(())
-}
-
-fn materialize_catalog_bundle(
-    bundle: &CatalogBundle,
-    output: &Path,
-    reporter: CatalogSetupReporter,
-) -> Result<Vec<PathBuf>, String> {
-    fs::create_dir_all(output)
-        .map_err(|error| format!("failed to create {}: {error}", output.display()))?;
-    let mut installed = Vec::with_capacity(bundle.artifacts().len());
-
-    for (index, artifact) in bundle.artifacts().enumerate() {
-        let target = output.join(&artifact.name);
-        let completed_before = index;
-        if existing_file_matches(
-            &target,
-            artifact.bytes,
-            &artifact.sha256,
-            |completed, total| {
-                reporter.report(CatalogSetupProgressResponse {
-                    phase: "verifying",
-                    message: format!("Verifying existing {}", artifact.name),
-                    file_name: Some(artifact.name.clone()),
-                    files_completed: completed_before,
-                    files_total: reporter.files_total,
-                    bytes_completed: Some(completed),
-                    bytes_total: Some(total),
-                    written_bytes: None,
-                });
-            },
-        )? {
-            reporter.report(CatalogSetupProgressResponse {
-                phase: "installing",
-                message: format!("{} is already installed and verified", artifact.name),
-                file_name: Some(artifact.name.clone()),
-                files_completed: index + 1,
-                files_total: reporter.files_total,
-                bytes_completed: Some(artifact.bytes),
-                bytes_total: Some(artifact.bytes),
-                written_bytes: Some(artifact.bytes),
-            });
-            installed.push(target);
-            continue;
-        }
-
-        let temp = setup_temp_path(output, &artifact.name);
-        let copy = copy_verified_file(
-            &artifact.path,
-            &temp,
-            artifact.bytes,
-            &artifact.sha256,
-            |completed, total| {
-                reporter.report(CatalogSetupProgressResponse {
-                    phase: "verifying",
-                    message: format!("Verifying and installing {}", artifact.name),
-                    file_name: Some(artifact.name.clone()),
-                    files_completed: completed_before,
-                    files_total: reporter.files_total,
-                    bytes_completed: Some(completed),
-                    bytes_total: Some(total),
-                    written_bytes: Some(completed),
-                });
-            },
-        );
-        if let Err(error) = copy {
-            let _ = fs::remove_file(&temp);
-            return Err(error);
-        }
-        if let Err(error) = fs::rename(&temp, &target) {
-            let _ = fs::remove_file(&temp);
-            return Err(format!(
-                "failed to install {} at {}: {error}",
-                artifact.name,
-                target.display()
-            ));
-        }
-        reporter.report(CatalogSetupProgressResponse {
-            phase: "installing",
-            message: format!("Installed {}", artifact.name),
-            file_name: Some(artifact.name.clone()),
-            files_completed: index + 1,
-            files_total: reporter.files_total,
-            bytes_completed: Some(artifact.bytes),
-            bytes_total: Some(artifact.bytes),
-            written_bytes: Some(artifact.bytes),
-        });
-        installed.push(target);
-    }
-    Ok(installed)
-}
-
-fn setup_temp_path(output: &Path, name: &str) -> PathBuf {
-    let sequence = SETUP_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
-    output.join(format!(".{name}.part-{}-{sequence}", std::process::id()))
-}
-
-fn existing_file_matches(
-    path: &Path,
-    expected_bytes: u64,
-    expected_sha256: &str,
-    mut report: impl FnMut(u64, u64),
-) -> Result<bool, String> {
-    let metadata = match fs::metadata(path) {
-        Ok(metadata) => metadata,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
-        Err(error) => return Err(format!("failed to inspect {}: {error}", path.display())),
-    };
-    if !metadata.is_file() || metadata.len() != expected_bytes {
-        return Ok(false);
-    }
-    let input =
-        File::open(path).map_err(|error| format!("failed to open {}: {error}", path.display()))?;
-    let actual = hash_reader(BufReader::new(input), expected_bytes, &mut report)?;
-    Ok(actual == expected_sha256)
-}
-
-fn copy_verified_file(
-    source: &Path,
-    target: &Path,
-    expected_bytes: u64,
-    expected_sha256: &str,
-    mut report: impl FnMut(u64, u64),
-) -> Result<(), String> {
-    let input = File::open(source)
-        .map_err(|error| format!("failed to open {}: {error}", source.display()))?;
-    let metadata = input
-        .metadata()
-        .map_err(|error| format!("failed to inspect {}: {error}", source.display()))?;
-    if metadata.len() != expected_bytes {
-        return Err(format!(
-            "{} has {} bytes; expected {expected_bytes}",
-            source.display(),
-            metadata.len()
-        ));
-    }
-    let output = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(target)
-        .map_err(|error| format!("failed to create {}: {error}", target.display()))?;
-    let mut input = BufReader::new(input);
-    let mut output = BufWriter::new(output);
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0u8; COPY_BUFFER_BYTES];
-    let mut completed = 0u64;
-    let mut last_reported = 0u64;
-    report(0, expected_bytes);
-    loop {
-        let read = input
-            .read(&mut buffer)
-            .map_err(|error| format!("failed to read {}: {error}", source.display()))?;
-        if read == 0 {
-            break;
-        }
-        output
-            .write_all(&buffer[..read])
-            .map_err(|error| format!("failed to write {}: {error}", target.display()))?;
-        hasher.update(&buffer[..read]);
-        completed = completed.saturating_add(read as u64);
-        if completed == expected_bytes
-            || completed.saturating_sub(last_reported) >= PROGRESS_INTERVAL_BYTES
-        {
-            report(completed, expected_bytes);
-            last_reported = completed;
-        }
-    }
-    output
-        .flush()
-        .map_err(|error| format!("failed to flush {}: {error}", target.display()))?;
-    output
-        .get_ref()
-        .sync_all()
-        .map_err(|error| format!("failed to sync {}: {error}", target.display()))?;
-    if completed != expected_bytes {
-        return Err(format!(
-            "{} yielded {completed} bytes; expected {expected_bytes}",
-            source.display()
-        ));
-    }
-    let actual = format!("{:x}", hasher.finalize());
-    if actual != expected_sha256 {
-        return Err(format!(
-            "SHA-256 verification failed for {}: expected {expected_sha256}, got {actual}",
-            source.display()
-        ));
-    }
-    Ok(())
-}
-
-fn hash_reader(
-    mut input: impl Read,
-    expected_bytes: u64,
-    mut report: impl FnMut(u64, u64),
-) -> Result<String, String> {
-    let mut hasher = Sha256::new();
-    let mut buffer = vec![0u8; COPY_BUFFER_BYTES];
-    let mut completed = 0u64;
-    let mut last_reported = 0u64;
-    report(0, expected_bytes);
-    loop {
-        let read = input
-            .read(&mut buffer)
-            .map_err(|error| format!("failed while hashing a catalog: {error}"))?;
-        if read == 0 {
-            break;
-        }
-        hasher.update(&buffer[..read]);
-        completed = completed.saturating_add(read as u64);
-        if completed == expected_bytes
-            || completed.saturating_sub(last_reported) >= PROGRESS_INTERVAL_BYTES
-        {
-            report(completed, expected_bytes);
-            last_reported = completed;
-        }
-    }
-    Ok(format!("{:x}", hasher.finalize()))
 }
 
 fn required_path(value: *const c_char, name: &str) -> Result<PathBuf, String> {
@@ -1952,34 +1779,41 @@ mod tests {
     }
 
     #[test]
-    fn catalog_install_copy_reports_hash_verification_progress() {
-        let directory = tempfile::tempdir().unwrap();
-        let source = directory.path().join("cache.bin");
-        let target = directory.path().join("installed.bin");
-        let bytes = vec![0x5a; COPY_BUFFER_BYTES + 17];
-        std::fs::write(&source, &bytes).unwrap();
-        let expected_sha256 = format!("{:x}", Sha256::digest(&bytes));
-        let mut progress = Vec::new();
-
-        copy_verified_file(
-            &source,
-            &target,
-            bytes.len() as u64,
-            &expected_sha256,
-            |completed, total| progress.push((completed, total)),
-        )
-        .unwrap();
-
-        assert_eq!(std::fs::read(&target).unwrap(), bytes);
-        assert_eq!(progress.first(), Some(&(0, bytes.len() as u64)));
-        assert_eq!(
-            progress.last(),
-            Some(&(bytes.len() as u64, bytes.len() as u64))
-        );
-        assert!(
-            existing_file_matches(&target, bytes.len() as u64, &expected_sha256, |_, _| {})
+    fn catalog_setup_translates_upstream_install_progress() {
+        unsafe extern "C" fn capture(json: *const c_char, context: *mut c_void) {
+            let json = unsafe { CStr::from_ptr(json) }.to_str().unwrap();
+            let events = unsafe { &*context.cast::<std::sync::Mutex<Vec<Value>>>() };
+            events
+                .lock()
                 .unwrap()
-        );
+                .push(serde_json::from_str(json).unwrap());
+        }
+
+        let events = std::sync::Mutex::new(Vec::<Value>::new());
+        let reporter = CatalogSetupReporter {
+            callback: Some(capture),
+            context: (&events as *const std::sync::Mutex<Vec<Value>>) as usize,
+            files_total: 2,
+            installed_files: Arc::new(AtomicUsize::new(0)),
+        };
+        reporter.download_event(DownloadEvent::Verifying {
+            name: "objects.bin".into(),
+        });
+        reporter.download_event(DownloadEvent::Installing {
+            name: "objects.bin".into(),
+            path: PathBuf::from("objects.bin"),
+        });
+        reporter.download_event(DownloadEvent::InstallComplete {
+            name: "objects.bin".into(),
+            path: PathBuf::from("objects.bin"),
+        });
+
+        let events = events.lock().unwrap();
+        assert_eq!(events.len(), 3);
+        assert_eq!(events[0]["phase"], "verifying");
+        assert_eq!(events[0]["message"], "Verifying SHA-256 for objects.bin");
+        assert_eq!(events[1]["phase"], "installing");
+        assert_eq!(events[2]["filesCompleted"], 1);
     }
 
     #[test]

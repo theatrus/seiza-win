@@ -33,6 +33,7 @@ loading, and plate solving because Explorer loads it out of process.
 6. Pixel buffers cross through opaque handles; versioned JSON carries metadata and solve records.
 7. The process hosts multiple document windows and redirects new file activations into the existing process.
 8. Distribution is a signed, self-contained MSIX with FITS file association.
+9. Shared Seiza workspace crates are pinned to one reviewed upstream Git commit; dependency updates move all pins together and regenerate `Cargo.lock`.
 
 ## Performance rules
 
