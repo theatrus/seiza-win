@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentDialog
+    x:Class="Seiza.App.AboutDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    CloseButtonText="Close"
+    DefaultButton="Close"
+    Title="About Seiza">
+
+    <StackPanel MinWidth="380" MaxWidth="480" Spacing="20">
+        <StackPanel Orientation="Horizontal" Spacing="16">
+            <Image
+                Width="64"
+                Height="64"
+                Source="Assets/Square150x150Logo.scale-200.png" />
+            <StackPanel VerticalAlignment="Center" Spacing="2">
+                <TextBlock
+                    Style="{StaticResource TitleTextBlockStyle}"
+                    Text="Seiza for Windows" />
+                <TextBlock
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="{x:Bind AppVersionText, Mode=OneTime}" />
+            </StackPanel>
+        </StackPanel>
+
+        <TextBlock
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            Text="A fast, native astronomy image viewer and plate-solving app powered by the shared Seiza Rust core."
+            TextWrapping="Wrap" />
+
+        <Border
+            Padding="16"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            CornerRadius="8">
+            <Grid ColumnSpacing="20" RowSpacing="10">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock
+                    FontWeight="SemiBold"
+                    Text="Seiza version" />
+                <TextBlock
+                    Grid.Column="1"
+                    IsTextSelectionEnabled="True"
+                    Text="{x:Bind SeizaVersion, Mode=OneTime}" />
+
+                <TextBlock
+                    Grid.Row="1"
+                    FontWeight="SemiBold"
+                    Text="Source commit" />
+                <TextBlock
+                    Grid.Row="1"
+                    Grid.Column="1"
+                    FontFamily="Consolas"
+                    IsTextSelectionEnabled="True"
+                    Text="{x:Bind SeizaCommit, Mode=OneTime}"
+                    TextWrapping="WrapWholeWords" />
+
+                <HyperlinkButton
+                    Grid.Row="2"
+                    Grid.Column="1"
+                    Padding="0"
+                    Content="View this commit on GitHub"
+                    NavigateUri="{x:Bind SeizaCommitUri, Mode=OneTime}" />
+            </Grid>
+        </Border>
+
+        <TextBlock
+            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+            Text="Seiza is open source under the Apache License 2.0."
+            TextWrapping="Wrap" />
+    </StackPanel>
+</ContentDialog>

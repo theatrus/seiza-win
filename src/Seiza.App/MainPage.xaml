@@ -105,11 +105,91 @@
             <AppBarSeparator />
 
             <AppBarButton
+                x:Name="SolveButton"
+                Click="Solve_Click"
+                IsEnabled="False"
+                Label="Solve"
+                ToolTipService.ToolTip="Plate solve the current image">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE9D9;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton
+                x:Name="OverlayButton"
+                IsEnabled="False"
+                Label="Overlays"
+                ToolTipService.ToolTip="Choose visible plate-solve overlays">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE81E;" />
+                </AppBarButton.Icon>
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <ToggleMenuFlyoutItem x:Name="DeepSkyOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Deep-sky objects" />
+                        <ToggleMenuFlyoutItem x:Name="NamedStarsOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Named stars" />
+                        <ToggleMenuFlyoutItem x:Name="TransientsOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Current transients" />
+                        <ToggleMenuFlyoutItem x:Name="HistoricalTransientsOverlayItem" Click="OverlayToggle_Click" Text="Historical transients" />
+                        <ToggleMenuFlyoutItem x:Name="MinorBodiesOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Solar-system bodies" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutSubItem Text="Deep-sky catalogs">
+                            <ToggleMenuFlyoutItem x:Name="MessierCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="Messier" />
+                            <ToggleMenuFlyoutItem x:Name="NgcCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="NGC" />
+                            <ToggleMenuFlyoutItem x:Name="IcCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="IC" />
+                            <ToggleMenuFlyoutItem x:Name="SharplessVdbCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="Sharpless / vdB" />
+                            <ToggleMenuFlyoutItem x:Name="LbnCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="LBN" />
+                            <ToggleMenuFlyoutItem x:Name="CederbladCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="Cederblad" />
+                            <ToggleMenuFlyoutItem x:Name="DarkNebulaeCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="Dark nebulae" />
+                            <ToggleMenuFlyoutItem x:Name="SupernovaRemnantsCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="Supernova remnants" />
+                            <ToggleMenuFlyoutItem x:Name="UgcCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="UGC" />
+                            <ToggleMenuFlyoutItem x:Name="PgcCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="PGC" />
+                            <ToggleMenuFlyoutItem x:Name="OtherCatalogItem" Click="CatalogToggle_Click" IsChecked="True" Text="Other catalogs" />
+                        </MenuFlyoutSubItem>
+                        <MenuFlyoutSeparator />
+                        <ToggleMenuFlyoutItem x:Name="CatalogOutlinesOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Detailed catalog outlines" />
+                        <ToggleMenuFlyoutItem x:Name="ObjectLabelsOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Object labels" />
+                        <ToggleMenuFlyoutItem x:Name="FieldStarsOverlayItem" Click="OverlayToggle_Click" Text="Field stars" />
+                        <ToggleMenuFlyoutItem x:Name="CoordinateGridOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="RA / Dec grid" />
+                        <ToggleMenuFlyoutItem x:Name="FieldCenterOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Field center" />
+                        <ToggleMenuFlyoutItem x:Name="DetectedStarsOverlayItem" Click="OverlayToggle_Click" Text="Detected stars" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem Click="HideAllOverlays_Click" Text="Hide all overlays" />
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
+            </AppBarButton>
+            <AppBarButton
+                x:Name="ExportButton"
+                IsEnabled="False"
+                Label="Export"
+                ToolTipService.ToolTip="Export the stretched image">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xEDE1;" />
+                </AppBarButton.Icon>
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem x:Name="ExportImageItem" Click="ExportImage_Click" Text="Export image..." />
+                        <MenuFlyoutItem x:Name="ExportOverlaysItem" Click="ExportOverlays_Click" IsEnabled="False" Text="Export with visible overlays..." />
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
+            </AppBarButton>
+
+            <AppBarSeparator />
+
+            <AppBarButton
                 Click="CatalogSettings_Click"
                 Label="Catalogs"
                 ToolTipService.ToolTip="Catalog settings">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE713;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarSeparator />
+
+            <AppBarButton
+                Click="About_Click"
+                Label="About"
+                ToolTipService.ToolTip="About Seiza">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE946;" />
                 </AppBarButton.Icon>
             </AppBarButton>
         </CommandBar>
@@ -179,6 +259,10 @@
                 </StackPanel>
             </Border>
 
+            <StackPanel
+                HorizontalAlignment="Stretch"
+                VerticalAlignment="Top"
+                Spacing="8">
             <InfoBar
                 x:Name="ErrorInfoBar"
                 Margin="16"
@@ -189,6 +273,45 @@
                 Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
                 Severity="Error"
                 Title="Couldn’t open image" />
+                <InfoBar
+                    x:Name="SolveErrorInfoBar"
+                    Margin="16,0,16,0"
+                    IsClosable="True"
+                    IsOpen="False"
+                    Message="{x:Bind ViewModel.SolveErrorMessage, Mode=OneWay}"
+                    Severity="Error"
+                    Title="Plate solve failed">
+                    <InfoBar.ActionButton>
+                        <Button
+                            x:Name="SolveCatalogSettingsButton"
+                            Click="CatalogSettings_Click"
+                            Content="Open Catalog Settings"
+                            Visibility="Collapsed" />
+                    </InfoBar.ActionButton>
+                </InfoBar>
+            </StackPanel>
+
+            <Border
+                x:Name="SolveSummaryCard"
+                MinWidth="310"
+                MaxWidth="480"
+                Margin="16"
+                Padding="14,11"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Bottom"
+                Background="#D9181C25"
+                BorderBrush="#5AFFFFFF"
+                BorderThickness="1"
+                CornerRadius="8"
+                Visibility="Collapsed">
+                <StackPanel Spacing="3">
+                    <TextBlock FontWeight="SemiBold" Text="{x:Bind ViewModel.SolveTitleText, Mode=OneWay}" />
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.SolveCoordinatesText, Mode=OneWay}" />
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.SolveQualityText, Mode=OneWay}" />
+                    <TextBlock Foreground="{ThemeResource TextFillColorTertiaryBrush}" Text="{x:Bind ViewModel.SolveOverlayText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock Foreground="#FFF2C66D" Text="{x:Bind ViewModel.SolveAvailabilityText, Mode=OneWay}" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
         </Grid>
 
         <Grid

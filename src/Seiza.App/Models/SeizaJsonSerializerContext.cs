@@ -6,6 +6,7 @@ namespace Seiza.App.Models;
 [JsonSerializable(typeof(ImageMetadata))]
 [JsonSerializable(typeof(CatalogStatus))]
 [JsonSerializable(typeof(CatalogSetupProgress))]
+[JsonSerializable(typeof(SolveResult))]
 internal sealed partial class SeizaJsonSerializerContext : JsonSerializerContext
 {
 }

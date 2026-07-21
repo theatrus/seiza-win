@@ -2,7 +2,9 @@
 
 `seiza-cabi.dll` deliberately exposes a small C ABI rather than Rust symbols.
 The same API is statically linked by the macOS app and dynamically loaded by
-the Windows app.
+the Windows app. Its implementation lives in the upstream Seiza workspace;
+this repository pins that crate by Git commit and builds it directly rather
+than maintaining a Windows fork.
 
 Rules:
 
@@ -19,3 +21,8 @@ The Windows interop layer uses source-generated `LibraryImport` declarations,
 an unmanaged progress trampoline, and `SafeHandle` wrappers. Raw ownership is
 contained in the service boundary and is never exposed to view models or
 controls.
+
+`scripts/build-rust.ps1` resolves the pinned package with `cargo metadata`,
+builds the upstream `seiza-cabi` workspace member, and emits
+`seiza-build-info.json` beside the DLL. The app packages that file so About can
+show the exact native crate version and 40-character source commit.

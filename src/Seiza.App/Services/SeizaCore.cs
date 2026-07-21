@@ -90,6 +90,41 @@ internal static unsafe class SeizaCore
         }
     }
 
+    public static SolveResult Solve(
+        string path,
+        string? catalogDirectory,
+        double minimumScaleArcsecPerPixel = 0.1,
+        double maximumScaleArcsecPerPixel = 20.0,
+        byte sipOrder = 0)
+    {
+        nint error = 0;
+        nint json = NativeMethods.SolveImageJson(
+            path,
+            catalogDirectory,
+            minimumScaleArcsecPerPixel,
+            maximumScaleArcsecPerPixel,
+            sipOrder,
+            out error);
+        if (json == 0)
+        {
+            throw ReadError(error, "The Seiza native core could not solve the image.");
+        }
+
+        try
+        {
+            string value = Marshal.PtrToStringUTF8(json)
+                ?? throw new SeizaCoreException("The Seiza native core returned an invalid solve result.");
+            return JsonSerializer.Deserialize(
+                value,
+                SeizaJsonSerializerContext.Default.SolveResult)
+                ?? throw new SeizaCoreException("The Seiza native core returned an invalid solve result.");
+        }
+        finally
+        {
+            NativeMethods.FreeString(json);
+        }
+    }
+
     public static void SetupCatalog(
         string? catalogDirectory,
         CatalogSetupPreset preset,
