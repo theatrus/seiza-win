@@ -1,0 +1,9 @@
+[package]
+name = "seiza-cabi-pin"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.89"
+publish = false
+
+[dependencies]
+seiza-cabi-upstream = { package = "seiza-cabi", git = "https://github.com/theatrus/seiza.git", rev = "82b7cfeed5e277994cbae46bab60ab6333bbdafd" }

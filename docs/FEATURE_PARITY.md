@@ -70,7 +70,7 @@ status/setup or an explicitly requested solve.
 | Solve error links to Catalog Settings | Available | **Planned** | Missing data should offer a direct Settings action. |
 | Catalog bundle update discovery and selective datasets | Planned | **Deferred** | Track after first-release catalog parity. |
 
-The Windows C ABI now includes `seiza_catalog_status_json`,
+The shared upstream C ABI includes `seiza_catalog_status_json`,
 `seiza_catalog_setup`, the three preset values, and the progress callback
 contract while retaining Windows BGRA render output.
 
@@ -122,6 +122,7 @@ means the Windows shell still needs C# models, layer state, and Win2D drawing.
 | Signed distributable | Signed/notarized universal DMG | **Planned** | Signed self-contained x64 MSIX; ARM64 follows parity. |
 | Release automation | macOS release workflows | **Partial** | CI builds Debug; add signed packaging, artifacts, tags, and protected release environment. |
 | Native accessibility | SwiftUI/AppKit accessibility | **Partial** | Core controls are named; add automated coverage for inspector, Settings, and overlay controls. |
+| About and native-core provenance | About panel | **Complete** | Reports the Windows app version plus the exact Seiza crate version and 40-character source commit resolved by Cargo. |
 
 ## Shared future roadmap
 

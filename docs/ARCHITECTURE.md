@@ -14,6 +14,7 @@ Seiza.App (WinUI 3 / C#)
     `-- generated P/Invoke bindings with SafeHandle ownership
                          |
                          `-- C ABI -- seiza-cabi.dll (Rust)
+                                           |-- built from the pinned upstream seiza-cabi crate
                                            |-- seiza-fits
                                            |-- image
                                            `-- seiza
@@ -33,7 +34,8 @@ loading, and plate solving because Explorer loads it out of process.
 6. Pixel buffers cross through opaque handles; versioned JSON carries metadata and solve records.
 7. The process hosts multiple document windows and redirects new file activations into the existing process.
 8. Distribution is a signed, self-contained MSIX with FITS file association.
-9. Shared Seiza workspace crates are pinned to one reviewed upstream Git commit; dependency updates move all pins together and regenerate `Cargo.lock`.
+9. The Windows app builds the unified upstream `seiza-cabi` crate directly from one reviewed Seiza Git commit; no C ABI implementation is forked in this repository.
+10. The native build emits its Cargo-resolved Seiza version and commit as packaged build metadata, and the About dialog reports both values.
 
 ## Performance rules
 

@@ -112,6 +112,17 @@
                     <FontIcon Glyph="&#xE713;" />
                 </AppBarButton.Icon>
             </AppBarButton>
+
+            <AppBarSeparator />
+
+            <AppBarButton
+                Click="About_Click"
+                Label="About"
+                ToolTipService.ToolTip="About Seiza">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE946;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
         </CommandBar>
 
         <Grid

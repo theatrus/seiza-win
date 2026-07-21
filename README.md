@@ -8,7 +8,7 @@ own image decoding, FITS stretching, metadata, solving, and overlay data.
 
 - WinUI 3, XAML, and C# for windows, controls, accessibility, activation, and settings.
 - Win2D for the GPU-backed image viewport and solve-overlay drawing.
-- `seiza-cabi` as a Rust `cdylib`, with opaque handles for pixels and JSON for evolving records.
+- The unified upstream `seiza-cabi` crate, pinned to an exact Seiza Git commit and built as a Rust `cdylib`.
 - Packaged, self-contained MSIX distribution, initially targeting Windows 11 x64.
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the decisions and component boundaries,
@@ -30,7 +30,8 @@ dotnet build Seiza.slnx
 ```
 
 The .NET build enters the installed Visual Studio developer environment,
-builds `seiza_cabi.dll`, and copies it into the app output automatically.
+builds the pinned upstream `seiza_cabi.dll`, and copies it and its exact
+version/commit metadata into the app output automatically.
 
 ## Current vertical slice
 

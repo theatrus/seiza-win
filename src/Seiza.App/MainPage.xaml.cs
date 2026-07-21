@@ -92,6 +92,15 @@ public sealed partial class MainPage : Page, IDisposable
     private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
         App.ShowCatalogSettings();
 
+    private async void About_Click(object sender, RoutedEventArgs e)
+    {
+        var dialog = new AboutDialog
+        {
+            XamlRoot = XamlRoot,
+        };
+        await dialog.ShowAsync();
+    }
+
     private async Task OpenImageAndDiscoverSiblingsAsync(string path)
     {
         IReadOnlyList<string> siblings = [path];
