@@ -1,0 +1,148 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="Seiza.App.ImageInspector"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:Seiza.App.Models">
+
+    <ScrollViewer
+        HorizontalScrollBarVisibility="Disabled"
+        VerticalScrollBarVisibility="Auto">
+        <StackPanel Padding="16,4,16,20" Spacing="20">
+            <StackPanel Spacing="8">
+                <TextBlock
+                    Style="{StaticResource SubtitleTextBlockStyle}"
+                    Text="Image" />
+                <ItemsRepeater ItemsSource="{x:Bind ImageDetails}">
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="models:InspectorEntry">
+                            <Grid Padding="0,3" ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" MinWidth="96" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind Label}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind Value}"
+                                    TextAlignment="Right"
+                                    TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+            </StackPanel>
+
+            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+            <StackPanel Spacing="8">
+                <TextBlock
+                    Style="{StaticResource SubtitleTextBlockStyle}"
+                    Text="Plate solution" />
+                <TextBlock
+                    x:Name="SolveStateText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    IsTextSelectionEnabled="True"
+                    Text="Not solved"
+                    TextWrapping="Wrap" />
+                <ProgressRing
+                    x:Name="SolveProgressRing"
+                    Width="20"
+                    Height="20"
+                    HorizontalAlignment="Left"
+                    IsActive="False"
+                    Visibility="Collapsed" />
+                <ItemsRepeater ItemsSource="{x:Bind SolveDetails}">
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="models:InspectorEntry">
+                            <Grid Padding="0,3" ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" MinWidth="96" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="{x:Bind Label}" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Right"
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind Value}"
+                                    TextAlignment="Right"
+                                    TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+                <Button
+                    x:Name="CatalogSettingsButton"
+                    Click="CatalogSettings_Click"
+                    Content="Open Catalog Settings"
+                    Visibility="Collapsed" />
+            </StackPanel>
+
+            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+            <StackPanel Spacing="10">
+                <Grid ColumnSpacing="8">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Style="{StaticResource SubtitleTextBlockStyle}"
+                        Text="FITS headers" />
+                    <Button
+                        x:Name="CopyHeadersButton"
+                        Grid.Column="1"
+                        Click="CopyHeaders_Click"
+                        Content="Copy visible"
+                        IsEnabled="False"
+                        ToolTipService.ToolTip="Copy the currently visible FITS headers" />
+                </Grid>
+                <TextBox
+                    x:Name="HeaderSearchBox"
+                    AutomationProperties.Name="Search FITS headers"
+                    Header="Search"
+                    PlaceholderText="Keyword or value"
+                    TextChanged="HeaderSearchBox_TextChanged" />
+                <TextBlock
+                    x:Name="HeadersEmptyText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="No FITS headers"
+                    TextWrapping="Wrap" />
+                <ItemsRepeater x:Name="HeadersRepeater" ItemsSource="{x:Bind VisibleHeaders}">
+                    <ItemsRepeater.ItemTemplate>
+                        <DataTemplate x:DataType="models:InspectorEntry">
+                            <Grid Padding="0,5" ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="112" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock
+                                    FontFamily="Consolas"
+                                    FontSize="12"
+                                    FontWeight="SemiBold"
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind Label}"
+                                    TextTrimming="CharacterEllipsis" />
+                                <TextBlock
+                                    Grid.Column="1"
+                                    FontFamily="Consolas"
+                                    FontSize="12"
+                                    IsTextSelectionEnabled="True"
+                                    Text="{x:Bind Value}"
+                                    TextWrapping="Wrap" />
+                            </Grid>
+                        </DataTemplate>
+                    </ItemsRepeater.ItemTemplate>
+                </ItemsRepeater>
+            </StackPanel>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

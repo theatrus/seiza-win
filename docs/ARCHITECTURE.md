@@ -53,9 +53,10 @@ The detailed status and acceptance criteria live in
 
 1. **Complete:** render FITS and raster files through the Rust DLL into a Win2D canvas, with file/folder opening, navigation, fit, pan, and zoom.
 2. **Complete:** catalog status/setup in the Windows ABI plus native Settings for location, readiness, presets, durable progress, verification, and repair.
-3. Bind the existing solve response, add the explicit Solve workflow, and present solution quality.
-4. Draw the solved overlay scene in Win2D with layer and catalog controls.
-5. Complete inspection, thumbnails/cache, multi-window activation, Explorer integration, signing, and release automation.
+3. **Complete:** bind the solve response, add the explicit Solve workflow, and present solution quality.
+4. **Complete:** draw the solved overlay scene in Win2D with layer and catalog controls.
+5. **In progress:** complete inspection and the RGB display modes, then add thumbnails/cache,
+   multi-window activation, Explorer integration, signing, and release automation.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.

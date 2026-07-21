@@ -8,13 +8,15 @@ internal static class ImageRenderService
 
     public static async Task<RenderedImageData> RenderAsync(
         string path,
+        RgbStretchMode rgbStretchMode = RgbStretchMode.Auto,
         CancellationToken cancellationToken = default)
     {
         await RenderGate.WaitAsync(cancellationToken);
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
-            RenderedImageData rendered = await Task.Run(() => SeizaCore.Render(path));
+            RenderedImageData rendered = await Task.Run(() =>
+                SeizaCore.Render(path, rgbStretchMode: (uint)rgbStretchMode));
             cancellationToken.ThrowIfCancellationRequested();
             return rendered;
         }
