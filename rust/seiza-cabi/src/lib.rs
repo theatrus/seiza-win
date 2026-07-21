@@ -1,6 +1,9 @@
 use image::DynamicImage;
 use seiza::blind::{BlindIndex, BlindParams, solve_blind};
 use seiza::catalog::{StarCatalog, tiles::TileCatalog};
+use seiza::downloads::{
+    CachePolicy, CatalogBundle, CatalogManager, CatalogSet, Dataset, DownloadEvent,
+};
 use seiza::minor_bodies::{MinorBodyCatalog, MinorBodyKind};
 use seiza::objects::{
     GeometryData, GeometryQuality, GeometryRole, ObjectCatalog, ObjectGeometry, ObjectKind,
@@ -11,14 +14,215 @@ use seiza::{DetectBackend, DetectConfig, detect_stars, detect_stars_luma_f32};
 use seiza_fits::{FitsImage, HeaderValue, RgbImage16, Statistics, StretchParams};
 use serde::Serialize;
 use serde_json::{Map, Value, json};
+use sha2::{Digest, Sha256};
 use std::collections::{BTreeMap, HashMap};
-use std::ffi::{CStr, CString, c_char};
+use std::ffi::{CStr, CString, c_char, c_void};
+use std::fs::{self, File, OpenOptions};
+use std::io::{BufReader, BufWriter, Read, Write};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use std::ptr;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::Instant;
 
 static VERSION: &[u8] = concat!(env!("CARGO_PKG_VERSION"), "\0").as_bytes();
+const COPY_BUFFER_BYTES: usize = 1024 * 1024;
+const PROGRESS_INTERVAL_BYTES: u64 = 16 * 1024 * 1024;
+static SETUP_TEMP_SEQUENCE: AtomicU64 = AtomicU64::new(0);
+
+pub type SeizaCatalogSetupProgressCallback =
+    Option<unsafe extern "C" fn(*const c_char, *mut c_void)>;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+enum CatalogSetupPreset {
+    StandardBlind = 0,
+    DeepestBlind = 1,
+    All = 2,
+}
+
+impl CatalogSetupPreset {
+    fn from_raw(value: u32) -> Result<Self, String> {
+        match value {
+            0 => Ok(Self::StandardBlind),
+            1 => Ok(Self::DeepestBlind),
+            2 => Ok(Self::All),
+            _ => Err(format!("unsupported catalog setup preset: {value}")),
+        }
+    }
+
+    fn datasets(self) -> &'static [Dataset] {
+        match self {
+            Self::StandardBlind => &[
+                Dataset::Objects,
+                Dataset::MinorBodies,
+                Dataset::Transients,
+                Dataset::StarsDeepGaia17,
+                Dataset::BlindGaia16,
+            ],
+            Self::DeepestBlind => &[
+                Dataset::Objects,
+                Dataset::MinorBodies,
+                Dataset::Transients,
+                Dataset::StarsDeepGaia20,
+                Dataset::BlindGaia16,
+            ],
+            Self::All => &[
+                Dataset::Objects,
+                Dataset::MinorBodies,
+                Dataset::Transients,
+                Dataset::StarsLiteTycho2,
+                Dataset::StarsLiteTycho2Identifiers,
+                Dataset::StarsGaia,
+                Dataset::StarsDeepGaia17,
+                Dataset::StarsDeepGaia20,
+                Dataset::BlindGaia16,
+            ],
+        }
+    }
+
+    fn selection(self) -> Result<CatalogSet, String> {
+        CatalogSet::from_names(
+            self.datasets()
+                .iter()
+                .map(|dataset| dataset.file_name().to_string()),
+        )
+        .map_err(|error| error.to_string())
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogComponentStatus {
+    available: bool,
+    path: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogStatusResponse {
+    directory: String,
+    ready_for_solving: bool,
+    ready_for_overlays: bool,
+    star_catalog: CatalogComponentStatus,
+    blind_index: CatalogComponentStatus,
+    objects: CatalogComponentStatus,
+    transients: CatalogComponentStatus,
+    minor_bodies: CatalogComponentStatus,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CatalogSetupProgressResponse {
+    phase: &'static str,
+    message: String,
+    file_name: Option<String>,
+    files_completed: usize,
+    files_total: usize,
+    bytes_completed: Option<u64>,
+    bytes_total: Option<u64>,
+    written_bytes: Option<u64>,
+}
+
+#[derive(Clone, Copy)]
+struct CatalogSetupReporter {
+    callback: SeizaCatalogSetupProgressCallback,
+    context: usize,
+    files_total: usize,
+}
+
+impl CatalogSetupReporter {
+    fn report(&self, event: CatalogSetupProgressResponse) {
+        let Some(callback) = self.callback else {
+            return;
+        };
+        let Ok(json) = serde_json::to_string(&event) else {
+            return;
+        };
+        let Ok(json) = CString::new(json) else {
+            return;
+        };
+        unsafe { callback(json.as_ptr(), self.context as *mut c_void) };
+    }
+
+    fn simple(&self, phase: &'static str, message: impl Into<String>) {
+        self.report(CatalogSetupProgressResponse {
+            phase,
+            message: message.into(),
+            file_name: None,
+            files_completed: 0,
+            files_total: self.files_total,
+            bytes_completed: None,
+            bytes_total: None,
+            written_bytes: None,
+        });
+    }
+
+    fn download_event(&self, event: DownloadEvent) {
+        match event {
+            DownloadEvent::FetchingManifest { .. } => {
+                self.simple("manifest", "Checking the Seiza catalog manifest…")
+            }
+            DownloadEvent::UsingCachedManifest { version, stale } => self.simple(
+                "manifest",
+                if stale {
+                    format!("Using cached catalog manifest {version} while offline")
+                } else {
+                    format!("Using catalog manifest {version}")
+                },
+            ),
+            DownloadEvent::CacheHit { name, .. } => self.report(CatalogSetupProgressResponse {
+                phase: "preparing",
+                message: format!("Found {name} in the download cache"),
+                file_name: Some(name),
+                files_completed: 0,
+                files_total: self.files_total,
+                bytes_completed: None,
+                bytes_total: None,
+                written_bytes: None,
+            }),
+            DownloadEvent::DownloadStarted { name, bytes } => {
+                self.report(CatalogSetupProgressResponse {
+                    phase: "downloading",
+                    message: format!("Downloading {name}"),
+                    file_name: Some(name),
+                    files_completed: 0,
+                    files_total: self.files_total,
+                    bytes_completed: Some(0),
+                    bytes_total: Some(bytes),
+                    written_bytes: Some(0),
+                })
+            }
+            DownloadEvent::DownloadProgress {
+                name,
+                downloaded,
+                total,
+                written,
+            } => self.report(CatalogSetupProgressResponse {
+                phase: "downloading",
+                message: format!("Downloading {name}"),
+                file_name: Some(name),
+                files_completed: 0,
+                files_total: self.files_total,
+                bytes_completed: Some(downloaded),
+                bytes_total: Some(total),
+                written_bytes: Some(written),
+            }),
+            DownloadEvent::DownloadComplete { name, .. } => {
+                self.report(CatalogSetupProgressResponse {
+                    phase: "preparing",
+                    message: format!("Downloaded {name}"),
+                    file_name: Some(name),
+                    files_completed: 0,
+                    files_total: self.files_total,
+                    bytes_completed: None,
+                    bytes_total: None,
+                    written_bytes: None,
+                })
+            }
+        }
+    }
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u32)]
@@ -152,6 +356,64 @@ struct SipResponse {
 #[unsafe(no_mangle)]
 pub extern "C" fn seiza_core_version() -> *const c_char {
     VERSION.as_ptr().cast()
+}
+
+#[unsafe(no_mangle)]
+/// Returns catalog readiness and resolved component paths as JSON.
+///
+/// # Safety
+/// `catalog_directory` may be null or a valid NUL-terminated string. When
+/// non-null, `error_out` must point to writable storage for one pointer.
+pub unsafe extern "C" fn seiza_catalog_status_json(
+    catalog_directory: *const c_char,
+    error_out: *mut *mut c_char,
+) -> *mut c_char {
+    clear_error(error_out);
+    ffi_result(error_out, || {
+        let catalog_directory = optional_path(catalog_directory)?;
+        let status = catalog_status(catalog_directory.as_deref());
+        let json = serde_json::to_string(&status).map_err(|error| error.to_string())?;
+        CString::new(json)
+            .map(CString::into_raw)
+            .map_err(|_| "catalog status contains a NUL byte".to_string())
+    })
+    .unwrap_or(ptr::null_mut())
+}
+
+#[unsafe(no_mangle)]
+/// Downloads and installs a solver-ready Seiza catalog preset.
+///
+/// Preset `0` is the standard G≤17 blind-solving package, `1` is the optional
+/// G≤20 package, and `2` installs every published catalog. The call is
+/// synchronous and must run off the UI thread. Progress JSON is valid only for
+/// the duration of each callback.
+///
+/// # Safety
+/// `catalog_directory` may be null or a valid NUL-terminated string. `context`
+/// is passed through untouched to `progress`. When non-null, `error_out` must
+/// point to writable storage for one pointer.
+pub unsafe extern "C" fn seiza_catalog_setup(
+    catalog_directory: *const c_char,
+    preset: u32,
+    progress: SeizaCatalogSetupProgressCallback,
+    context: *mut c_void,
+    error_out: *mut *mut c_char,
+) -> bool {
+    clear_error(error_out);
+    ffi_result(error_out, || {
+        let catalog_directory = optional_path(catalog_directory)?;
+        let preset = CatalogSetupPreset::from_raw(preset)?;
+        run_catalog_setup(
+            catalog_directory.as_deref(),
+            preset,
+            CatalogSetupReporter {
+                callback: progress,
+                context: context as usize,
+                files_total: preset.datasets().len(),
+            },
+        )
+    })
+    .is_some()
 }
 
 #[unsafe(no_mangle)]
@@ -1162,6 +1424,315 @@ fn statistics_json(statistics: &Statistics) -> Value {
     })
 }
 
+fn catalog_status(catalog_directory: Option<&Path>) -> CatalogStatusResponse {
+    let directory = catalog_directory
+        .map(Path::to_path_buf)
+        .unwrap_or_else(seiza::data_paths::default_catalog_dir);
+    let star_catalog = component_status(seiza::data_paths::star_data(catalog_directory));
+    let blind_index = optional_component_status(seiza::data_paths::blind_index(catalog_directory));
+    let objects = component_status(seiza::data_paths::objects(catalog_directory));
+    let transients = component_status(seiza::data_paths::transients(catalog_directory));
+    let minor_bodies = component_status(seiza::data_paths::minor_bodies(catalog_directory));
+    CatalogStatusResponse {
+        directory: directory.to_string_lossy().into_owned(),
+        ready_for_solving: star_catalog.available && blind_index.available,
+        ready_for_overlays: objects.available && transients.available && minor_bodies.available,
+        star_catalog,
+        blind_index,
+        objects,
+        transients,
+        minor_bodies,
+    }
+}
+
+fn component_status<E: std::fmt::Display>(result: Result<PathBuf, E>) -> CatalogComponentStatus {
+    match result {
+        Ok(path) => CatalogComponentStatus {
+            available: true,
+            path: Some(path.to_string_lossy().into_owned()),
+        },
+        Err(_) => CatalogComponentStatus {
+            available: false,
+            path: None,
+        },
+    }
+}
+
+fn optional_component_status<E: std::fmt::Display>(
+    result: Result<Option<PathBuf>, E>,
+) -> CatalogComponentStatus {
+    match result {
+        Ok(Some(path)) => CatalogComponentStatus {
+            available: true,
+            path: Some(path.to_string_lossy().into_owned()),
+        },
+        Ok(None) | Err(_) => CatalogComponentStatus {
+            available: false,
+            path: None,
+        },
+    }
+}
+
+fn run_catalog_setup(
+    catalog_directory: Option<&Path>,
+    preset: CatalogSetupPreset,
+    reporter: CatalogSetupReporter,
+) -> Result<(), String> {
+    let output = catalog_directory
+        .map(Path::to_path_buf)
+        .unwrap_or_else(seiza::data_paths::default_catalog_dir);
+    reporter.simple(
+        "preparing",
+        format!("Preparing catalog setup in {}", output.display()),
+    );
+    let selection = preset.selection()?;
+    let manager = CatalogManager::builder()
+        .policy(CachePolicy::ForceRefresh)
+        .build()
+        .map_err(|error| error.to_string())?;
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|error| format!("failed to start the catalog download runtime: {error}"))?;
+    let download_reporter = reporter;
+    let bundle = runtime.block_on(async move {
+        manager
+            .ensure_with(&selection, move |event| {
+                download_reporter.download_event(event)
+            })
+            .await
+    });
+    let bundle = bundle.map_err(|error| error.to_string())?;
+    materialize_catalog_bundle(&bundle, &output, reporter)?;
+    reporter.report(CatalogSetupProgressResponse {
+        phase: "complete",
+        message: format!("Catalogs are ready in {}", output.display()),
+        file_name: None,
+        files_completed: reporter.files_total,
+        files_total: reporter.files_total,
+        bytes_completed: None,
+        bytes_total: None,
+        written_bytes: None,
+    });
+    Ok(())
+}
+
+fn materialize_catalog_bundle(
+    bundle: &CatalogBundle,
+    output: &Path,
+    reporter: CatalogSetupReporter,
+) -> Result<Vec<PathBuf>, String> {
+    fs::create_dir_all(output)
+        .map_err(|error| format!("failed to create {}: {error}", output.display()))?;
+    let mut installed = Vec::with_capacity(bundle.artifacts().len());
+
+    for (index, artifact) in bundle.artifacts().enumerate() {
+        let target = output.join(&artifact.name);
+        let completed_before = index;
+        if existing_file_matches(
+            &target,
+            artifact.bytes,
+            &artifact.sha256,
+            |completed, total| {
+                reporter.report(CatalogSetupProgressResponse {
+                    phase: "verifying",
+                    message: format!("Verifying existing {}", artifact.name),
+                    file_name: Some(artifact.name.clone()),
+                    files_completed: completed_before,
+                    files_total: reporter.files_total,
+                    bytes_completed: Some(completed),
+                    bytes_total: Some(total),
+                    written_bytes: None,
+                });
+            },
+        )? {
+            reporter.report(CatalogSetupProgressResponse {
+                phase: "installing",
+                message: format!("{} is already installed and verified", artifact.name),
+                file_name: Some(artifact.name.clone()),
+                files_completed: index + 1,
+                files_total: reporter.files_total,
+                bytes_completed: Some(artifact.bytes),
+                bytes_total: Some(artifact.bytes),
+                written_bytes: Some(artifact.bytes),
+            });
+            installed.push(target);
+            continue;
+        }
+
+        let temp = setup_temp_path(output, &artifact.name);
+        let copy = copy_verified_file(
+            &artifact.path,
+            &temp,
+            artifact.bytes,
+            &artifact.sha256,
+            |completed, total| {
+                reporter.report(CatalogSetupProgressResponse {
+                    phase: "verifying",
+                    message: format!("Verifying and installing {}", artifact.name),
+                    file_name: Some(artifact.name.clone()),
+                    files_completed: completed_before,
+                    files_total: reporter.files_total,
+                    bytes_completed: Some(completed),
+                    bytes_total: Some(total),
+                    written_bytes: Some(completed),
+                });
+            },
+        );
+        if let Err(error) = copy {
+            let _ = fs::remove_file(&temp);
+            return Err(error);
+        }
+        if let Err(error) = fs::rename(&temp, &target) {
+            let _ = fs::remove_file(&temp);
+            return Err(format!(
+                "failed to install {} at {}: {error}",
+                artifact.name,
+                target.display()
+            ));
+        }
+        reporter.report(CatalogSetupProgressResponse {
+            phase: "installing",
+            message: format!("Installed {}", artifact.name),
+            file_name: Some(artifact.name.clone()),
+            files_completed: index + 1,
+            files_total: reporter.files_total,
+            bytes_completed: Some(artifact.bytes),
+            bytes_total: Some(artifact.bytes),
+            written_bytes: Some(artifact.bytes),
+        });
+        installed.push(target);
+    }
+    Ok(installed)
+}
+
+fn setup_temp_path(output: &Path, name: &str) -> PathBuf {
+    let sequence = SETUP_TEMP_SEQUENCE.fetch_add(1, Ordering::Relaxed);
+    output.join(format!(".{name}.part-{}-{sequence}", std::process::id()))
+}
+
+fn existing_file_matches(
+    path: &Path,
+    expected_bytes: u64,
+    expected_sha256: &str,
+    mut report: impl FnMut(u64, u64),
+) -> Result<bool, String> {
+    let metadata = match fs::metadata(path) {
+        Ok(metadata) => metadata,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+        Err(error) => return Err(format!("failed to inspect {}: {error}", path.display())),
+    };
+    if !metadata.is_file() || metadata.len() != expected_bytes {
+        return Ok(false);
+    }
+    let input =
+        File::open(path).map_err(|error| format!("failed to open {}: {error}", path.display()))?;
+    let actual = hash_reader(BufReader::new(input), expected_bytes, &mut report)?;
+    Ok(actual == expected_sha256)
+}
+
+fn copy_verified_file(
+    source: &Path,
+    target: &Path,
+    expected_bytes: u64,
+    expected_sha256: &str,
+    mut report: impl FnMut(u64, u64),
+) -> Result<(), String> {
+    let input = File::open(source)
+        .map_err(|error| format!("failed to open {}: {error}", source.display()))?;
+    let metadata = input
+        .metadata()
+        .map_err(|error| format!("failed to inspect {}: {error}", source.display()))?;
+    if metadata.len() != expected_bytes {
+        return Err(format!(
+            "{} has {} bytes; expected {expected_bytes}",
+            source.display(),
+            metadata.len()
+        ));
+    }
+    let output = OpenOptions::new()
+        .create_new(true)
+        .write(true)
+        .open(target)
+        .map_err(|error| format!("failed to create {}: {error}", target.display()))?;
+    let mut input = BufReader::new(input);
+    let mut output = BufWriter::new(output);
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; COPY_BUFFER_BYTES];
+    let mut completed = 0u64;
+    let mut last_reported = 0u64;
+    report(0, expected_bytes);
+    loop {
+        let read = input
+            .read(&mut buffer)
+            .map_err(|error| format!("failed to read {}: {error}", source.display()))?;
+        if read == 0 {
+            break;
+        }
+        output
+            .write_all(&buffer[..read])
+            .map_err(|error| format!("failed to write {}: {error}", target.display()))?;
+        hasher.update(&buffer[..read]);
+        completed = completed.saturating_add(read as u64);
+        if completed == expected_bytes
+            || completed.saturating_sub(last_reported) >= PROGRESS_INTERVAL_BYTES
+        {
+            report(completed, expected_bytes);
+            last_reported = completed;
+        }
+    }
+    output
+        .flush()
+        .map_err(|error| format!("failed to flush {}: {error}", target.display()))?;
+    output
+        .get_ref()
+        .sync_all()
+        .map_err(|error| format!("failed to sync {}: {error}", target.display()))?;
+    if completed != expected_bytes {
+        return Err(format!(
+            "{} yielded {completed} bytes; expected {expected_bytes}",
+            source.display()
+        ));
+    }
+    let actual = format!("{:x}", hasher.finalize());
+    if actual != expected_sha256 {
+        return Err(format!(
+            "SHA-256 verification failed for {}: expected {expected_sha256}, got {actual}",
+            source.display()
+        ));
+    }
+    Ok(())
+}
+
+fn hash_reader(
+    mut input: impl Read,
+    expected_bytes: u64,
+    mut report: impl FnMut(u64, u64),
+) -> Result<String, String> {
+    let mut hasher = Sha256::new();
+    let mut buffer = vec![0u8; COPY_BUFFER_BYTES];
+    let mut completed = 0u64;
+    let mut last_reported = 0u64;
+    report(0, expected_bytes);
+    loop {
+        let read = input
+            .read(&mut buffer)
+            .map_err(|error| format!("failed while hashing a catalog: {error}"))?;
+        if read == 0 {
+            break;
+        }
+        hasher.update(&buffer[..read]);
+        completed = completed.saturating_add(read as u64);
+        if completed == expected_bytes
+            || completed.saturating_sub(last_reported) >= PROGRESS_INTERVAL_BYTES
+        {
+            report(completed, expected_bytes);
+            last_reported = completed;
+        }
+    }
+    Ok(format!("{:x}", hasher.finalize()))
+}
+
 fn required_path(value: *const c_char, name: &str) -> Result<PathBuf, String> {
     optional_path(value)?.ok_or_else(|| format!("{name} is required"))
 }
@@ -1331,6 +1902,84 @@ mod tests {
         assert_eq!(RgbStretchMode::from_raw(1), Ok(RgbStretchMode::LinkedAuto));
         assert_eq!(RgbStretchMode::from_raw(2), Ok(RgbStretchMode::Linear));
         assert!(RgbStretchMode::from_raw(3).is_err());
+    }
+
+    #[test]
+    fn catalog_setup_presets_include_solver_and_overlay_data() {
+        let standard = CatalogSetupPreset::StandardBlind.datasets();
+        assert!(standard.contains(&Dataset::StarsDeepGaia17));
+        assert!(standard.contains(&Dataset::BlindGaia16));
+        assert!(standard.contains(&Dataset::Objects));
+        assert!(standard.contains(&Dataset::Transients));
+        assert!(standard.contains(&Dataset::MinorBodies));
+
+        let deepest = CatalogSetupPreset::DeepestBlind.datasets();
+        assert!(deepest.contains(&Dataset::StarsDeepGaia20));
+        assert!(!deepest.contains(&Dataset::StarsDeepGaia17));
+
+        let all = CatalogSetupPreset::All.datasets();
+        assert!(all.len() > standard.len());
+        assert!(all.contains(&Dataset::StarsLiteTycho2Identifiers));
+    }
+
+    #[test]
+    fn catalog_status_requires_a_star_catalog_and_blind_index() {
+        let directory = tempfile::tempdir().unwrap();
+        for name in [
+            "stars-deep-gaia17.bin",
+            "objects.bin",
+            "transients.bin",
+            "minor-bodies.bin",
+        ] {
+            std::fs::write(directory.path().join(name), []).unwrap();
+        }
+
+        let incomplete = catalog_status(Some(directory.path()));
+        assert!(!incomplete.ready_for_solving);
+        assert!(incomplete.ready_for_overlays);
+
+        std::fs::write(directory.path().join("blind-gaia16.idx"), []).unwrap();
+        let ready = catalog_status(Some(directory.path()));
+        assert!(ready.ready_for_solving);
+        assert!(ready.ready_for_overlays);
+        assert!(
+            ready
+                .star_catalog
+                .path
+                .unwrap()
+                .ends_with("stars-deep-gaia17.bin")
+        );
+    }
+
+    #[test]
+    fn catalog_install_copy_reports_hash_verification_progress() {
+        let directory = tempfile::tempdir().unwrap();
+        let source = directory.path().join("cache.bin");
+        let target = directory.path().join("installed.bin");
+        let bytes = vec![0x5a; COPY_BUFFER_BYTES + 17];
+        std::fs::write(&source, &bytes).unwrap();
+        let expected_sha256 = format!("{:x}", Sha256::digest(&bytes));
+        let mut progress = Vec::new();
+
+        copy_verified_file(
+            &source,
+            &target,
+            bytes.len() as u64,
+            &expected_sha256,
+            |completed, total| progress.push((completed, total)),
+        )
+        .unwrap();
+
+        assert_eq!(std::fs::read(&target).unwrap(), bytes);
+        assert_eq!(progress.first(), Some(&(0, bytes.len() as u64)));
+        assert_eq!(
+            progress.last(),
+            Some(&(bytes.len() as u64, bytes.len() as u64))
+        );
+        assert!(
+            existing_file_matches(&target, bytes.len() as u64, &expected_sha256, |_, _| {})
+                .unwrap()
+        );
     }
 
     #[test]

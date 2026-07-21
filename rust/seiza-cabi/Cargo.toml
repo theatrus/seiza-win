@@ -10,11 +10,13 @@ publish = false
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-seiza = "0.11.2"
+seiza = { version = "0.11.2", features = ["downloads"] }
 seiza-fits = "0.1.6"
 image = { version = "0.25", default-features = false, features = ["png", "jpeg", "tiff"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+sha2 = "0.10"
+tokio = { version = "1", features = ["net", "rt", "time"] }
 
 [dev-dependencies]
 tempfile = "3"

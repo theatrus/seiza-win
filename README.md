@@ -39,3 +39,5 @@ builds `seiza_cabi.dll`, and copies it into the app output automatically.
 - Naturally sorts and navigates supported images without blocking the UI thread.
 - Uploads a BGRA8 frame once to Win2D, then fits, pans, and zooms on the GPU.
 - Accepts image and folder drag-and-drop and reports native errors with actionable detail.
+- Reports solver and overlay catalog readiness in native Catalog Settings.
+- Persists default or custom catalog locations and installs, verifies, or repairs shared Rust catalog presets with durable progress.

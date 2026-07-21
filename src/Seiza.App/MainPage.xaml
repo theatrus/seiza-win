@@ -101,6 +101,17 @@
                     <FontIcon Glyph="&#xE8A3;" />
                 </AppBarButton.Icon>
             </AppBarButton>
+
+            <AppBarSeparator />
+
+            <AppBarButton
+                Click="CatalogSettings_Click"
+                Label="Catalogs"
+                ToolTipService.ToolTip="Catalog settings">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE713;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
         </CommandBar>
 
         <Grid

@@ -15,6 +15,8 @@ namespace Seiza.App;
 /// </summary>
 public partial class App : Application
 {
+    private static CatalogSettingsWindow? _catalogSettingsWindow;
+
     /// <summary>
     /// The main application window. Use <c>App.Window</c> from any class that needs
     /// the window reference (for dialogs, pickers, interop, etc.).
@@ -35,6 +37,20 @@ public partial class App : Application
     /// </summary>
     public static nint WindowHandle =>
         WinRT.Interop.WindowNative.GetWindowHandle(Window);
+
+    public static void ShowCatalogSettings()
+    {
+        _catalogSettingsWindow ??= new CatalogSettingsWindow();
+        _catalogSettingsWindow.Activate();
+    }
+
+    internal static void NotifyCatalogSettingsClosed(CatalogSettingsWindow window)
+    {
+        if (ReferenceEquals(_catalogSettingsWindow, window))
+        {
+            _catalogSettingsWindow = null;
+        }
+    }
 
     /// <summary>
     /// Initializes the singleton application object.

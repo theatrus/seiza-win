@@ -56,24 +56,23 @@ status/setup or an explicitly requested solve.
 
 | Capability | macOS 0.2.0 | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
-| Use Seiza's default catalog directory | Available | **Planned** | Resolve the same default through shared Rust. |
-| Choose and persist a custom catalog directory | Available | **Planned** | Use a WinUI folder picker and persist a FutureAccessList token plus display path. |
-| Per-component status | Available | **Planned** | Report star catalog, blind index, objects, transients, and minor bodies. |
-| Separate solve-ready and overlay-ready status | Available | **Planned** | Show clear Ready, Setup required, and Incomplete states. |
-| Setup presets | Available | **Planned** | Standard blind (recommended), Deepest blind, and All. |
-| Download and install | Available | **Planned** | Call shared Rust setup; do not reproduce manifest/download logic in C#. |
-| Verify or repair an existing install | Available | **Planned** | Safe to retry and reuse already verified files. |
-| Structured setup progress | Available | **Planned** | Support preparing, manifest, downloading, verifying, installing, and complete phases. |
-| File and byte progress | Available | **Planned** | Show file name/count, downloaded bytes, total bytes, unpacked/written bytes, and percentage. |
-| Full SHA-256 verification feedback | Available | **Planned** | Explain that verification reads large files completely and may take several minutes. |
-| Setup continues after Settings closes | Available | **Planned** | App-scoped controller/service owns the operation, not the page. |
+| Use Seiza's default catalog directory | Available | **Complete** | Resolved by shared Rust; runtime-tested against the default Windows catalog. |
+| Choose and persist a custom catalog directory | Available | **Complete** | WinUI folder picker persists both FutureAccessList access and the display path. |
+| Per-component status | Available | **Complete** | Star catalog, blind index, objects, transients, and minor bodies are reported independently. |
+| Separate solve-ready and overlay-ready status | Available | **Complete** | Native readiness cards distinguish the two capabilities. |
+| Setup presets | Available | **Complete** | Standard blind (recommended), Deepest blind, and All map directly to shared Rust. |
+| Download and install | Available | **Complete** | Shared Rust owns manifest, cache, download, and atomic install behavior. |
+| Verify or repair an existing install | Available | **Complete** | Retrying reuses files only after their size and digest are verified. |
+| Structured setup progress | Available | **Complete** | Preparing, manifest, downloading, verifying, installing, and complete are surfaced. |
+| File and byte progress | Available | **Complete** | File name/count, downloaded bytes, total bytes, written bytes, and percentage are supported. |
+| Full SHA-256 verification feedback | Available | **Complete** | Settings explains full-file verification and the core reports verification progress. |
+| Setup continues after Settings closes | Available | **Complete** | The app-scoped singleton controller owns the worker operation. |
 | Solve error links to Catalog Settings | Available | **Planned** | Missing data should offer a direct Settings action. |
 | Catalog bundle update discovery and selective datasets | Planned | **Deferred** | Track after first-release catalog parity. |
 
-The current Windows C ABI predates the macOS catalog setup additions. The next
-sync must add `seiza_catalog_status_json`, `seiza_catalog_setup`, the three
-preset values, and the progress callback contract while retaining Windows BGRA
-render output.
+The Windows C ABI now includes `seiza_catalog_status_json`,
+`seiza_catalog_setup`, the three preset values, and the progress callback
+contract while retaining Windows BGRA render output.
 
 ## Plate solving
 
@@ -139,9 +138,9 @@ These remain tracked even though they are not macOS 0.2.0 release features:
 
 ## Delivery order
 
-1. **Catalog Settings vertical slice** — sync the new Rust ABI; add status,
-   location, presets, download/repair, durable progress, and tests.
-2. **Solve vertical slice** — safe C# solve bindings, solve state, stale-result
+1. **Complete: Catalog Settings vertical slice** — shared Rust ABI, native
+   status/location UI, presets, download/repair, durable progress, and tests.
+2. **Next: Solve vertical slice** — safe C# solve bindings, solve state, stale-result
    protection, solution summary, and Settings remediation.
 3. **Overlay scene** — common coordinate transform, layer menu, grid/center,
    stars, DSOs and catalog filters, contours, transients, and minor bodies.

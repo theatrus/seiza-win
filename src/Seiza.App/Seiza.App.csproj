@@ -84,9 +84,11 @@
 
   <!-- Publish Properties -->
   <PropertyGroup>
+    <SelfContained Condition="'$(Configuration)' == 'Debug'">False</SelfContained>
+    <SelfContained Condition="'$(Configuration)' != 'Debug'">True</SelfContained>
     <PublishReadyToRun Condition="'$(Configuration)' == 'Debug'">False</PublishReadyToRun>
     <PublishReadyToRun Condition="'$(Configuration)' != 'Debug'">True</PublishReadyToRun>
-    <PublishTrimmed Condition="'$(Configuration)' == 'Debug'">False</PublishTrimmed>
-    <PublishTrimmed Condition="'$(Configuration)' != 'Debug'">True</PublishTrimmed>
+    <!-- WinUI's WinRT projection assemblies are not linker-clean under .NET 10. -->
+    <PublishTrimmed>False</PublishTrimmed>
   </PropertyGroup>
 </Project>

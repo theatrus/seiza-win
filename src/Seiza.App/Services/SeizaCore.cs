@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Seiza.App.Interop;
@@ -5,13 +6,8 @@ using Seiza.App.Models;
 
 namespace Seiza.App.Services;
 
-internal static class SeizaCore
+internal static unsafe class SeizaCore
 {
-    private static readonly JsonSerializerOptions JsonOptions = new()
-    {
-        PropertyNameCaseInsensitive = true,
-    };
-
     public static string Version
     {
         get
@@ -62,17 +58,102 @@ internal static class SeizaCore
 
         string metadataJson = Marshal.PtrToStringUTF8(metadataPointer)
             ?? throw new SeizaCoreException("The Seiza native core returned invalid metadata.");
-        ImageMetadata metadata = JsonSerializer.Deserialize<ImageMetadata>(metadataJson, JsonOptions)
+        ImageMetadata metadata = JsonSerializer.Deserialize(
+            metadataJson,
+            SeizaJsonSerializerContext.Default.ImageMetadata)
             ?? throw new SeizaCoreException("The Seiza native core returned invalid metadata.");
 
         return new RenderedImageData(bgra, width, height, metadata);
     }
 
-    private static SeizaCoreException ReadError(nint error)
+    public static CatalogStatus GetCatalogStatus(string? catalogDirectory)
+    {
+        nint error = 0;
+        nint json = NativeMethods.GetCatalogStatusJson(catalogDirectory, out error);
+        if (json == 0)
+        {
+            throw ReadError(error, "The Seiza native core could not inspect the catalog.");
+        }
+
+        try
+        {
+            string value = Marshal.PtrToStringUTF8(json)
+                ?? throw new SeizaCoreException("The Seiza native core returned invalid catalog status.");
+            return JsonSerializer.Deserialize(
+                value,
+                SeizaJsonSerializerContext.Default.CatalogStatus)
+                ?? throw new SeizaCoreException("The Seiza native core returned invalid catalog status.");
+        }
+        finally
+        {
+            NativeMethods.FreeString(json);
+        }
+    }
+
+    public static void SetupCatalog(
+        string? catalogDirectory,
+        CatalogSetupPreset preset,
+        Action<CatalogSetupProgress> progress)
+    {
+        GCHandle callbackState = GCHandle.Alloc(progress);
+        nint error = 0;
+        try
+        {
+            bool succeeded = NativeMethods.SetupCatalog(
+                catalogDirectory,
+                (uint)preset,
+                &CatalogProgressCallback,
+                GCHandle.ToIntPtr(callbackState),
+                out error);
+            if (!succeeded)
+            {
+                throw ReadError(error, "The Seiza native core could not set up the catalog.");
+            }
+        }
+        finally
+        {
+            callbackState.Free();
+        }
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void CatalogProgressCallback(nint json, nint context)
+    {
+        try
+        {
+            if (json == 0 || context == 0)
+            {
+                return;
+            }
+
+            string? value = Marshal.PtrToStringUTF8(json);
+            CatalogSetupProgress? update = value is null
+                ? null
+                : JsonSerializer.Deserialize(
+                    value,
+                    SeizaJsonSerializerContext.Default.CatalogSetupProgress);
+            if (update is null)
+            {
+                return;
+            }
+
+            GCHandle callbackState = GCHandle.FromIntPtr(context);
+            if (callbackState.Target is Action<CatalogSetupProgress> progress)
+            {
+                progress(update);
+            }
+        }
+        catch
+        {
+            // Managed exceptions must never cross the native callback boundary.
+        }
+    }
+
+    private static SeizaCoreException ReadError(nint error, string fallbackMessage = "The Seiza native core could not render the image.")
     {
         if (error == 0)
         {
-            return new SeizaCoreException("The Seiza native core could not render the image.");
+            return new SeizaCoreException(fallbackMessage);
         }
 
         try

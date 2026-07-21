@@ -11,6 +11,24 @@ internal static partial class NativeMethods
 
     [LibraryImport(
         LibraryName,
+        EntryPoint = "seiza_catalog_status_json",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint GetCatalogStatusJson(string? catalogDirectory, out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_catalog_setup",
+        StringMarshalling = StringMarshalling.Utf8)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static unsafe partial bool SetupCatalog(
+        string? catalogDirectory,
+        uint preset,
+        delegate* unmanaged[Cdecl]<nint, nint, void> progress,
+        nint context,
+        out nint error);
+
+    [LibraryImport(
+        LibraryName,
         EntryPoint = "seiza_rendered_image_open_with_rgb_stretch",
         StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint OpenRenderedImage(
