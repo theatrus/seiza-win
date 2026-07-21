@@ -116,6 +116,7 @@ means the Windows shell still needs C# models, layer state, and Win2D drawing.
 
 | Capability | macOS analogue | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
+| Product app icon | macOS app icon | **Complete** | The same Seiza artwork is supplied at Windows executable, taskbar, title-bar, Start, Store, tile, lock-screen, splash, and About sizes. |
 | FITS file registration and document icon | Finder association/icon | **Planned** | MSIX `.fits`, `.fit`, and `.fts` associations with a dedicated icon. |
 | Stretched system preview | Quick Look extension | **Planned** | Explorer Preview Pane handler in a separately hosted native component. |
 | Content thumbnails on file icons | Finder thumbnail provider (planned) | **Planned** | Explorer thumbnail provider, isolated from .NET, catalogs, and solving. |
