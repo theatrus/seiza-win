@@ -32,15 +32,28 @@ public sealed partial class ImageInspector : UserControl
         UpdateHeaderState();
     }
 
-    public void ShowMetadata(ImageMetadata metadata, RgbStretchMode rgbStretchMode)
+    internal void ShowMetadata(
+        ImageMetadata metadata,
+        FitsImageProcessingConfiguration processing)
     {
         ImageDetails.Clear();
         ImageDetails.Add(new("Dimensions", $"{metadata.Width:N0} × {metadata.Height:N0}"));
         ImageDetails.Add(new("Format", metadata.Format));
         ImageDetails.Add(new("Encoding", FormatColorKind(metadata.ColorKind)));
-        if (SupportsRgbStretch(metadata))
+        if (string.Equals(metadata.Format, "FITS", StringComparison.OrdinalIgnoreCase))
         {
-            ImageDetails.Add(new("RGB stretch", rgbStretchMode.Title()));
+            FitsStretchConfiguration current = processing.StretchStack.Stages[^1];
+            string stretch = processing.StretchStack.Stages.Count == 1
+                ? current.Type.Title()
+                : $"{processing.StretchStack.Stages.Count} stages · {current.Type.Title()}";
+            ImageDetails.Add(new("Stretch", stretch));
+            if (SupportsColorStretch(metadata))
+            {
+                ImageDetails.Add(new("Color", current.ColorStrategy.Title()));
+            }
+            ImageDetails.Add(new(
+                "Background",
+                processing.ExtractsBackground ? "Gradient removed" : "Original"));
         }
         ImageDetails.Add(new("Minimum", metadata.Statistics.Minimum.ToString("N0", CultureInfo.CurrentCulture)));
         ImageDetails.Add(new("Maximum", metadata.Statistics.Maximum.ToString("N0", CultureInfo.CurrentCulture)));
@@ -188,7 +201,7 @@ public sealed partial class ImageInspector : UserControl
     private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
         App.ShowCatalogSettings();
 
-    private static bool SupportsRgbStretch(ImageMetadata metadata) =>
+    private static bool SupportsColorStretch(ImageMetadata metadata) =>
         metadata.ColorKind is "planar-rgb" or "bayer";
 
     private static string FormatColorKind(string colorKind) => colorKind switch

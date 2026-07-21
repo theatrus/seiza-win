@@ -6,4 +6,4 @@ rust-version = "1.89"
 publish = false
 
 [dependencies]
-seiza-cabi-upstream = { package = "seiza-cabi", git = "https://github.com/theatrus/seiza.git", rev = "82b7cfeed5e277994cbae46bab60ab6333bbdafd" }
+seiza-cabi-upstream = { package = "seiza-cabi", git = "https://github.com/theatrus/seiza.git", rev = "32a8dbf62dda60e5ae2a1f3743c5d21976461f83" }

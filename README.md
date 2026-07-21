@@ -39,7 +39,8 @@ version/commit metadata into the app output automatically.
 - Opens a folder or discovers sibling images next to a selected file.
 - Naturally sorts and navigates supported images without blocking the UI thread.
 - Uploads a BGRA8 frame once to Win2D, then fits, pans, and zooms on the GPU.
-- Selects per-channel Auto, color-preserving Linked Auto, or Linear rendering for color FITS images.
+- Edits FITS processing in a modeless native tool window with seven stretch methods, ordered stages, three color strategies, optional background-gradient removal, numeric/sliding controls, validation, and debounced live previews.
+- Commits full-resolution stretch changes only on Save and supports toolbar/keyboard undo and redo; Cancel restores the committed image immediately.
 - Shows image statistics, searchable/copyable FITS headers, solve quality, and overlay availability in a native inspector.
 - Accepts image and folder drag-and-drop and reports native errors with actionable detail.
 - Reports solver and overlay catalog readiness in native Catalog Settings.

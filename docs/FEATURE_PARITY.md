@@ -8,8 +8,10 @@ merely because its Rust implementation exists.
 ## Baseline
 
 - macOS reference: `main` at
-  [`88b7d3a`](https://github.com/theatrus/seiza-mac/commit/88b7d3a23c6b6230c94899af115d9b605e4330d1)
-- Windows reference: current inspection-parity branch
+  [`b1f76a8`](https://github.com/theatrus/seiza-mac/commit/b1f76a8de798d29d7374c93b8827b62c2fbabac3)
+- Seiza core reference: `main` at
+  [`32a8dbf`](https://github.com/theatrus/seiza/commit/32a8dbf62dda60e5ae2a1f3743c5d21976461f83)
+- Windows reference: current stretch-controls branch
 - Last audited: 2026-07-21
 
 Update this baseline and the affected rows whenever the macOS app gains a
@@ -27,7 +29,7 @@ test exist.
 
 ## Viewer and navigation
 
-| Capability | macOS 0.2.0 | Windows | Windows gap / acceptance criterion |
+| Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
 | FITS, JPEG, PNG, and TIFF opening | Available | **Complete** | Keep the supported-extension lists synchronized. |
 | File and folder picker | Available | **Complete** | — |
@@ -37,11 +39,19 @@ test exist.
 | Replace the active viewer contents when opening another item | Available | **Complete** | — |
 | Multiple document windows and file activation routing | Available | **Planned** | One process, one window per document collection, activation redirected into the running app. |
 | Thumbnail drawer | Available | **Planned** | Virtualized WinUI thumbnail rail with selection and accessibility names. |
-| Memory/disk thumbnail cache and adjacent prefetch | Available | **Planned** | Cache keys include source identity and RGB stretch mode; visible work wins over prefetch. |
+| Memory/disk thumbnail cache and adjacent prefetch | Available | **Planned** | Cache keys include source identity and the full FITS processing configuration; visible work wins over prefetch. |
 | Cached preview while full resolution loads | Available | **Planned** | Never blank an already available preview during a full render. |
 | Mono FITS autostretch | Available | **Complete** | Runtime-tested against telescope FITS data. |
 | Planar RGB and Bayer/OSC rendering | Available | **Partial** | Core path exists; add representative RGB and Bayer fixtures and visual QA. |
-| Auto, Linked Auto, and Linear RGB modes | Available | **Complete** | Toolbar selection and inspector state are runtime-tested on a 4,138 x 5,263 planar-RGB FITS image. |
+| Seven FITS stretch methods | Available | **Partial** | Auto MTF and GHS are runtime-tested through the Windows editor; complete a visual fixture matrix for Percentile Asinh, Linear, Asinh, explicit MTF, and No Stretch. |
+| Ordered stretch stages | Available | **Complete** | Modeless editor adds, selects, removes, and reorders stages; a GHS plus identity stack is runtime-tested through the upstream C ABI. |
+| Color strategies | Available | **Complete** | Linked Channels, Per Channel, and Preserve Luminance Color replace the old three-item RGB menu and share the macOS JSON contract. |
+| Background-gradient removal | Available | **Complete** | Runtime-tested as an interactive preview on a 261 MB planar-RGB FITS frame with explicit progress. |
+| Debounced live stretch preview | Available | **Complete** | Latest valid draft renders at a bounded 2,048-pixel dimension without replacing the committed full-resolution bitmap. |
+| Save/Cancel and stretch undo/redo | Available | **Complete** | Runtime-tested full-resolution commit, cancel restoration, and Ctrl+Z/Ctrl+Shift+Z history. |
+| GHS symmetry-point image picker | Available | **Planned** | Add an eyedropper mode that samples displayed luminance from the image canvas and returns to the modeless editor. |
+| Modeless/detachable stretch panel | Available | **Complete** | Native DPI-aware Windows tool window leaves the viewer undimmed and interactive while previews render. |
+| Histogram and transfer-curve inspector | Available | **Planned** | Add channel-aware histogram and pre-/post-stretch curve plots to the native inspector. |
 | Fit, pan, wheel zoom, and toolbar zoom | Available | **Complete** | — |
 | Pointer-anchored pinch/touch zoom | Available | **Planned** | Add native manipulation handling without rerendering pixels. |
 | Image dimensions, format, and color-kind status | Available | **Complete** | — |
@@ -57,7 +67,7 @@ The macOS Settings flow is now part of first-release parity, not a future
 enhancement. Previewing remains catalog-free; catalog I/O starts only for
 status/setup or an explicitly requested solve.
 
-| Capability | macOS 0.2.0 | Windows | Windows gap / acceptance criterion |
+| Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
 | Use Seiza's default catalog directory | Available | **Complete** | Resolved by shared Rust; runtime-tested against the default Windows catalog. |
 | Choose and persist a custom catalog directory | Available | **Complete** | WinUI folder picker persists both FutureAccessList access and the display path. |
@@ -79,7 +89,7 @@ contract while retaining Windows BGRA render output.
 
 ## Plate solving
 
-| Capability | macOS 0.2.0 | Windows | Windows gap / acceptance criterion |
+| Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
 | Explicit local blind solve | Available | **Complete** | Runtime-tested through the upstream C ABI on a raw telescope FITS frame. |
 | Background solve state | Available | **Complete** | Solving remains off the UI thread and leaves viewing/navigation responsive. |
@@ -96,7 +106,7 @@ contract while retaining Windows BGRA render output.
 The Windows renderer consumes the upstream solve response directly and shares
 one Win2D drawing path between the live viewport and full-resolution export.
 
-| Layer or behavior | macOS 0.2.0 | Windows | Windows gap / acceptance criterion |
+| Layer or behavior | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
 | Overlay availability, unavailable reasons, and counts | Available | **Complete** | Counts and disabled states remain in the overlay menu; detailed core reasons are selectable in the inspector. |
 | Named stars | Available | **Complete** | Catalog palette, markers, and labels share the macOS defaults. |
@@ -120,8 +130,8 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | Capability | macOS analogue | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
 | Product app icon | macOS app icon | **Complete** | The same Seiza artwork is supplied at Windows executable, taskbar, title-bar, Start, Store, tile, lock-screen, splash, and About sizes. |
-| FITS file registration and document icon | Finder association/icon | **Planned** | MSIX `.fits`, `.fit`, and `.fts` associations with a dedicated icon. |
-| Stretched system preview | Quick Look extension | **Planned** | Explorer Preview Pane handler in a separately hosted native component. |
+| FITS file registration and document icon | Finder association/icon available | **Planned** | MSIX `.fits`, `.fit`, and `.fts` associations with a dedicated icon. |
+| Stretched system preview | Quick Look extension available | **Planned** | Explorer Preview Pane handler in a separately hosted native component. |
 | Content thumbnails on file icons | Finder thumbnail provider (planned) | **Planned** | Explorer thumbnail provider, isolated from .NET, catalogs, and solving. |
 | Signed distributable | Signed/notarized universal DMG | **Planned** | Signed self-contained x64 MSIX; ARM64 follows parity. |
 | Release automation | macOS release workflows | **Partial** | CI builds Debug; add signed packaging, artifacts, tags, and protected release environment. |
@@ -130,9 +140,14 @@ one Win2D drawing path between the live viewport and full-resolution export.
 
 ## Shared future roadmap
 
-These remain tracked even though they are not macOS 0.2.0 release features:
+These remain tracked beyond the current macOS parity surface:
 
-- pixel loupe, histogram, and black/midtone controls;
+- XISF opening (shared core ready; Windows activation, extension handling, and
+  representative runtime fixtures remain);
+- deconvolution processing controls (shared core ready; Windows configuration,
+  preview, export, and validation remain);
+- native RGBA16 export (shared core ready; Windows high-bit-depth export remains);
+- pixel loupe and WCS-aware cursor sampling;
 - star-detection overlays with HFR/FWHM measurements;
 - compass, scale bar, and WCS cursor readout;
 - solve sidecar provenance and FITS WCS-card export;
@@ -149,7 +164,8 @@ These remain tracked even though they are not macOS 0.2.0 release features:
    protection, solution summary, and Settings remediation.
 3. **Complete: Overlay/export vertical slice** — common coordinate transform,
    layer menu, grid/center, catalog layers, and clean/composited export.
-4. **In progress: Inspection parity** — metadata inspector and RGB modes are complete;
-   next are the thumbnail drawer/cache and preview-while-loading pipeline.
+4. **In progress: FITS processing parity** — the modeless stack editor, live preview,
+   background removal, and history are implemented; next are the GHS image picker,
+   full method fixture matrix, and histogram/transfer-curve inspector.
 5. **Windows integration** — multi-window activation, file associations,
    Explorer components, signed packaging, and release automation.
