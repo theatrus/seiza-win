@@ -17,6 +17,18 @@ internal static partial class NativeMethods
 
     [LibraryImport(
         LibraryName,
+        EntryPoint = "seiza_solve_image_json",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint SolveImageJson(
+        string path,
+        string? catalogDirectory,
+        double minimumScaleArcsecPerPixel,
+        double maximumScaleArcsecPerPixel,
+        byte sipOrder,
+        out nint error);
+
+    [LibraryImport(
+        LibraryName,
         EntryPoint = "seiza_catalog_setup",
         StringMarshalling = StringMarshalling.Utf8)]
     [return: MarshalAs(UnmanagedType.U1)]

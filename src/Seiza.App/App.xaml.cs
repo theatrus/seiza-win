@@ -66,8 +66,21 @@ public partial class App : Application
     /// <param name="args">Details about the launch request and process.</param>
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
     {
-        Window = new MainWindow();
+        var mainWindow = new MainWindow();
+        Window = mainWindow;
         DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
         Window.Activate();
+
+        string launchPath = args.Arguments.Trim().Trim('"');
+        if (!File.Exists(launchPath))
+        {
+            launchPath = Environment.GetCommandLineArgs()
+                .Skip(1)
+                .FirstOrDefault(File.Exists) ?? string.Empty;
+        }
+        if (File.Exists(launchPath))
+        {
+            _ = mainWindow.OpenPathAsync(launchPath);
+        }
     }
 }

@@ -31,4 +31,8 @@ public sealed partial class MainWindow : Window
         AppTitleBar.Title = title;
         AppWindow.Title = title;
     }
+
+    public Task OpenPathAsync(string path) => RootFrame.Content is MainPage page
+        ? page.OpenPathAsync(path)
+        : Task.CompletedTask;
 }
