@@ -1,0 +1,56 @@
+# Architecture
+
+## Product boundary
+
+Seiza for Windows uses the same native-shell/shared-Rust split as Seiza for
+macOS. Windows-specific behavior remains in the Windows shell; astronomy and
+pixel-domain behavior remains in Rust.
+
+```text
+Seiza.App (WinUI 3 / C#)
+    |-- Windows lifecycle, file activation, multi-window sessions
+    |-- native controls, accessibility, settings, drag and drop
+    |-- Win2D image viewport and overlay presentation
+    `-- generated P/Invoke bindings with SafeHandle ownership
+                         |
+                         `-- C ABI -- seiza-cabi.dll (Rust)
+                                           |-- seiza-fits
+                                           |-- image
+                                           `-- seiza
+```
+
+A later, separately hosted Rust COM DLL will provide Explorer FITS thumbnails
+and Preview Pane integration. It must stay independent of WinUI, .NET, catalog
+loading, and plate solving because Explorer loads it out of process.
+
+## Locked decisions
+
+1. The supported first release is Windows 11 x64. ARM64 follows after parity.
+2. WinUI 3 owns application chrome and standard interactions.
+3. Win2D owns interactive image and vector-overlay presentation.
+4. Rust owns decoding, stretching, statistics, WCS, solving, and catalog data.
+5. No Rust layout, allocator-owned string, or panic crosses the C ABI.
+6. Pixel buffers cross through opaque handles; versioned JSON carries metadata and solve records.
+7. The process hosts multiple document windows and redirects new file activations into the existing process.
+8. Distribution is a signed, self-contained MSIX with FITS file association.
+
+## Performance rules
+
+- Never perform per-pixel work in C#.
+- Upload a rendered image once; pan, zoom, and overlay visibility changes must not rerender pixels.
+- Prioritize the visible image over adjacent thumbnails and cache maintenance.
+- Bound background concurrency and memory use.
+- Add a tiled rendering API only after measurements show full-image upload is a bottleneck.
+- Keep cached previews visible while full-resolution work is in flight.
+
+## Porting sequence
+
+1. **Complete:** render FITS and raster files through the Rust DLL into a Win2D canvas.
+2. **In progress:** fit, pan, zoom, and RGB stretch selection. Fit, pan, and zoom are complete.
+3. **In progress:** collections, thumbnails, cache, navigation, drag and drop, and windows. Folder navigation and drag and drop are complete.
+4. Add the inspector, catalog settings, solving, and overlay scene.
+5. Add MSIX activation, Explorer integration, signing, and release automation.
+
+Overlay geometry and WCS calculations currently implemented in the macOS view
+should move into shared Rust rather than be independently reimplemented in C#.
+The platform shells should draw a common overlay scene using native graphics.

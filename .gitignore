@@ -1,0 +1,31 @@
+# Rust
+/target/
+/artifacts/
+
+# .NET / Visual Studio
+**/bin/
+**/obj/
+.vs/
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# WinUI / MSIX
+AppPackages/
+BundleArtifacts/
+Generated Files/
+Package.StoreAssociation.xml
+*.appx
+*.appxbundle
+*.appxupload
+*.cer
+*.pfx
+*.msix
+*.msixbundle
+*.msixupload
+
+# Local tooling
+.DS_Store
+Thumbs.db
+*.log

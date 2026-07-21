@@ -1,0 +1,10 @@
+{
+  "profiles": {
+    "Seiza.App (Package)": {
+      "commandName": "MsixPackage"
+    },
+    "Seiza.App (Unpackaged)": {
+      "commandName": "Project"
+    }
+  }
+}
