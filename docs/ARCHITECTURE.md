@@ -45,11 +45,14 @@ loading, and plate solving because Explorer loads it out of process.
 
 ## Porting sequence
 
-1. **Complete:** render FITS and raster files through the Rust DLL into a Win2D canvas.
-2. **In progress:** fit, pan, zoom, and RGB stretch selection. Fit, pan, and zoom are complete.
-3. **In progress:** collections, thumbnails, cache, navigation, drag and drop, and windows. Folder navigation and drag and drop are complete.
-4. Add the inspector, catalog settings, solving, and overlay scene.
-5. Add MSIX activation, Explorer integration, signing, and release automation.
+The detailed status and acceptance criteria live in
+[FEATURE_PARITY.md](FEATURE_PARITY.md). The current delivery order is:
+
+1. **Complete:** render FITS and raster files through the Rust DLL into a Win2D canvas, with file/folder opening, navigation, fit, pan, and zoom.
+2. Sync catalog status/setup into the Windows ABI and build the managed catalog Settings experience.
+3. Bind the existing solve response, add the explicit Solve workflow, and present solution quality.
+4. Draw the solved overlay scene in Win2D with layer and catalog controls.
+5. Complete inspection, thumbnails/cache, multi-window activation, Explorer integration, signing, and release automation.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.

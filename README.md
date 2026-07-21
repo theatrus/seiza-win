@@ -11,7 +11,9 @@ own image decoding, FITS stretching, metadata, solving, and overlay data.
 - `seiza-cabi` as a Rust `cdylib`, with opaque handles for pixels and JSON for evolving records.
 - Packaged, self-contained MSIX distribution, initially targeting Windows 11 x64.
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the decisions and component boundaries.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the decisions and component boundaries,
+and [docs/FEATURE_PARITY.md](docs/FEATURE_PARITY.md) for the maintained macOS-to-Windows
+feature matrix and delivery order.
 
 ## Prerequisites
 
