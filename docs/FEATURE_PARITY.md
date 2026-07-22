@@ -9,8 +9,8 @@ merely because its Rust implementation exists.
 
 - macOS reference: `main` at
   [`5b110ed`](https://github.com/theatrus/seiza-mac/commit/5b110edd813af485d18810d48173d6ec3dcc303b)
-- Seiza core reference: `main` at
-  [`32a8dbf`](https://github.com/theatrus/seiza/commit/32a8dbf62dda60e5ae2a1f3743c5d21976461f83)
+- Seiza core reference: crates.io `seiza-cabi 0.12.0` from
+  [`badb6e8`](https://github.com/theatrus/seiza/commit/badb6e8664d96a2253e0e99c40341e66de805f9f)
 - Windows reference: `main` at
   [`069bce6`](https://github.com/theatrus/seiza-win/commit/069bce6)
 - Last audited: 2026-07-21
@@ -32,7 +32,7 @@ test exist.
 
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
-| FITS, XISF, JPEG, PNG, and TIFF opening | Available | **Complete** | XISF uses the pinned upstream `seiza-xisf` decoder through `seiza-cabi`; keep the supported-extension lists synchronized. |
+| FITS, XISF, JPEG, PNG, and TIFF opening | Available | **Complete** | XISF uses the Cargo-locked crates.io `seiza-xisf` decoder through `seiza-cabi`; keep the supported-extension lists synchronized. |
 | File and folder picker | Available | **Complete** | — |
 | Drop file/folder into the active viewer | Available | **Complete** | — |
 | Mixed-format folder collection and natural ordering | Available | **Complete** | — |

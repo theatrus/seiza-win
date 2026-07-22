@@ -34,20 +34,25 @@ $metadata = $metadataJson | ConvertFrom-Json
 $nativePackages = @(
     $metadata.packages | Where-Object {
         $_.name -eq "seiza-cabi" -and
-        $_.source -like "git+https://github.com/theatrus/seiza.git*"
+        $_.source -like "registry+*"
     }
 )
 if ($nativePackages.Count -ne 1) {
-    throw "Expected exactly one upstream seiza-cabi package, found $($nativePackages.Count)."
+    throw "Expected exactly one registry seiza-cabi package, found $($nativePackages.Count)."
 }
 
 $nativePackage = $nativePackages[0]
-$source = [string]$nativePackage.source
-if ($source -notmatch '#(?<revision>[0-9a-f]{40})$') {
-    throw "Could not read the resolved Seiza commit from Cargo source '$source'."
+$vcsInfoPath = Join-Path (Split-Path -Parent $nativePackage.manifest_path) ".cargo_vcs_info.json"
+if (-not (Test-Path -LiteralPath $vcsInfoPath)) {
+    throw "The published seiza-cabi package does not contain Cargo VCS metadata."
 }
 
-$resolvedRevision = $Matches.revision
+$vcsInfo = Get-Content -LiteralPath $vcsInfoPath -Raw | ConvertFrom-Json
+$resolvedRevision = [string]$vcsInfo.git.sha1
+if ($resolvedRevision -notmatch '^[0-9a-f]{40}$') {
+    throw "Could not read the Seiza source commit from '$vcsInfoPath'."
+}
+
 $cargoAction = if ($Test) { "test" } else { "build" }
 $cargoCommand = "cargo $cargoAction --manifest-path `"$($nativePackage.manifest_path)`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked"
 if ($Configuration -eq "Release") {

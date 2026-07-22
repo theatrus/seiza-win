@@ -47,8 +47,8 @@ user into `Program Files\Seiza for Windows`, adds a shared Start Menu shortcut,
 and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows Default Apps.
 
 The MSI is fully self-contained. It includes .NET 10, the Windows App SDK/WinUI
-runtime, Win2D, and the pinned Seiza Rust core, so installation and first launch
-do not download or bootstrap a separate runtime. Windows will request
+runtime, Win2D, and the Cargo-locked Seiza Rust core, so installation and first
+launch do not download or bootstrap a separate runtime. Windows will request
 administrator approval because this is an all-users installation.
 
 The current target is Windows 11 24H2 or newer on x64. Release signing is still
@@ -83,10 +83,11 @@ The installer is written to `dist`. See the
 ## Architecture
 
 WinUI 3 and C# own Windows lifecycle, controls, accessibility, and settings.
-Win2D owns interactive image and vector-overlay presentation. The exact pinned
-upstream `seiza-cabi` Rust crate owns decoding, FITS/XISF processing, statistics,
-catalogs, WCS, and solving; its version and 40-character source commit are
-shown in the About dialog.
+Win2D owns interactive image and vector-overlay presentation. The published
+`seiza-cabi` Rust crate and its crates.io dependencies own decoding, FITS/XISF
+processing, statistics, catalogs, WCS, and solving. `Cargo.lock` selects exact
+versions, and the About dialog reports the C ABI version and packaged source
+commit.
 
 See [Architecture](docs/ARCHITECTURE.md) for component boundaries and
 performance rules.

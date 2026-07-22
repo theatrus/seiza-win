@@ -5,7 +5,7 @@ Windows`, adds a shared Start Menu shortcut, and registers Seiza with Windows
 Default Apps for `.fit`, `.fits`, `.fts`, and `.xisf` files.
 
 The payload is self-contained: it includes .NET 10, the Windows App SDK/WinUI
-runtime, Win2D, and the pinned Seiza Rust core. Installation and first launch do
+runtime, Win2D, and the Cargo-locked Seiza Rust core. Installation and first launch do
 not need a network connection or separate runtime installers.
 
 Build the installer from the repository root:

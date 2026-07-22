@@ -31,7 +31,8 @@ Richardson-Lucy deconvolution, then the ordered display-stretch stack. The
 `deconvolution` JSON object carries `psf_fwhm_pixels`, `iterations`, `amount`,
 `noise_fraction`, and `max_correction`.
 
-`scripts/build-rust.ps1` resolves the pinned package with `cargo metadata`,
-builds the upstream `seiza-cabi` workspace member, and emits
-`seiza-build-info.json` beside the DLL. The app packages that file so About can
-show the exact native crate version and 40-character source commit.
+`scripts/build-rust.ps1` resolves the crates.io package with `cargo metadata`,
+builds the published `seiza-cabi` crate, reads Cargo's packaged
+`.cargo_vcs_info.json`, and emits `seiza-build-info.json` beside the DLL. The app
+packages that file so About can show the exact native crate version and
+40-character source commit without a Git dependency.
