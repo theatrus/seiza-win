@@ -97,6 +97,67 @@ internal static class FitsStretchColorStrategyExtensions
     };
 }
 
+internal sealed class FitsDeconvolutionConfiguration : IEquatable<FitsDeconvolutionConfiguration>
+{
+    public double PsfFwhmPixels { get; set; } = 3.0;
+    public int Iterations { get; set; } = 4;
+    public double Amount { get; set; } = 0.35;
+    public double NoiseFraction { get; set; } = 0.001;
+    public double MaxCorrection { get; set; } = 2.0;
+
+    public FitsDeconvolutionConfiguration Clone() =>
+        (FitsDeconvolutionConfiguration)MemberwiseClone();
+
+    public string? ValidationMessage
+    {
+        get
+        {
+            if (!double.IsFinite(PsfFwhmPixels) ||
+                !double.IsFinite(Amount) ||
+                !double.IsFinite(NoiseFraction) ||
+                !double.IsFinite(MaxCorrection))
+            {
+                return "Deconvolution parameters must be finite numbers.";
+            }
+            if (PsfFwhmPixels is < 0.25 or > 100)
+            {
+                return "PSF FWHM must be between 0.25 and 100 pixels.";
+            }
+            if (Iterations is < 1 or > 50)
+            {
+                return "Iterations must be between 1 and 50.";
+            }
+            if (Amount is < 0 or > 1)
+            {
+                return "Amount must be between 0 and 1.";
+            }
+            if (NoiseFraction is < 0 or > 0.25)
+            {
+                return "Noise damping must be between 0 and 0.25.";
+            }
+            return MaxCorrection is < 1 or > 100
+                ? "Correction limit must be between 1 and 100."
+                : null;
+        }
+    }
+
+    public bool Equals(FitsDeconvolutionConfiguration? other) => other is not null &&
+        PsfFwhmPixels == other.PsfFwhmPixels &&
+        Iterations == other.Iterations &&
+        Amount == other.Amount &&
+        NoiseFraction == other.NoiseFraction &&
+        MaxCorrection == other.MaxCorrection;
+
+    public override bool Equals(object? obj) => Equals(obj as FitsDeconvolutionConfiguration);
+
+    public override int GetHashCode() => HashCode.Combine(
+        PsfFwhmPixels,
+        Iterations,
+        Amount,
+        NoiseFraction,
+        MaxCorrection);
+}
+
 internal sealed class FitsStretchConfiguration : IEquatable<FitsStretchConfiguration>
 {
     public FitsStretchType Type { get; set; } = FitsStretchType.AutoMtf;
@@ -253,15 +314,18 @@ internal sealed class FitsImageProcessingConfiguration
     public FitsImageProcessingConfiguration(
         FitsStretchStack stretchStack,
         bool extractsBackground,
+        FitsDeconvolutionConfiguration? deconvolution = null,
         bool interactivePreview = false)
     {
         StretchStack = stretchStack.Clone();
         ExtractsBackground = extractsBackground;
+        Deconvolution = deconvolution?.Clone();
         InteractivePreview = interactivePreview;
     }
 
     public FitsStretchStack StretchStack { get; }
     public bool ExtractsBackground { get; }
+    public FitsDeconvolutionConfiguration? Deconvolution { get; }
     public bool InteractivePreview { get; }
 
     public static FitsImageProcessingConfiguration Default { get; } = new(
@@ -270,7 +334,8 @@ internal sealed class FitsImageProcessingConfiguration
 
     public string ToJson()
     {
-        string? validationMessage = StretchStack.ValidationMessage;
+        string? validationMessage = StretchStack.ValidationMessage ??
+            Deconvolution?.ValidationMessage;
         if (validationMessage is not null)
         {
             throw new InvalidOperationException(validationMessage);
@@ -293,6 +358,17 @@ internal sealed class FitsImageProcessingConfiguration
                 writer.WritePropertyName("background");
                 writer.WriteStartObject();
                 writer.WriteString("mode", "subtract");
+                writer.WriteEndObject();
+            }
+            if (Deconvolution is not null)
+            {
+                writer.WritePropertyName("deconvolution");
+                writer.WriteStartObject();
+                writer.WriteNumber("psf_fwhm_pixels", Deconvolution.PsfFwhmPixels);
+                writer.WriteNumber("iterations", Deconvolution.Iterations);
+                writer.WriteNumber("amount", Deconvolution.Amount);
+                writer.WriteNumber("noise_fraction", Deconvolution.NoiseFraction);
+                writer.WriteNumber("max_correction", Deconvolution.MaxCorrection);
                 writer.WriteEndObject();
             }
             if (InteractivePreview)

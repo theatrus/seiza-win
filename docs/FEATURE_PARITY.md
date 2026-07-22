@@ -8,7 +8,7 @@ merely because its Rust implementation exists.
 ## Baseline
 
 - macOS reference: `main` at
-  [`b1f76a8`](https://github.com/theatrus/seiza-mac/commit/b1f76a8de798d29d7374c93b8827b62c2fbabac3)
+  [`5b110ed`](https://github.com/theatrus/seiza-mac/commit/5b110edd813af485d18810d48173d6ec3dcc303b)
 - Seiza core reference: `main` at
   [`32a8dbf`](https://github.com/theatrus/seiza/commit/32a8dbf62dda60e5ae2a1f3743c5d21976461f83)
 - Windows reference: current stretch-controls branch
@@ -47,11 +47,13 @@ test exist.
 | Ordered stretch stages | Available | **Complete** | Modeless editor adds, selects, removes, and reorders stages; a GHS plus identity stack is runtime-tested through the upstream C ABI. |
 | Color strategies | Available | **Complete** | Linked Channels, Per Channel, and Preserve Luminance Color replace the old three-item RGB menu and share the macOS JSON contract. |
 | Background-gradient removal | Available | **Complete** | Runtime-tested as an interactive preview on a 261 MB planar-RGB FITS frame with explicit progress. |
+| Light Richardson-Lucy deconvolution | Available | **Complete** | Shared Rust runs background correction, deconvolution, then display stretch; the native controls, bounded live preview, full-resolution commit, validation, and inspector provenance are runtime-tested on a 261 MB planar-RGB FITS frame. |
 | Debounced live stretch preview | Available | **Complete** | Latest valid draft renders at a bounded 2,048-pixel dimension without replacing the committed full-resolution bitmap. |
 | Save/Cancel and stretch undo/redo | Available | **Complete** | Runtime-tested full-resolution commit, cancel restoration, and Ctrl+Z/Ctrl+Shift+Z history. |
-| GHS symmetry-point image picker | Available | **Planned** | Add an eyedropper mode that samples displayed luminance from the image canvas and returns to the modeless editor. |
+| GHS symmetry-point image picker | Available | **Complete** | Runtime-tested end to end: the modeless panel hides, the viewer samples median 3 x 3 Rec.709 display luminance, protection bounds clamp, and the panel returns with a fresh preview. |
 | Modeless/detachable stretch panel | Available | **Complete** | Native DPI-aware Windows tool window leaves the viewer undimmed and interactive while previews render. |
-| Histogram and transfer-curve inspector | Available | **Planned** | Add channel-aware histogram and pre-/post-stretch curve plots to the native inspector. |
+| Input and display histogram inspector | Available | **Complete** | Native 256-bin RGB/mono plots use the macOS robust 98th-percentile interior-bin ceiling and expose accessible histogram names. |
+| Transfer-curve inspector | Not present | **Deferred** | Track as a shared future enhancement rather than a current macOS parity gap. |
 | Fit, pan, wheel zoom, and toolbar zoom | Available | **Complete** | — |
 | Pointer-anchored pinch/touch zoom | Available | **Planned** | Add native manipulation handling without rerendering pixels. |
 | Image dimensions, format, and color-kind status | Available | **Complete** | — |
@@ -121,7 +123,7 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | RA/Dec coordinate grid and labels | Available | **Complete** | Derived from solved WCS and cached per solution. |
 | Field-center marker | Available | **Complete** | Drawn in the common solved-image coordinate space. |
 | Hide all overlays | Available | **Complete** | One accessible action without losing catalog filter preferences. |
-| Overlay transforms during pan/zoom | Available | **Partial** | Image-space anchors track the bitmap, but marker glyphs, stroke widths, label text, and halos currently change size with zoom. Keep those screen-space sizes constant while contours and object extents remain image-scaled. |
+| Overlay transforms during pan/zoom | Available | **Complete** | Runtime-tested after a 6.20-second solve at Fit and two zoom levels: contours and object extents remain image-scaled while strokes, marker glyphs, label text, and halos remain screen-space stable. |
 | Catalog-aware palette and restrained styling | Available | **Complete** | Matches the semantic macOS palette with readable haloed labels. |
 | Satellite overlays | Planned | **Deferred** | Requires time span, observer, element epoch, and explicit provenance. |
 
@@ -144,9 +146,8 @@ These remain tracked beyond the current macOS parity surface:
 
 - XISF opening (shared core ready; Windows activation, extension handling, and
   representative runtime fixtures remain);
-- deconvolution processing controls (shared core ready; Windows configuration,
-  preview, export, and validation remain);
 - native RGBA16 export (shared core ready; Windows high-bit-depth export remains);
+- transfer-curve visualization and direct curve editing;
 - pixel loupe and WCS-aware cursor sampling;
 - star-detection overlays with HFR/FWHM measurements;
 - compass, scale bar, and WCS cursor readout;
@@ -164,8 +165,9 @@ These remain tracked beyond the current macOS parity surface:
    protection, solution summary, and Settings remediation.
 3. **Complete: Overlay/export vertical slice** — common coordinate transform,
    layer menu, grid/center, catalog layers, and clean/composited export.
-4. **In progress: FITS processing parity** — the modeless stack editor, live preview,
-   background removal, and history are implemented; next are the GHS image picker,
-   full method fixture matrix, and histogram/transfer-curve inspector.
+4. **Complete: Current FITS processing interaction set** — modeless ordered
+   stages, live preview, background removal, light deconvolution, GHS image
+   sampling, histograms, history, and full-resolution commit are implemented.
+   The remaining stretch-method fixture matrix is tracked as visual QA.
 5. **Windows integration** — multi-window activation, file associations,
    Explorer components, signed packaging, and release automation.

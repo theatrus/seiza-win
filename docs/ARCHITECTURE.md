@@ -45,7 +45,8 @@ loading, and plate solving because Explorer loads it out of process.
 - Bound background concurrency and memory use.
 - Add a tiled rendering API only after measurements show full-image upload is a bottleneck.
 - Keep cached previews visible while full-resolution work is in flight.
-- Render interactive stretch drafts through the shared JSON C ABI at a bounded 2,048-pixel dimension, cancel stale UI results, and retain the committed full-resolution bitmap until Save succeeds.
+- Render interactive processing drafts through the shared JSON C ABI at a bounded 2,048-pixel dimension, cancel stale UI results, and retain the committed full-resolution bitmap until Save succeeds.
+- Keep the shared pixel pipeline ordered as background correction, optional light deconvolution, then display stretch; the Windows shell only edits and serializes configuration.
 
 ## Porting sequence
 
@@ -56,7 +57,8 @@ The detailed status and acceptance criteria live in
 2. **Complete:** catalog status/setup in the Windows ABI plus native Settings for location, readiness, presets, durable progress, verification, and repair.
 3. **Complete:** bind the solve response, add the explicit Solve workflow, and present solution quality.
 4. **Complete:** draw the solved overlay scene in Win2D with layer and catalog controls.
-5. **In progress:** complete the stackable FITS stretch editor and histogram parity, then add thumbnails/cache, multi-window activation, Explorer integration, signing, and release automation.
+5. **Complete:** match the current macOS FITS processing interactions with the stackable editor, GHS image sampling, input/display histograms, and live light deconvolution.
+6. **Next:** add thumbnails/cache, multi-window activation, Explorer integration, signing, and release automation.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.

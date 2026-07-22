@@ -42,7 +42,9 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _isDragging;
     private bool _isFitToWindow = true;
     private bool _isInspectorOpen;
+    private bool _isPickingSymmetryPoint;
     private bool _extractsBackground;
+    private FitsDeconvolutionConfiguration? _deconvolutionConfiguration;
     private FitsStretchWindow? _stretchWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
@@ -106,7 +108,14 @@ public sealed partial class MainPage : Page, IDisposable
     {
         if (_stretchWindow is not null)
         {
-            _stretchWindow.Activate();
+            if (_isPickingSymmetryPoint)
+            {
+                EndSymmetryPointPicker(showEditor: true);
+            }
+            else
+            {
+                _stretchWindow.Activate();
+            }
             return;
         }
         if (_currentPath is null || !SupportsFitsStretch(_currentMetadata))
@@ -119,9 +128,11 @@ public sealed partial class MainPage : Page, IDisposable
             Path.GetFileName(path),
             _stretchHistory.Current,
             _extractsBackground,
+            _deconvolutionConfiguration,
             SupportsColorStretch(_currentMetadata));
         _stretchWindow = window;
         window.PreviewRequested = request => PreviewStretchAsync(path, request);
+        window.PickSymmetryPointRequested = BeginSymmetryPointPicker;
 
         try
         {
@@ -137,8 +148,11 @@ public sealed partial class MainPage : Page, IDisposable
 
             FitsStretchStack requestedStack = window.ResultStack;
             bool requestedBackground = window.ResultExtractsBackground;
+            FitsDeconvolutionConfiguration? requestedDeconvolution =
+                window.ResultDeconvolution;
             bool changed = !_stretchHistory.Current.Equals(requestedStack) ||
-                _extractsBackground != requestedBackground;
+                _extractsBackground != requestedBackground ||
+                !Equals(_deconvolutionConfiguration, requestedDeconvolution);
             if (!changed)
             {
                 return;
@@ -146,7 +160,8 @@ public sealed partial class MainPage : Page, IDisposable
 
             var processing = new FitsImageProcessingConfiguration(
                 requestedStack,
-                requestedBackground);
+                requestedBackground,
+                requestedDeconvolution);
             if (await LoadImageAsync(
                 path,
                 preserveSolution: true,
@@ -154,6 +169,7 @@ public sealed partial class MainPage : Page, IDisposable
             {
                 _stretchHistory.Replace(requestedStack);
                 _extractsBackground = requestedBackground;
+                _deconvolutionConfiguration = requestedDeconvolution?.Clone();
                 if (_currentMetadata is not null)
                 {
                     InspectorControl.ShowMetadata(_currentMetadata, CurrentProcessing());
@@ -163,6 +179,8 @@ public sealed partial class MainPage : Page, IDisposable
         finally
         {
             window.PreviewRequested = null;
+            window.PickSymmetryPointRequested = null;
+            EndSymmetryPointPicker(showEditor: false);
             RestoreCommittedBitmap();
             if (ReferenceEquals(_stretchWindow, window))
             {
@@ -509,6 +527,7 @@ public sealed partial class MainPage : Page, IDisposable
         bool isNewImage = !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase);
         if (isNewImage)
         {
+            EndSymmetryPointPicker(showEditor: false);
             _stretchWindow?.Close();
         }
         FitsImageProcessingConfiguration processing = processingOverride ??
@@ -561,6 +580,7 @@ public sealed partial class MainPage : Page, IDisposable
             {
                 _stretchHistory.Reset();
                 _extractsBackground = false;
+                _deconvolutionConfiguration = null;
             }
             InspectorControl.ShowMetadata(image.Metadata, processing);
             ViewModel.CompleteLoading(path, image.Metadata);
@@ -626,7 +646,11 @@ public sealed partial class MainPage : Page, IDisposable
     }
 
     private FitsImageProcessingConfiguration CurrentProcessing(bool interactivePreview = false) =>
-        new(_stretchHistory.Current, _extractsBackground, interactivePreview);
+        new(
+            _stretchHistory.Current,
+            _extractsBackground,
+            _deconvolutionConfiguration,
+            interactivePreview);
 
     private void SetCommittedBitmap(CanvasBitmap bitmap)
     {
@@ -702,11 +726,102 @@ public sealed partial class MainPage : Page, IDisposable
             return;
         }
 
+        if (_isPickingSymmetryPoint)
+        {
+            var position = new Vector2((float)point.Position.X, (float)point.Position.Y);
+            if (TrySampleCommittedLuminance(position, out double luminance))
+            {
+                CompleteSymmetryPointPicker(luminance);
+            }
+            e.Handled = true;
+            return;
+        }
+
         _isDragging = true;
         _dragStart = new Vector2((float)point.Position.X, (float)point.Position.Y);
         _offsetAtDragStart = _offset;
         ImageCanvas.CapturePointer(e.Pointer);
         e.Handled = true;
+    }
+
+    private void BeginSymmetryPointPicker()
+    {
+        if (_stretchWindow is null || _committedBitmap is null)
+        {
+            return;
+        }
+
+        _isPickingSymmetryPoint = true;
+        RestoreCommittedBitmap();
+        SymmetryPickerBanner.Visibility = Visibility.Visible;
+        ImageCanvas.Focus(FocusState.Programmatic);
+    }
+
+    private void CancelSymmetryPointPicker_Click(object sender, RoutedEventArgs e) =>
+        EndSymmetryPointPicker(showEditor: true);
+
+    private void CompleteSymmetryPointPicker(double luminance)
+    {
+        _isPickingSymmetryPoint = false;
+        SymmetryPickerBanner.Visibility = Visibility.Collapsed;
+        _stretchWindow?.ApplySymmetryPoint(luminance);
+    }
+
+    private void EndSymmetryPointPicker(bool showEditor)
+    {
+        bool wasPicking = _isPickingSymmetryPoint;
+        _isPickingSymmetryPoint = false;
+        SymmetryPickerBanner.Visibility = Visibility.Collapsed;
+        if (showEditor && wasPicking)
+        {
+            _stretchWindow?.CancelSymmetryPointPicker();
+        }
+    }
+
+    private bool TrySampleCommittedLuminance(Vector2 viewportPoint, out double luminance)
+    {
+        luminance = 0;
+        if (_committedBitmap is null || _scale <= 0 || _sourceWidth <= 0 || _sourceHeight <= 0)
+        {
+            return false;
+        }
+
+        Vector2 imagePoint = (viewportPoint - _offset) / _scale;
+        if (imagePoint.X < 0 || imagePoint.Y < 0 ||
+            imagePoint.X >= _sourceWidth || imagePoint.Y >= _sourceHeight)
+        {
+            return false;
+        }
+
+        int bitmapWidth = checked((int)_committedBitmap.SizeInPixels.Width);
+        int bitmapHeight = checked((int)_committedBitmap.SizeInPixels.Height);
+        int centerX = Math.Min(
+            (int)Math.Floor(imagePoint.X * bitmapWidth / _sourceWidth),
+            bitmapWidth - 1);
+        int centerY = Math.Min(
+            (int)Math.Floor(imagePoint.Y * bitmapHeight / _sourceHeight),
+            bitmapHeight - 1);
+        int left = Math.Max(centerX - 1, 0);
+        int top = Math.Max(centerY - 1, 0);
+        int width = Math.Min(centerX + 1, bitmapWidth - 1) - left + 1;
+        int height = Math.Min(centerY + 1, bitmapHeight - 1) - top + 1;
+        byte[] bgra = _committedBitmap.GetPixelBytes(left, top, width, height);
+        var samples = new List<double>(width * height);
+        for (int index = 0; index + 3 < bgra.Length; index += 4)
+        {
+            double blue = bgra[index] / 255.0;
+            double green = bgra[index + 1] / 255.0;
+            double red = bgra[index + 2] / 255.0;
+            samples.Add((0.2126 * red) + (0.7152 * green) + (0.0722 * blue));
+        }
+        if (samples.Count == 0)
+        {
+            return false;
+        }
+
+        samples.Sort();
+        luminance = samples[samples.Count / 2];
+        return true;
     }
 
     private void ImageCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
@@ -970,6 +1085,7 @@ public sealed partial class MainPage : Page, IDisposable
         _loadCancellation?.Cancel();
         _loadCancellation?.Dispose();
         _loadCancellation = null;
+        EndSymmetryPointPicker(showEditor: false);
         _stretchWindow?.Close();
         _stretchWindow = null;
         if (!ReferenceEquals(_bitmap, _committedBitmap))

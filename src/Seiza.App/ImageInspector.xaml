@@ -3,6 +3,7 @@
     x:Class="Seiza.App.ImageInspector"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:local="using:Seiza.App"
     xmlns:models="using:Seiza.App.Models">
 
     <ScrollViewer
@@ -35,6 +36,72 @@
                         </DataTemplate>
                     </ItemsRepeater.ItemTemplate>
                 </ItemsRepeater>
+            </StackPanel>
+
+            <StackPanel
+                x:Name="HistogramsSection"
+                Spacing="10"
+                Visibility="Collapsed">
+                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <TextBlock
+                    Style="{StaticResource SubtitleTextBlockStyle}"
+                    Text="Histograms" />
+                <StackPanel x:Name="InputHistogramSection" Spacing="5">
+                    <TextBlock FontWeight="SemiBold" Text="Input" />
+                    <local:HistogramPlot x:Name="InputHistogramPlot" Height="88" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="InputHistogramLowerLabel"
+                            FontFamily="Consolas"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            HorizontalAlignment="Center"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Pre-stretch level" />
+                        <TextBlock
+                            x:Name="InputHistogramUpperLabel"
+                            Grid.Column="2"
+                            FontFamily="Consolas"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                </StackPanel>
+                <StackPanel x:Name="DisplayHistogramSection" Spacing="5">
+                    <TextBlock FontWeight="SemiBold" Text="Display" />
+                    <local:HistogramPlot x:Name="DisplayHistogramPlot" Height="88" />
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock
+                            x:Name="DisplayHistogramLowerLabel"
+                            FontFamily="Consolas"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                        <TextBlock
+                            Grid.Column="1"
+                            HorizontalAlignment="Center"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Stretched level" />
+                        <TextBlock
+                            x:Name="DisplayHistogramUpperLabel"
+                            Grid.Column="2"
+                            FontFamily="Consolas"
+                            FontSize="11"
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    </Grid>
+                </StackPanel>
             </StackPanel>
 
             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />

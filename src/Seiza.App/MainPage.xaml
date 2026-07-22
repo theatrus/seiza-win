@@ -349,6 +349,27 @@
                 </StackPanel>
             </Border>
 
+            <Border
+                x:Name="SymmetryPickerBanner"
+                Margin="16"
+                Padding="14,10"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                CornerRadius="20"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <FontIcon Glyph="&#xE7B8;" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Text="Click the image to sample the GHS symmetry point" />
+                    <Button
+                        AutomationProperties.Name="Cancel GHS symmetry point picker"
+                        Click="CancelSymmetryPointPicker_Click"
+                        Content="Cancel" />
+                </StackPanel>
+            </Border>
+
             <StackPanel
                 HorizontalAlignment="Stretch"
                 VerticalAlignment="Top"

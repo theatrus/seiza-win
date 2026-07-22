@@ -93,17 +93,33 @@
                 </Button>
             </Grid>
 
-            <ToggleSwitch
-                x:Name="BackgroundToggle"
-                Header="Remove background gradient"
-                OffContent="Keep original background"
-                OnContent="Subtract smooth background"
-                Toggled="BackgroundToggle_Toggled" />
-            <TextBlock
-                Margin="0,-10,0,0"
-                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="Fit and subtract a smooth background from linear FITS samples before the first stretch stage."
-                TextWrapping="Wrap" />
+            <StackPanel Spacing="10">
+                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Linear processing" />
+                <ToggleSwitch
+                    x:Name="BackgroundToggle"
+                    Header="Remove background gradient"
+                    OffContent="Keep original background"
+                    OnContent="Subtract smooth background"
+                    Toggled="BackgroundToggle_Toggled" />
+                <TextBlock
+                    Margin="0,-6,0,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Fit and subtract a smooth background from linear FITS samples before the first stretch stage."
+                    TextWrapping="Wrap" />
+
+                <ToggleSwitch
+                    x:Name="DeconvolutionToggle"
+                    Header="Apply light deconvolution"
+                    OffContent="Deconvolution off"
+                    OnContent="Deconvolution on"
+                    Toggled="DeconvolutionToggle_Toggled" />
+                <TextBlock
+                    Margin="0,-6,0,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Restore stellar detail with a measured Gaussian PSF after background correction and before display stretching. Conservative defaults reduce, but cannot eliminate, noise amplification and ringing."
+                    TextWrapping="Wrap" />
+                <StackPanel x:Name="DeconvolutionParameterPanel" Spacing="10" />
+            </StackPanel>
 
             <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 

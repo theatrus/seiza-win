@@ -27,6 +27,7 @@ public sealed partial class FitsStretchWindow : Window
     private readonly List<FitsStretchConfiguration> _stages;
     private readonly TaskCompletionSource<bool> _completion = new(
         TaskCreationOptions.RunContinuationsAsynchronously);
+    private FitsDeconvolutionConfiguration? _deconvolution;
     private CancellationTokenSource? _previewCancellation;
     private int _selectedStageIndex;
     private int _previewGeneration;
@@ -37,10 +38,12 @@ public sealed partial class FitsStretchWindow : Window
         string documentName,
         FitsStretchStack stack,
         bool extractsBackground,
+        FitsDeconvolutionConfiguration? deconvolution,
         bool supportsColor)
     {
         InitializeComponent();
         _stages = stack.Stages.Select(stage => stage.Clone()).ToList();
+        _deconvolution = deconvolution?.Clone();
         _selectedStageIndex = _stages.Count - 1;
         Title = $"FITS Stretch — {documentName}";
         StretchTitleBar.Title = Title;
@@ -58,18 +61,25 @@ public sealed partial class FitsStretchWindow : Window
 
         MethodPicker.ItemsSource = StretchTypes;
         ColorStrategyPicker.ItemsSource = ColorStrategies;
+        _isUpdating = true;
         BackgroundToggle.IsOn = extractsBackground;
+        DeconvolutionToggle.IsOn = _deconvolution is not null;
+        _isUpdating = false;
         ColorPanel.Visibility = supportsColor ? Visibility.Visible : Visibility.Collapsed;
         RefreshEditor();
     }
 
     internal Func<FitsStretchPreviewRequest, Task>? PreviewRequested { get; set; }
 
+    internal Action? PickSymmetryPointRequested { get; set; }
+
     internal Task<bool> Completion => _completion.Task;
 
     internal FitsStretchStack ResultStack => new(_stages);
 
     internal bool ResultExtractsBackground => BackgroundToggle.IsOn;
+
+    internal FitsDeconvolutionConfiguration? ResultDeconvolution => _deconvolution?.Clone();
 
     private FitsStretchConfiguration Configuration => _stages[_selectedStageIndex];
 
@@ -113,6 +123,7 @@ public sealed partial class FitsStretchWindow : Window
                 item => item.Strategy == Configuration.ColorStrategy);
             ColorHelpText.Text = Configuration.ColorStrategy.Help();
             BuildParameterControls();
+            BuildDeconvolutionControls();
             UpdateValidation();
         }
         finally
@@ -171,6 +182,14 @@ public sealed partial class FitsStretchWindow : Window
                             DispatcherQueuePriority.Low,
                             BuildParameterControls);
                     });
+                var picker = new Button
+                {
+                    Content = "Pick from image…",
+                    HorizontalAlignment = HorizontalAlignment.Right,
+                };
+                AutomationProperties.SetName(picker, "Pick GHS symmetry point from image");
+                picker.Click += PickSymmetryPoint_Click;
+                ParameterPanel.Children.Add(picker);
                 AddParameter(
                     "Shadow protection",
                     Configuration.ProtectShadows,
@@ -200,6 +219,59 @@ public sealed partial class FitsStretchWindow : Window
         }
     }
 
+    private void BuildDeconvolutionControls()
+    {
+        DeconvolutionParameterPanel.Children.Clear();
+        DeconvolutionParameterPanel.Visibility = _deconvolution is null
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (_deconvolution is null)
+        {
+            return;
+        }
+
+        AddParameter(
+            DeconvolutionParameterPanel,
+            "PSF FWHM",
+            _deconvolution.PsfFwhmPixels,
+            0.25,
+            15,
+            0.05,
+            value => _deconvolution.PsfFwhmPixels = value);
+        AddParameter(
+            DeconvolutionParameterPanel,
+            "Iterations",
+            _deconvolution.Iterations,
+            1,
+            50,
+            1,
+            value => _deconvolution.Iterations = (int)Math.Round(value));
+        AddParameter(
+            DeconvolutionParameterPanel,
+            "Amount",
+            _deconvolution.Amount,
+            0,
+            1,
+            0.01,
+            value => _deconvolution.Amount = value);
+        AddParameter(
+            DeconvolutionParameterPanel,
+            "Noise damping",
+            _deconvolution.NoiseFraction,
+            0,
+            0.05,
+            0.0005,
+            value => _deconvolution.NoiseFraction = value);
+        AddParameter(
+            DeconvolutionParameterPanel,
+            "Correction limit",
+            _deconvolution.MaxCorrection,
+            1,
+            10,
+            0.1,
+            value => _deconvolution.MaxCorrection = value);
+    }
+
     private void AddBlackAndWhiteParameters()
     {
         AddParameter("Black point", Configuration.Black, 0, 0.99, 0.001,
@@ -209,6 +281,16 @@ public sealed partial class FitsStretchWindow : Window
     }
 
     private void AddParameter(
+        string title,
+        double value,
+        double minimum,
+        double maximum,
+        double step,
+        Action<double> setter) =>
+        AddParameter(ParameterPanel, title, value, minimum, maximum, step, setter);
+
+    private void AddParameter(
+        StackPanel target,
         string title,
         double value,
         double minimum,
@@ -282,7 +364,7 @@ public sealed partial class FitsStretchWindow : Window
         grid.Children.Add(label);
         grid.Children.Add(slider);
         grid.Children.Add(number);
-        ParameterPanel.Children.Add(grid);
+        target.Children.Add(grid);
     }
 
     private void StagePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -370,6 +452,56 @@ public sealed partial class FitsStretchWindow : Window
         }
     }
 
+    private void DeconvolutionToggle_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_isUpdating)
+        {
+            return;
+        }
+
+        _deconvolution = DeconvolutionToggle.IsOn
+            ? _deconvolution ?? new FitsDeconvolutionConfiguration()
+            : null;
+        BuildDeconvolutionControls();
+        DraftChanged();
+    }
+
+    private void PickSymmetryPoint_Click(object sender, RoutedEventArgs e)
+    {
+        if (PickSymmetryPointRequested is null)
+        {
+            return;
+        }
+
+        CancelPreview();
+        AppWindow.Hide();
+        PickSymmetryPointRequested();
+    }
+
+    internal void ApplySymmetryPoint(double value)
+    {
+        FitsStretchConfiguration configuration = Configuration;
+        configuration.Type = FitsStretchType.Ghs;
+        configuration.SymmetryPoint = Math.Clamp(value, 0, 1);
+        configuration.ProtectShadows = Math.Min(
+            configuration.ProtectShadows,
+            configuration.SymmetryPoint);
+        configuration.ProtectHighlights = Math.Max(
+            configuration.ProtectHighlights,
+            configuration.SymmetryPoint);
+        ShowAfterSymmetryPointPicker();
+        RefreshEditor();
+        DraftChanged();
+    }
+
+    internal void CancelSymmetryPointPicker() => ShowAfterSymmetryPointPicker();
+
+    private void ShowAfterSymmetryPointPicker()
+    {
+        AppWindow.Show();
+        Activate();
+    }
+
     private void DraftChanged()
     {
         RefreshStageLabels();
@@ -398,7 +530,8 @@ public sealed partial class FitsStretchWindow : Window
     {
         string? message = _stages
             .Select(stage => stage.ValidationMessage)
-            .FirstOrDefault(candidate => candidate is not null);
+            .FirstOrDefault(candidate => candidate is not null) ??
+            _deconvolution?.ValidationMessage;
         SaveButton.IsEnabled = message is null;
         ValidationInfoBar.Message = message ?? string.Empty;
         ValidationInfoBar.IsOpen = message is not null;
@@ -428,6 +561,7 @@ public sealed partial class FitsStretchWindow : Window
             var processing = new FitsImageProcessingConfiguration(
                 new FitsStretchStack(_stages),
                 BackgroundToggle.IsOn,
+                _deconvolution,
                 interactivePreview: true);
             await PreviewRequested(new FitsStretchPreviewRequest(processing, cancellationToken));
             if (generation == _previewGeneration && !cancellationToken.IsCancellationRequested)
@@ -479,6 +613,8 @@ public sealed partial class FitsStretchWindow : Window
     private void Window_Closed(object sender, WindowEventArgs args)
     {
         CancelPreview();
+        PreviewRequested = null;
+        PickSymmetryPointRequested = null;
         _completion.TrySetResult(false);
     }
 
