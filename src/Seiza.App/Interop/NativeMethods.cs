@@ -51,6 +51,16 @@ internal static partial class NativeMethods
         uint rgbStretchMode,
         out nint error);
 
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_rendered_image_open_with_stretch_config",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint OpenRenderedImageWithStretchConfiguration(
+        string path,
+        string configurationJson,
+        uint maxDimension,
+        out nint error);
+
     [LibraryImport(LibraryName, EntryPoint = "seiza_rendered_image_width")]
     internal static partial uint GetRenderedImageWidth(nint image);
 

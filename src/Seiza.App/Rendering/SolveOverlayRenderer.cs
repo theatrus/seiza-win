@@ -10,6 +10,7 @@ namespace Seiza.App.Rendering;
 internal sealed class SolveOverlayRenderer
 {
     private const int GridSamples = 96;
+    private const float ScreenStrokeWidth = 1.35f;
 
     private static readonly double[] GridStepsDegrees =
     [
@@ -49,8 +50,11 @@ internal sealed class SolveOverlayRenderer
         float scaleY,
         Vector2 offset)
     {
-        float referenceScale = MathF.Max(0.001f, MathF.Min(MathF.Abs(scaleX), MathF.Abs(scaleY)));
-        float stroke = Math.Clamp(referenceScale * 1.35f, 1.0f, 2.5f);
+        // Positions, contours, and catalog extents stay in image space, but
+        // marker strokes are a screen-space affordance and must not breathe as
+        // the user zooms. Label fonts, halos, and marker radii below are also
+        // intentionally expressed in device-independent canvas units.
+        const float stroke = ScreenStrokeWidth;
 
         if (options.ShowCoordinateGrid)
         {

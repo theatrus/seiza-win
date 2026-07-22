@@ -19,19 +19,23 @@ internal static unsafe class SeizaCore
 
     public static RenderedImageData Render(
         string path,
-        double targetMedian = 0.2,
-        double shadowsClip = -2.8,
         uint maxDimension = 0,
-        uint rgbStretchMode = 0)
+        FitsImageProcessingConfiguration? processing = null)
     {
         nint error = 0;
-        nint rawHandle = NativeMethods.OpenRenderedImage(
-            path,
-            targetMedian,
-            shadowsClip,
-            maxDimension,
-            rgbStretchMode,
-            out error);
+        nint rawHandle = IsFits(path)
+            ? NativeMethods.OpenRenderedImageWithStretchConfiguration(
+                path,
+                (processing ?? FitsImageProcessingConfiguration.Default).ToJson(),
+                maxDimension,
+                out error)
+            : NativeMethods.OpenRenderedImage(
+                path,
+                0.2,
+                -2.8,
+                maxDimension,
+                0,
+                out error);
 
         if (rawHandle == 0)
         {
@@ -65,6 +69,9 @@ internal static unsafe class SeizaCore
 
         return new RenderedImageData(bgra, width, height, metadata);
     }
+
+    private static bool IsFits(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".fits" or ".fit" or ".fts";
 
     public static CatalogStatus GetCatalogStatus(string? catalogDirectory)
     {

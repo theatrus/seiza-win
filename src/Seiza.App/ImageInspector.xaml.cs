@@ -29,18 +29,46 @@ public sealed partial class ImageInspector : UserControl
         _allHeaders.Clear();
         VisibleHeaders.Clear();
         HeaderSearchBox.Text = string.Empty;
+        ClearHistograms();
         UpdateHeaderState();
     }
 
-    public void ShowMetadata(ImageMetadata metadata, RgbStretchMode rgbStretchMode)
+    internal void ShowMetadata(
+        ImageMetadata metadata,
+        FitsImageProcessingConfiguration processing)
     {
         ImageDetails.Clear();
         ImageDetails.Add(new("Dimensions", $"{metadata.Width:N0} × {metadata.Height:N0}"));
         ImageDetails.Add(new("Format", metadata.Format));
         ImageDetails.Add(new("Encoding", FormatColorKind(metadata.ColorKind)));
-        if (SupportsRgbStretch(metadata))
+        if (string.Equals(metadata.Format, "FITS", StringComparison.OrdinalIgnoreCase))
         {
-            ImageDetails.Add(new("RGB stretch", rgbStretchMode.Title()));
+            FitsStretchConfiguration current = processing.StretchStack.Stages[^1];
+            string stretch = processing.StretchStack.Stages.Count == 1
+                ? current.Type.Title()
+                : $"{processing.StretchStack.Stages.Count} stages · {current.Type.Title()}";
+            ImageDetails.Add(new("Stretch", stretch));
+            if (SupportsColorStretch(metadata))
+            {
+                ImageDetails.Add(new("Color", current.ColorStrategy.Title()));
+            }
+            ImageDetails.Add(new(
+                "Background",
+                processing.ExtractsBackground ? "Gradient removed" : "Original"));
+            if (processing.Deconvolution is { } deconvolution)
+            {
+                ImageDetails.Add(new("Deconvolution", "Light Richardson–Lucy"));
+                ImageDetails.Add(new(
+                    "PSF FWHM",
+                    $"{deconvolution.PsfFwhmPixels:N2} px"));
+                ImageDetails.Add(new(
+                    "Restoration",
+                    $"{deconvolution.Iterations} iterations · {deconvolution.Amount:P0} amount"));
+            }
+            else
+            {
+                ImageDetails.Add(new("Deconvolution", "Off"));
+            }
         }
         ImageDetails.Add(new("Minimum", metadata.Statistics.Minimum.ToString("N0", CultureInfo.CurrentCulture)));
         ImageDetails.Add(new("Maximum", metadata.Statistics.Maximum.ToString("N0", CultureInfo.CurrentCulture)));
@@ -48,12 +76,60 @@ public sealed partial class ImageInspector : UserControl
         ImageDetails.Add(new("Median", metadata.Statistics.Median.ToString("N0", CultureInfo.CurrentCulture)));
         ImageDetails.Add(new("MAD", metadata.Statistics.Mad.ToString("N2", CultureInfo.CurrentCulture)));
 
+        ShowHistograms(metadata);
+
         _allHeaders.Clear();
         _allHeaders.AddRange(metadata.Headers
             .OrderBy(pair => pair.Key, StringComparer.OrdinalIgnoreCase)
             .Select(pair => new InspectorEntry(pair.Key, FormatHeaderValue(pair.Value))));
         ApplyHeaderFilter();
     }
+
+    private void ShowHistograms(ImageMetadata metadata)
+    {
+        bool isMonochrome = metadata.ColorKind.StartsWith("mono", StringComparison.OrdinalIgnoreCase);
+        bool hasInput = metadata.InputHistogram is { IsValid: true };
+        bool hasDisplay = metadata.DisplayHistogram is { IsValid: true };
+        HistogramsSection.Visibility = hasInput || hasDisplay
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+
+        InputHistogramSection.Visibility = hasInput ? Visibility.Visible : Visibility.Collapsed;
+        if (metadata.InputHistogram is { IsValid: true } input)
+        {
+            InputHistogramPlot.ShowHistogram(input, isMonochrome);
+            InputHistogramLowerLabel.Text = FormatHistogramLevel(input.LowerBound);
+            InputHistogramUpperLabel.Text = FormatHistogramLevel(input.UpperBound);
+        }
+        else
+        {
+            InputHistogramPlot.ClearHistogram();
+        }
+
+        DisplayHistogramSection.Visibility = hasDisplay ? Visibility.Visible : Visibility.Collapsed;
+        if (metadata.DisplayHistogram is { IsValid: true } display)
+        {
+            DisplayHistogramPlot.ShowHistogram(display, isMonochrome);
+            DisplayHistogramLowerLabel.Text = FormatHistogramLevel(display.LowerBound);
+            DisplayHistogramUpperLabel.Text = FormatHistogramLevel(display.UpperBound);
+        }
+        else
+        {
+            DisplayHistogramPlot.ClearHistogram();
+        }
+    }
+
+    private void ClearHistograms()
+    {
+        HistogramsSection.Visibility = Visibility.Collapsed;
+        InputHistogramPlot.ClearHistogram();
+        DisplayHistogramPlot.ClearHistogram();
+    }
+
+    private static string FormatHistogramLevel(double value) =>
+        Math.Abs(value - Math.Round(value)) < double.Epsilon
+            ? Math.Round(value).ToString("N0", CultureInfo.CurrentCulture)
+            : value.ToString("N2", CultureInfo.CurrentCulture);
 
     public void ResetSolve()
     {
@@ -188,7 +264,7 @@ public sealed partial class ImageInspector : UserControl
     private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
         App.ShowCatalogSettings();
 
-    private static bool SupportsRgbStretch(ImageMetadata metadata) =>
+    private static bool SupportsColorStretch(ImageMetadata metadata) =>
         metadata.ColorKind is "planar-rgb" or "bayer";
 
     private static string FormatColorKind(string colorKind) => colorKind switch

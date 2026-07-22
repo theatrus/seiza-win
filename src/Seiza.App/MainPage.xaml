@@ -106,30 +106,40 @@
             <AppBarSeparator />
 
             <AppBarButton
-                x:Name="RgbStretchButton"
+                x:Name="UndoStretchButton"
+                Click="UndoStretch_Click"
                 IsEnabled="False"
-                Label="RGB stretch"
-                ToolTipService.ToolTip="RGB stretch is available for color FITS images">
+                Label="Undo stretch"
+                ToolTipService.ToolTip="Undo the last stretch change (Ctrl+Z)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE7A7;" />
+                </AppBarButton.Icon>
+                <AppBarButton.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="Z" Modifiers="Control" />
+                </AppBarButton.KeyboardAccelerators>
+            </AppBarButton>
+            <AppBarButton
+                x:Name="RedoStretchButton"
+                Click="RedoStretch_Click"
+                IsEnabled="False"
+                Label="Redo stretch"
+                ToolTipService.ToolTip="Redo the last stretch change (Ctrl+Shift+Z)">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE7A6;" />
+                </AppBarButton.Icon>
+                <AppBarButton.KeyboardAccelerators>
+                    <KeyboardAccelerator Key="Z" Modifiers="Control,Shift" />
+                </AppBarButton.KeyboardAccelerators>
+            </AppBarButton>
+            <AppBarButton
+                x:Name="StretchButton"
+                Click="Stretch_Click"
+                IsEnabled="False"
+                Label="Stretch"
+                ToolTipService.ToolTip="Stretch controls are available for FITS images">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE790;" />
                 </AppBarButton.Icon>
-                <AppBarButton.Flyout>
-                    <MenuFlyout>
-                        <ToggleMenuFlyoutItem
-                            x:Name="AutoRgbStretchItem"
-                            Click="RgbStretch_Click"
-                            IsChecked="True"
-                            Text="Auto" />
-                        <ToggleMenuFlyoutItem
-                            x:Name="LinkedAutoRgbStretchItem"
-                            Click="RgbStretch_Click"
-                            Text="Linked Auto" />
-                        <ToggleMenuFlyoutItem
-                            x:Name="LinearRgbStretchItem"
-                            Click="RgbStretch_Click"
-                            Text="Linear" />
-                    </MenuFlyout>
-                </AppBarButton.Flyout>
             </AppBarButton>
 
             <AppBarButton
@@ -336,6 +346,27 @@
                         HorizontalAlignment="Center"
                         IsActive="{x:Bind ViewModel.IsLoading, Mode=OneWay}" />
                     <TextBlock Text="{x:Bind ViewModel.StatusText, Mode=OneWay}" />
+                </StackPanel>
+            </Border>
+
+            <Border
+                x:Name="SymmetryPickerBanner"
+                Margin="16"
+                Padding="14,10"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Bottom"
+                Background="{ThemeResource AcrylicInAppFillColorDefaultBrush}"
+                CornerRadius="20"
+                Visibility="Collapsed">
+                <StackPanel Orientation="Horizontal" Spacing="12">
+                    <FontIcon Glyph="&#xE7B8;" />
+                    <TextBlock
+                        VerticalAlignment="Center"
+                        Text="Click the image to sample the GHS symmetry point" />
+                    <Button
+                        AutomationProperties.Name="Cancel GHS symmetry point picker"
+                        Click="CancelSymmetryPointPicker_Click"
+                        Content="Cancel" />
                 </StackPanel>
             </Border>
 

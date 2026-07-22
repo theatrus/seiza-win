@@ -10,7 +10,9 @@ public sealed record ImageMetadata(
     string ColorKind,
     string? RgbStretchMode,
     ImageStatistics Statistics,
-    IReadOnlyDictionary<string, JsonElement> Headers);
+    IReadOnlyDictionary<string, JsonElement> Headers,
+    ImageHistogram? InputHistogram = null,
+    ImageHistogram? DisplayHistogram = null);
 
 public sealed record ImageStatistics(
     int Minimum,
@@ -18,3 +20,21 @@ public sealed record ImageStatistics(
     double Mean,
     int Median,
     double Mad);
+
+public sealed record ImageHistogram(
+    IReadOnlyList<ulong> Red,
+    IReadOnlyList<ulong> Green,
+    IReadOnlyList<ulong> Blue,
+    double LowerBound,
+    double UpperBound)
+{
+    public const int BinCount = 256;
+
+    public bool IsValid =>
+        Red.Count == BinCount &&
+        Green.Count == BinCount &&
+        Blue.Count == BinCount &&
+        double.IsFinite(LowerBound) &&
+        double.IsFinite(UpperBound) &&
+        UpperBound > LowerBound;
+}

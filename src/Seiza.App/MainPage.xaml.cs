@@ -22,8 +22,10 @@ public sealed partial class MainPage : Page, IDisposable
 
     private readonly List<string> _imagePaths = [];
     private readonly OverlayOptions _overlayOptions = new();
+    private readonly FitsStretchHistory _stretchHistory = new();
 
     private CanvasBitmap? _bitmap;
+    private CanvasBitmap? _committedBitmap;
     private CancellationTokenSource? _loadCancellation;
     private CancellationTokenSource? _solveCancellation;
     private ImageMetadata? _currentMetadata;
@@ -40,7 +42,10 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _isDragging;
     private bool _isFitToWindow = true;
     private bool _isInspectorOpen;
-    private RgbStretchMode _rgbStretchMode = RgbStretchMode.Auto;
+    private bool _isPickingSymmetryPoint;
+    private bool _extractsBackground;
+    private FitsDeconvolutionConfiguration? _deconvolutionConfiguration;
+    private FitsStretchWindow? _stretchWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
 
@@ -99,38 +104,116 @@ public sealed partial class MainPage : Page, IDisposable
     private void ZoomOut_Click(object sender, RoutedEventArgs e) =>
         ZoomAt(new Vector2((float)ImageCanvas.ActualWidth / 2, (float)ImageCanvas.ActualHeight / 2), 0.8f);
 
-    private async void RgbStretch_Click(object sender, RoutedEventArgs e)
+    private async void Stretch_Click(object sender, RoutedEventArgs e)
     {
-        RgbStretchMode? requestedMode = sender switch
+        if (_stretchWindow is not null)
         {
-            var item when ReferenceEquals(item, AutoRgbStretchItem) => RgbStretchMode.Auto,
-            var item when ReferenceEquals(item, LinkedAutoRgbStretchItem) => RgbStretchMode.LinkedAuto,
-            var item when ReferenceEquals(item, LinearRgbStretchItem) => RgbStretchMode.Linear,
-            _ => null,
-        };
-        if (requestedMode is null)
-        {
-            SyncRgbStretchControls();
+            if (_isPickingSymmetryPoint)
+            {
+                EndSymmetryPointPicker(showEditor: true);
+            }
+            else
+            {
+                _stretchWindow.Activate();
+            }
             return;
         }
-
-        RgbStretchMode previousMode = _rgbStretchMode;
-        _rgbStretchMode = requestedMode.Value;
-        SyncRgbStretchControls();
-        UpdateVisualState();
-        if (previousMode == _rgbStretchMode || _currentPath is null)
+        if (_currentPath is null || !SupportsFitsStretch(_currentMetadata))
         {
             return;
         }
 
-        RgbStretchMode activeRequest = _rgbStretchMode;
-        bool succeeded = await LoadImageAsync(_currentPath, preserveSolution: true);
-        if (!succeeded && _rgbStretchMode == activeRequest)
+        string path = _currentPath;
+        var window = new FitsStretchWindow(
+            Path.GetFileName(path),
+            _stretchHistory.Current,
+            _extractsBackground,
+            _deconvolutionConfiguration,
+            SupportsColorStretch(_currentMetadata));
+        _stretchWindow = window;
+        window.PreviewRequested = request => PreviewStretchAsync(path, request);
+        window.PickSymmetryPointRequested = BeginSymmetryPointPicker;
+
+        try
         {
-            _rgbStretchMode = previousMode;
-            SyncRgbStretchControls();
+            window.Activate();
+            bool saveChanges = await window.Completion;
+            window.PreviewRequested = null;
+            RestoreCommittedBitmap();
+            if (!saveChanges ||
+                !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+
+            FitsStretchStack requestedStack = window.ResultStack;
+            bool requestedBackground = window.ResultExtractsBackground;
+            FitsDeconvolutionConfiguration? requestedDeconvolution =
+                window.ResultDeconvolution;
+            bool changed = !_stretchHistory.Current.Equals(requestedStack) ||
+                _extractsBackground != requestedBackground ||
+                !Equals(_deconvolutionConfiguration, requestedDeconvolution);
+            if (!changed)
+            {
+                return;
+            }
+
+            var processing = new FitsImageProcessingConfiguration(
+                requestedStack,
+                requestedBackground,
+                requestedDeconvolution);
+            if (await LoadImageAsync(
+                path,
+                preserveSolution: true,
+                processingOverride: processing))
+            {
+                _stretchHistory.Replace(requestedStack);
+                _extractsBackground = requestedBackground;
+                _deconvolutionConfiguration = requestedDeconvolution?.Clone();
+                if (_currentMetadata is not null)
+                {
+                    InspectorControl.ShowMetadata(_currentMetadata, CurrentProcessing());
+                }
+            }
+        }
+        finally
+        {
+            window.PreviewRequested = null;
+            window.PickSymmetryPointRequested = null;
+            EndSymmetryPointPicker(showEditor: false);
+            RestoreCommittedBitmap();
+            if (ReferenceEquals(_stretchWindow, window))
+            {
+                _stretchWindow = null;
+            }
             UpdateVisualState();
         }
+    }
+
+    private async void UndoStretch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentPath is null || !_stretchHistory.Undo())
+        {
+            return;
+        }
+        if (!await LoadImageAsync(_currentPath, preserveSolution: true))
+        {
+            _stretchHistory.Redo();
+        }
+        UpdateVisualState();
+    }
+
+    private async void RedoStretch_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentPath is null || !_stretchHistory.Redo())
+        {
+            return;
+        }
+        if (!await LoadImageAsync(_currentPath, preserveSolution: true))
+        {
+            _stretchHistory.Undo();
+        }
+        UpdateVisualState();
     }
 
     private void Inspector_Click(object sender, RoutedEventArgs e)
@@ -436,8 +519,21 @@ public sealed partial class MainPage : Page, IDisposable
         UpdateNavigationState();
     }
 
-    private async Task<bool> LoadImageAsync(string path, bool preserveSolution = false)
+    private async Task<bool> LoadImageAsync(
+        string path,
+        bool preserveSolution = false,
+        FitsImageProcessingConfiguration? processingOverride = null)
     {
+        bool isNewImage = !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase);
+        if (isNewImage)
+        {
+            EndSymmetryPointPicker(showEditor: false);
+            _stretchWindow?.Close();
+        }
+        FitsImageProcessingConfiguration processing = processingOverride ??
+            (isNewImage
+                ? FitsImageProcessingConfiguration.Default
+                : CurrentProcessing());
         if (!preserveSolution || ViewModel.IsSolving)
         {
             ResetSolveForImageChange();
@@ -458,8 +554,8 @@ public sealed partial class MainPage : Page, IDisposable
         {
             RenderedImageData image = await ImageRenderService.RenderAsync(
                 path,
-                _rgbStretchMode,
-                cancellationToken);
+                processing,
+                cancellationToken: cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             if (generation != _loadGeneration)
             {
@@ -475,13 +571,18 @@ public sealed partial class MainPage : Page, IDisposable
                 96.0f,
                 CanvasAlphaMode.Ignore);
 
-            _bitmap?.Dispose();
-            _bitmap = nextBitmap;
+            SetCommittedBitmap(nextBitmap);
             _sourceWidth = image.Width;
             _sourceHeight = image.Height;
             _currentPath = path;
             _currentMetadata = image.Metadata;
-            InspectorControl.ShowMetadata(image.Metadata, _rgbStretchMode);
+            if (isNewImage && processingOverride is null)
+            {
+                _stretchHistory.Reset();
+                _extractsBackground = false;
+                _deconvolutionConfiguration = null;
+            }
+            InspectorControl.ShowMetadata(image.Metadata, processing);
             ViewModel.CompleteLoading(path, image.Metadata);
             if (App.Window is MainWindow window)
             {
@@ -504,6 +605,72 @@ public sealed partial class MainPage : Page, IDisposable
             }
             return false;
         }
+    }
+
+    private async Task PreviewStretchAsync(
+        string path,
+        FitsStretchPreviewRequest request)
+    {
+        if (_stretchWindow is null ||
+            !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        RenderedImageData image = await ImageRenderService.RenderAsync(
+            path,
+            request.Processing,
+            maxDimension: 2_048,
+            cancellationToken: request.CancellationToken);
+        request.CancellationToken.ThrowIfCancellationRequested();
+        if (_stretchWindow is null ||
+            !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        CanvasBitmap nextBitmap = CanvasBitmap.CreateFromBytes(
+            ImageCanvas,
+            image.Bgra,
+            image.Width,
+            image.Height,
+            DirectXPixelFormat.B8G8R8A8UIntNormalized,
+            96.0f,
+            CanvasAlphaMode.Ignore);
+        if (!ReferenceEquals(_bitmap, _committedBitmap))
+        {
+            _bitmap?.Dispose();
+        }
+        _bitmap = nextBitmap;
+        ImageCanvas.Invalidate();
+    }
+
+    private FitsImageProcessingConfiguration CurrentProcessing(bool interactivePreview = false) =>
+        new(
+            _stretchHistory.Current,
+            _extractsBackground,
+            _deconvolutionConfiguration,
+            interactivePreview);
+
+    private void SetCommittedBitmap(CanvasBitmap bitmap)
+    {
+        if (!ReferenceEquals(_bitmap, _committedBitmap))
+        {
+            _bitmap?.Dispose();
+        }
+        _committedBitmap?.Dispose();
+        _committedBitmap = bitmap;
+        _bitmap = bitmap;
+    }
+
+    private void RestoreCommittedBitmap()
+    {
+        if (!ReferenceEquals(_bitmap, _committedBitmap))
+        {
+            _bitmap?.Dispose();
+        }
+        _bitmap = _committedBitmap;
+        ImageCanvas.Invalidate();
     }
 
     private void ImageCanvas_Draw(CanvasControl sender, CanvasDrawEventArgs args)
@@ -559,11 +726,102 @@ public sealed partial class MainPage : Page, IDisposable
             return;
         }
 
+        if (_isPickingSymmetryPoint)
+        {
+            var position = new Vector2((float)point.Position.X, (float)point.Position.Y);
+            if (TrySampleCommittedLuminance(position, out double luminance))
+            {
+                CompleteSymmetryPointPicker(luminance);
+            }
+            e.Handled = true;
+            return;
+        }
+
         _isDragging = true;
         _dragStart = new Vector2((float)point.Position.X, (float)point.Position.Y);
         _offsetAtDragStart = _offset;
         ImageCanvas.CapturePointer(e.Pointer);
         e.Handled = true;
+    }
+
+    private void BeginSymmetryPointPicker()
+    {
+        if (_stretchWindow is null || _committedBitmap is null)
+        {
+            return;
+        }
+
+        _isPickingSymmetryPoint = true;
+        RestoreCommittedBitmap();
+        SymmetryPickerBanner.Visibility = Visibility.Visible;
+        ImageCanvas.Focus(FocusState.Programmatic);
+    }
+
+    private void CancelSymmetryPointPicker_Click(object sender, RoutedEventArgs e) =>
+        EndSymmetryPointPicker(showEditor: true);
+
+    private void CompleteSymmetryPointPicker(double luminance)
+    {
+        _isPickingSymmetryPoint = false;
+        SymmetryPickerBanner.Visibility = Visibility.Collapsed;
+        _stretchWindow?.ApplySymmetryPoint(luminance);
+    }
+
+    private void EndSymmetryPointPicker(bool showEditor)
+    {
+        bool wasPicking = _isPickingSymmetryPoint;
+        _isPickingSymmetryPoint = false;
+        SymmetryPickerBanner.Visibility = Visibility.Collapsed;
+        if (showEditor && wasPicking)
+        {
+            _stretchWindow?.CancelSymmetryPointPicker();
+        }
+    }
+
+    private bool TrySampleCommittedLuminance(Vector2 viewportPoint, out double luminance)
+    {
+        luminance = 0;
+        if (_committedBitmap is null || _scale <= 0 || _sourceWidth <= 0 || _sourceHeight <= 0)
+        {
+            return false;
+        }
+
+        Vector2 imagePoint = (viewportPoint - _offset) / _scale;
+        if (imagePoint.X < 0 || imagePoint.Y < 0 ||
+            imagePoint.X >= _sourceWidth || imagePoint.Y >= _sourceHeight)
+        {
+            return false;
+        }
+
+        int bitmapWidth = checked((int)_committedBitmap.SizeInPixels.Width);
+        int bitmapHeight = checked((int)_committedBitmap.SizeInPixels.Height);
+        int centerX = Math.Min(
+            (int)Math.Floor(imagePoint.X * bitmapWidth / _sourceWidth),
+            bitmapWidth - 1);
+        int centerY = Math.Min(
+            (int)Math.Floor(imagePoint.Y * bitmapHeight / _sourceHeight),
+            bitmapHeight - 1);
+        int left = Math.Max(centerX - 1, 0);
+        int top = Math.Max(centerY - 1, 0);
+        int width = Math.Min(centerX + 1, bitmapWidth - 1) - left + 1;
+        int height = Math.Min(centerY + 1, bitmapHeight - 1) - top + 1;
+        byte[] bgra = _committedBitmap.GetPixelBytes(left, top, width, height);
+        var samples = new List<double>(width * height);
+        for (int index = 0; index + 3 < bgra.Length; index += 4)
+        {
+            double blue = bgra[index] / 255.0;
+            double green = bgra[index + 1] / 255.0;
+            double red = bgra[index + 2] / 255.0;
+            samples.Add((0.2126 * red) + (0.7152 * green) + (0.0722 * blue));
+        }
+        if (samples.Count == 0)
+        {
+            return false;
+        }
+
+        samples.Sort();
+        luminance = samples[samples.Count / 2];
+        return true;
     }
 
     private void ImageCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
@@ -674,16 +932,24 @@ public sealed partial class MainPage : Page, IDisposable
             ViewModel.HasSolution &&
             _overlayOptions.HasVisibleOverlays &&
             !ViewModel.IsExporting;
-        bool supportsRgbStretch = SupportsRgbStretch(_currentMetadata);
-        RgbStretchButton.IsEnabled = supportsRgbStretch && !ViewModel.IsLoading;
-        RgbStretchButton.Label = supportsRgbStretch
-            ? $"RGB: {_rgbStretchMode.Title()}"
-            : "RGB stretch";
+        bool supportsFitsStretch = SupportsFitsStretch(_currentMetadata);
+        FitsStretchConfiguration currentStretch = _stretchHistory.Current.Stages[^1];
+        UndoStretchButton.IsEnabled =
+            supportsFitsStretch && _stretchHistory.CanUndo && !ViewModel.IsLoading;
+        RedoStretchButton.IsEnabled =
+            supportsFitsStretch && _stretchHistory.CanRedo && !ViewModel.IsLoading;
+        StretchButton.IsEnabled =
+            supportsFitsStretch && !ViewModel.IsLoading;
+        StretchButton.Label = supportsFitsStretch
+            ? _stretchHistory.Current.Stages.Count == 1
+                ? currentStretch.Type.Title()
+                : $"{_stretchHistory.Current.Stages.Count} stages"
+            : "Stretch";
         ToolTipService.SetToolTip(
-            RgbStretchButton,
-            supportsRgbStretch
-                ? $"RGB stretch: {_rgbStretchMode.Title()}. {_rgbStretchMode.Help()}"
-                : "RGB stretch is available for color FITS images");
+            StretchButton,
+            supportsFitsStretch
+                ? $"Stretch: {currentStretch.Type.Title()}. {currentStretch.Type.Help()}"
+                : "Stretch controls are available for FITS images");
         WorkspaceSplitView.IsPaneOpen = _isInspectorOpen && ViewModel.HasImage;
         InspectorButton.Label = WorkspaceSplitView.IsPaneOpen
             ? "Hide inspector"
@@ -697,13 +963,6 @@ public sealed partial class MainPage : Page, IDisposable
         ViewModel.ResetSolve();
         InspectorControl.ResetSolve();
         ImageCanvas.Invalidate();
-    }
-
-    private void SyncRgbStretchControls()
-    {
-        AutoRgbStretchItem.IsChecked = _rgbStretchMode == RgbStretchMode.Auto;
-        LinkedAutoRgbStretchItem.IsChecked = _rgbStretchMode == RgbStretchMode.LinkedAuto;
-        LinearRgbStretchItem.IsChecked = _rgbStretchMode == RgbStretchMode.Linear;
     }
 
     private void SyncOverlayControls()
@@ -778,8 +1037,11 @@ public sealed partial class MainPage : Page, IDisposable
             : $"{type} ({code}): {exception.Message}";
     }
 
-    private static bool SupportsRgbStretch(ImageMetadata? metadata) =>
+    private static bool SupportsColorStretch(ImageMetadata? metadata) =>
         metadata?.ColorKind is "planar-rgb" or "bayer";
+
+    private static bool SupportsFitsStretch(ImageMetadata? metadata) =>
+        string.Equals(metadata?.Format, "FITS", StringComparison.OrdinalIgnoreCase);
 
     private void Viewport_DragOver(object sender, DragEventArgs e)
     {
@@ -823,8 +1085,16 @@ public sealed partial class MainPage : Page, IDisposable
         _loadCancellation?.Cancel();
         _loadCancellation?.Dispose();
         _loadCancellation = null;
-        _bitmap?.Dispose();
+        EndSymmetryPointPicker(showEditor: false);
+        _stretchWindow?.Close();
+        _stretchWindow = null;
+        if (!ReferenceEquals(_bitmap, _committedBitmap))
+        {
+            _bitmap?.Dispose();
+        }
         _bitmap = null;
+        _committedBitmap?.Dispose();
+        _committedBitmap = null;
         ImageCanvas.RemoveFromVisualTree();
         GC.SuppressFinalize(this);
     }

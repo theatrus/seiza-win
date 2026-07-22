@@ -1,0 +1,221 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="Seiza.App.FitsStretchWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="FITS Stretch">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="ContentRoot">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TitleBar x:Name="StretchTitleBar" Title="FITS Stretch">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <ScrollViewer
+            Grid.Row="1"
+            Margin="24"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="16">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="3">
+                    <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Stretch stages" />
+                    <TextBlock
+                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                        Text="Stages run from first to last at full floating-point precision."
+                        TextWrapping="Wrap" />
+                </StackPanel>
+                <Button
+                    Grid.Column="1"
+                    Click="ResetStage_Click"
+                    Content="Reset stage"
+                    VerticalAlignment="Top" />
+            </Grid>
+
+            <Grid ColumnSpacing="8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <ComboBox
+                    x:Name="StagePicker"
+                    AutomationProperties.Name="Selected stretch stage"
+                    HorizontalAlignment="Stretch"
+                    SelectionChanged="StagePicker_SelectionChanged" />
+                <Button
+                    Grid.Column="1"
+                    AutomationProperties.Name="Add stretch stage"
+                    Click="AddStage_Click"
+                    ToolTipService.ToolTip="Add stage">
+                    <FontIcon Glyph="&#xE710;" />
+                </Button>
+                <Button
+                    x:Name="MoveStageUpButton"
+                    Grid.Column="2"
+                    AutomationProperties.Name="Move stretch stage up"
+                    Click="MoveStageUp_Click"
+                    ToolTipService.ToolTip="Move stage earlier">
+                    <FontIcon Glyph="&#xE70E;" />
+                </Button>
+                <Button
+                    x:Name="MoveStageDownButton"
+                    Grid.Column="3"
+                    AutomationProperties.Name="Move stretch stage down"
+                    Click="MoveStageDown_Click"
+                    ToolTipService.ToolTip="Move stage later">
+                    <FontIcon Glyph="&#xE70D;" />
+                </Button>
+                <Button
+                    x:Name="RemoveStageButton"
+                    Grid.Column="4"
+                    AutomationProperties.Name="Remove stretch stage"
+                    Click="RemoveStage_Click"
+                    ToolTipService.ToolTip="Remove stage">
+                    <FontIcon Glyph="&#xE711;" />
+                </Button>
+            </Grid>
+
+            <StackPanel Spacing="10">
+                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Linear processing" />
+                <ToggleSwitch
+                    x:Name="BackgroundToggle"
+                    Header="Remove background gradient"
+                    OffContent="Keep original background"
+                    OnContent="Subtract smooth background"
+                    Toggled="BackgroundToggle_Toggled" />
+                <TextBlock
+                    Margin="0,-6,0,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Fit and subtract a smooth background from linear FITS samples before the first stretch stage."
+                    TextWrapping="Wrap" />
+
+                <ToggleSwitch
+                    x:Name="DeconvolutionToggle"
+                    Header="Apply light deconvolution"
+                    OffContent="Deconvolution off"
+                    OnContent="Deconvolution on"
+                    Toggled="DeconvolutionToggle_Toggled" />
+                <TextBlock
+                    Margin="0,-6,0,0"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    Text="Restore stellar detail with a measured Gaussian PSF after background correction and before display stretching. Conservative defaults reduce, but cannot eliminate, noise amplification and ringing."
+                    TextWrapping="Wrap" />
+                <StackPanel x:Name="DeconvolutionParameterPanel" Spacing="10" />
+            </StackPanel>
+
+            <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="140" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <TextBlock VerticalAlignment="Center" Text="Method" />
+                <ComboBox
+                    x:Name="MethodPicker"
+                    Grid.Column="1"
+                    AutomationProperties.Name="Stretch method"
+                    DisplayMemberPath="Title"
+                    HorizontalAlignment="Stretch"
+                    SelectionChanged="MethodPicker_SelectionChanged" />
+            </Grid>
+            <TextBlock
+                x:Name="MethodHelpText"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                TextWrapping="Wrap" />
+
+            <StackPanel x:Name="ParameterPanel" Spacing="10" />
+
+            <StackPanel x:Name="ColorPanel" Spacing="8">
+                <Rectangle Height="1" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
+                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Color" />
+                <Grid ColumnSpacing="12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="140" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock VerticalAlignment="Center" Text="Color handling" />
+                    <ComboBox
+                        x:Name="ColorStrategyPicker"
+                        Grid.Column="1"
+                        AutomationProperties.Name="Color handling"
+                        DisplayMemberPath="Title"
+                        HorizontalAlignment="Stretch"
+                        SelectionChanged="ColorStrategyPicker_SelectionChanged" />
+                </Grid>
+                <TextBlock
+                    x:Name="ColorHelpText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextWrapping="Wrap" />
+            </StackPanel>
+
+            <InfoBar
+                x:Name="ValidationInfoBar"
+                IsClosable="False"
+                IsOpen="False"
+                Severity="Error" />
+
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <ProgressRing
+                    x:Name="PreviewProgressRing"
+                    Width="18"
+                    Height="18"
+                    IsActive="False"
+                    Visibility="Collapsed" />
+                <TextBlock
+                    x:Name="PreviewStatusText"
+                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                    TextWrapping="Wrap"
+                    VerticalAlignment="Center" />
+            </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid
+            Grid.Row="2"
+            Padding="24,16"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0"
+            ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="Changes preview on the image before you save."
+                TextWrapping="Wrap"
+                VerticalAlignment="Center" />
+            <Button
+                Grid.Column="1"
+                Click="Cancel_Click"
+                Content="Cancel" />
+            <Button
+                x:Name="SaveButton"
+                Grid.Column="2"
+                Click="Save_Click"
+                Content="Save changes"
+                Style="{ThemeResource AccentButtonStyle}" />
+        </Grid>
+    </Grid>
+</Window>
