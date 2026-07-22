@@ -1,6 +1,7 @@
 # Rust
 /target/
 /artifacts/
+/dist/
 
 # .NET / Visual Studio
 **/bin/

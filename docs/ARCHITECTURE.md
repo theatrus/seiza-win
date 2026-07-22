@@ -33,7 +33,9 @@ loading, and plate solving because Explorer loads it out of process.
 5. No Rust layout, allocator-owned string, or panic crosses the C ABI.
 6. Pixel buffers cross through opaque handles; versioned JSON carries metadata and solve records.
 7. The process hosts multiple document windows and redirects new file activations into the existing process.
-8. Distribution is a signed, self-contained MSIX with FITS file association.
+8. Distribution is an all-users, self-contained WiX 4 MSI with Windows Default
+   Apps registration for FITS files. The MSI carries .NET and Windows App SDK
+   runtimes; production releases must be code-signed.
 9. The Windows app builds the unified upstream `seiza-cabi` crate directly from one reviewed Seiza Git commit; no C ABI implementation is forked in this repository.
 10. The native build emits its Cargo-resolved Seiza version and commit as packaged build metadata, and the About dialog reports both values.
 
@@ -58,7 +60,10 @@ The detailed status and acceptance criteria live in
 3. **Complete:** bind the solve response, add the explicit Solve workflow, and present solution quality.
 4. **Complete:** draw the solved overlay scene in Win2D with layer and catalog controls.
 5. **Complete:** match the current macOS FITS processing interactions with the stackable editor, GHS image sampling, input/display histograms, and live light deconvolution.
-6. **Next:** add thumbnails/cache, multi-window activation, Explorer integration, signing, and release automation.
+6. **Complete:** build an all-users, self-contained WiX MSI, include both
+   runtimes, register FITS files, and exercise install/launch/uninstall in CI.
+7. **Next:** add thumbnails/cache, multi-window activation, Explorer preview
+   integration, signing, and tagged release automation.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.

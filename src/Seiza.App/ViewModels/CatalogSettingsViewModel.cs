@@ -191,7 +191,6 @@ public partial class CatalogSettingsViewModel : ObservableObject
         try
         {
             CatalogSettingsStore.SaveCatalogDirectory(null);
-            CatalogDirectoryPicker.ClearAccess();
             _configuredDirectory = null;
             NotifyDirectoryChanged();
             await RefreshAsync();

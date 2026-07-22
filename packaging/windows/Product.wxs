@@ -1,0 +1,99 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
+     xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package
+      Name="Seiza"
+      Manufacturer="Seiza"
+      Version="$(var.SeizaVersion)"
+      UpgradeCode="9E48A749-B21A-4EB9-9417-B1A5AA61D2F6"
+      Language="1033"
+      InstallerVersion="500"
+      Scope="perMachine"
+      Compressed="yes">
+    <SummaryInformation Description="Seiza native astronomy image viewer and plate solver" />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Seiza is already installed." />
+    <MediaTemplate EmbedCab="yes" />
+
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="APPLICATIONFOLDER" Name="Seiza for Windows" />
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="SeizaProgramMenu" Name="Seiza">
+        <Component Id="SeizaStartMenuShortcut" Guid="E24E6145-1BC6-45A8-90B1-22942E8B36E1">
+          <Shortcut
+              Id="SeizaShortcut"
+              Name="Seiza"
+              Description="Open and solve astronomy images"
+              Target="[APPLICATIONFOLDER]Seiza.App.exe"
+              WorkingDirectory="APPLICATIONFOLDER" />
+          <RemoveFolder Id="RemoveSeizaProgramMenu" On="uninstall" />
+          <RegistryValue
+              Root="HKCU"
+              Key="Software\Seiza"
+              Name="StartMenuShortcut"
+              Type="integer"
+              Value="1"
+              KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+
+    <Component Directory="APPLICATIONFOLDER" Id="SeizaFileAssociations" Guid="AD8A1151-9576-4890-8E9A-C35203674506">
+      <RegistryValue
+          Root="HKLM"
+          Key="Software\RegisteredApplications"
+          Name="Seiza"
+          Type="string"
+          Value="Software\Seiza\Capabilities"
+          KeyPath="yes" />
+      <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities" Name="ApplicationName" Type="string" Value="Seiza" />
+      <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities" Name="ApplicationDescription" Type="string" Value="Native astronomy image viewer and plate solver" />
+      <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities\FileAssociations" Name=".fit" Type="string" Value="Seiza.FitsFile" />
+      <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities\FileAssociations" Name=".fits" Type="string" Value="Seiza.FitsFile" />
+      <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities\FileAssociations" Name=".fts" Type="string" Value="Seiza.FitsFile" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.FitsFile" Type="string" Value="FITS astronomy image" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.FitsFile\DefaultIcon" Type="string" Value="[APPLICATIONFOLDER]Seiza.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.FitsFile\shell\open\command" Type="string" Value="&quot;[APPLICATIONFOLDER]Seiza.App.exe&quot; &quot;%1&quot;" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\.fit\OpenWithProgids" Name="Seiza.FitsFile" Type="string" Value="" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\.fits\OpenWithProgids" Name="Seiza.FitsFile" Type="string" Value="" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\.fts\OpenWithProgids" Name="Seiza.FitsFile" Type="string" Value="" />
+    </Component>
+
+    <Feature
+        Id="MainFeature"
+        Title="Seiza"
+        Description="Seiza application and self-contained runtimes"
+        Level="1"
+        AllowAbsent="no"
+        AllowAdvertise="no"
+        ConfigurableDirectory="APPLICATIONFOLDER">
+      <ComponentGroupRef Id="PublishedAppFiles" />
+      <ComponentRef Id="SeizaStartMenuShortcut" />
+      <ComponentRef Id="SeizaFileAssociations" />
+    </Feature>
+
+    <Icon Id="SeizaAppIcon" SourceFile="$(var.RepoRoot)src\Seiza.App\Assets\AppIcon.ico" />
+    <Property Id="ARPPRODUCTICON" Value="SeizaAppIcon" />
+    <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONFOLDER" />
+    <ui:WixUI Id="WixUI_InstallDir" />
+    <WixVariable Id="WixUILicenseRtf" Value="$(var.RepoRoot)packaging\windows\License.rtf" />
+
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch Seiza" />
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
+    <CustomAction
+        Id="LaunchSeiza"
+        Directory="APPLICATIONFOLDER"
+        ExeCommand="Seiza.App.exe"
+        Execute="immediate"
+        Return="asyncNoWait"
+        Impersonate="yes" />
+    <UI>
+      <Publish
+          Dialog="ExitDialog"
+          Control="Finish"
+          Event="DoAction"
+          Value="LaunchSeiza"
+          Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+  </Package>
+</Wix>

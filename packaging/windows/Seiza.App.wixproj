@@ -1,0 +1,45 @@
+<Project Sdk="WixToolset.Sdk/4.0.6">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <InstallerPlatform>x64</InstallerPlatform>
+    <RepoRoot Condition="'$(RepoRoot)' == ''">$(MSBuildThisFileDirectory)..\..\</RepoRoot>
+    <AppProject>$(RepoRoot)src\Seiza.App\Seiza.App.csproj</AppProject>
+    <PublishDirectory>$(RepoRoot)artifacts\publish\win-x64\</PublishDirectory>
+    <SeizaVersion Condition="'$(SeizaVersion)' == ''">1.0.0</SeizaVersion>
+    <OutputName>seiza-$(SeizaVersion)-windows-x86_64</OutputName>
+    <OutputPath>$(RepoRoot)dist\</OutputPath>
+    <IntermediateOutputPath>$(RepoRoot)artifacts\wix\</IntermediateOutputPath>
+    <!-- Some Windows App SDK binaries carry resource language values that MSI's ICE03
+         validator cannot represent, even though Windows loads them correctly. -->
+    <SuppressIces>ICE03;ICE91</SuppressIces>
+    <DefineConstants>SeizaVersion=$(SeizaVersion);PublishDir=$(PublishDirectory);RepoRoot=$(RepoRoot)</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Heat" Version="4.0.6" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="4.0.6" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InstallerDocumentation Include="$(RepoRoot)LICENSE" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <HarvestDirectory Include="$(PublishDirectory)">
+      <ComponentGroupName>PublishedAppFiles</ComponentGroupName>
+      <DirectoryRefId>APPLICATIONFOLDER</DirectoryRefId>
+      <PreprocessorVariable>var.PublishDir</PreprocessorVariable>
+      <SuppressCom>true</SuppressCom>
+      <SuppressRegistry>true</SuppressRegistry>
+      <SuppressRootDirectory>true</SuppressRootDirectory>
+    </HarvestDirectory>
+  </ItemGroup>
+
+  <Target Name="PublishSeizaApp" BeforeTargets="GetHarvestDirectoryContent">
+    <MSBuild
+        Projects="$(AppProject)"
+        Targets="Publish"
+        Properties="Configuration=Release;Platform=x64;RuntimeIdentifier=win-x64;SelfContained=true;WindowsPackageType=None;WindowsAppSDKSelfContained=true;PublishSingleFile=false;PublishReadyToRun=true;PublishTrimmed=false;DebugSymbols=false;DebugType=None;PublishDir=$(PublishDirectory)" />
+    <Copy SourceFiles="@(InstallerDocumentation)" DestinationFolder="$(PublishDirectory)" />
+  </Target>
+</Project>

@@ -11,7 +11,8 @@ merely because its Rust implementation exists.
   [`5b110ed`](https://github.com/theatrus/seiza-mac/commit/5b110edd813af485d18810d48173d6ec3dcc303b)
 - Seiza core reference: `main` at
   [`32a8dbf`](https://github.com/theatrus/seiza/commit/32a8dbf62dda60e5ae2a1f3743c5d21976461f83)
-- Windows reference: current stretch-controls branch
+- Windows reference: `main` at
+  [`069bce6`](https://github.com/theatrus/seiza-win/commit/069bce6)
 - Last audited: 2026-07-21
 
 Update this baseline and the affected rows whenever the macOS app gains a
@@ -72,7 +73,7 @@ status/setup or an explicitly requested solve.
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
 | Use Seiza's default catalog directory | Available | **Complete** | Resolved by shared Rust; runtime-tested against the default Windows catalog. |
-| Choose and persist a custom catalog directory | Available | **Complete** | WinUI folder picker persists both FutureAccessList access and the display path. |
+| Choose and persist a custom catalog directory | Available | **Complete** | Full-trust WinUI folder picker persists the path in `%LOCALAPPDATA%\Seiza\settings.json`. |
 | Per-component status | Available | **Complete** | Star catalog, blind index, objects, transients, and minor bodies are reported independently. |
 | Separate solve-ready and overlay-ready status | Available | **Complete** | Native readiness cards distinguish the two capabilities. |
 | Setup presets | Available | **Complete** | Standard blind (recommended), Deepest blind, and All map directly to shared Rust. |
@@ -132,11 +133,11 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | Capability | macOS analogue | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
 | Product app icon | macOS app icon | **Complete** | The same Seiza artwork is supplied at Windows executable, taskbar, title-bar, Start, Store, tile, lock-screen, splash, and About sizes. |
-| FITS file registration and document icon | Finder association/icon available | **Planned** | MSIX `.fits`, `.fit`, and `.fts` associations with a dedicated icon. |
+| FITS file registration and document icon | Finder association/icon available | **Complete** | All-users MSI registers `.fits`, `.fit`, and `.fts` with Windows Default Apps and the Seiza executable icon. |
 | Stretched system preview | Quick Look extension available | **Planned** | Explorer Preview Pane handler in a separately hosted native component. |
 | Content thumbnails on file icons | Finder thumbnail provider (planned) | **Planned** | Explorer thumbnail provider, isolated from .NET, catalogs, and solving. |
-| Signed distributable | Signed/notarized universal DMG | **Planned** | Signed self-contained x64 MSIX; ARM64 follows parity. |
-| Release automation | macOS release workflows | **Partial** | CI builds Debug; add signed packaging, artifacts, tags, and protected release environment. |
+| Signed distributable | Signed/notarized universal DMG | **Partial** | Self-contained x64 MSI is complete and runtime-tested; production code signing and ARM64 remain. |
+| Release automation | macOS release workflows | **Partial** | CI builds and smoke-tests the MSI and uploads it as an artifact; add signing, tags, and a protected release environment. |
 | Native accessibility | SwiftUI/AppKit accessibility | **Partial** | Core controls are named; add automated coverage for inspector, Settings, and overlay controls. |
 | About and native-core provenance | About panel | **Complete** | Reports the Windows app version plus the exact Seiza crate version and 40-character source commit resolved by Cargo. |
 
@@ -169,5 +170,7 @@ These remain tracked beyond the current macOS parity surface:
    stages, live preview, background removal, light deconvolution, GHS image
    sampling, histograms, history, and full-resolution commit are implemented.
    The remaining stretch-method fixture matrix is tracked as visual QA.
-5. **Windows integration** — multi-window activation, file associations,
-   Explorer components, signed packaging, and release automation.
+5. **In progress: Windows integration** — app identity, FITS registration,
+   the all-users self-contained WiX MSI, and installer CI are complete;
+   multi-window activation, Explorer components, signing, and tagged releases
+   remain.
