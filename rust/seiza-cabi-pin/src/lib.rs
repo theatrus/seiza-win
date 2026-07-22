@@ -1,4 +1,4 @@
-//! Pins the upstream Seiza C ABI checkout used by the Windows application.
+//! Pins the published Seiza C ABI release used by the Windows application.
 //!
 //! The application build locates this resolved dependency with `cargo metadata`
 //! and builds the upstream `seiza-cabi` package directly. No ABI implementation

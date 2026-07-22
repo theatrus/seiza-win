@@ -5,7 +5,7 @@
     <RepoRoot Condition="'$(RepoRoot)' == ''">$(MSBuildThisFileDirectory)..\..\</RepoRoot>
     <AppProject>$(RepoRoot)src\Seiza.App\Seiza.App.csproj</AppProject>
     <PublishDirectory>$(RepoRoot)artifacts\publish\win-x64\</PublishDirectory>
-    <SeizaVersion Condition="'$(SeizaVersion)' == ''">1.0.0</SeizaVersion>
+    <SeizaVersion Condition="'$(SeizaVersion)' == ''">0.1.0</SeizaVersion>
     <OutputName>seiza-$(SeizaVersion)-windows-x86_64</OutputName>
     <OutputPath>$(RepoRoot)dist\</OutputPath>
     <IntermediateOutputPath>$(RepoRoot)artifacts\wix\</IntermediateOutputPath>
@@ -39,7 +39,7 @@
     <MSBuild
         Projects="$(AppProject)"
         Targets="Publish"
-        Properties="Configuration=Release;Platform=x64;RuntimeIdentifier=win-x64;SelfContained=true;WindowsPackageType=None;WindowsAppSDKSelfContained=true;PublishSingleFile=false;PublishReadyToRun=true;PublishTrimmed=false;DebugSymbols=false;DebugType=None;PublishDir=$(PublishDirectory)" />
+        Properties="Configuration=Release;Platform=x64;RuntimeIdentifier=win-x64;Version=$(SeizaVersion);SelfContained=true;WindowsPackageType=None;WindowsAppSDKSelfContained=true;PublishSingleFile=false;PublishReadyToRun=true;PublishTrimmed=false;DebugSymbols=false;DebugType=None;PublishDir=$(PublishDirectory)" />
     <Copy SourceFiles="@(InstallerDocumentation)" DestinationFolder="$(PublishDirectory)" />
   </Target>
 </Project>

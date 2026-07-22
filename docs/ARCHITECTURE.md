@@ -14,7 +14,7 @@ Seiza.App (WinUI 3 / C#)
     `-- generated P/Invoke bindings with SafeHandle ownership
                          |
                          `-- C ABI -- seiza-cabi.dll (Rust)
-                                           |-- built from the pinned upstream seiza-cabi crate
+                                           |-- built from the crates.io seiza-cabi release
                                            |-- seiza-fits
                                            |-- seiza-xisf
                                            |-- image
@@ -37,8 +37,12 @@ loading, and plate solving because Explorer loads it out of process.
 8. Distribution is an all-users, self-contained WiX 4 MSI with Windows Default
    Apps registration for FITS and XISF files. The MSI carries .NET and Windows App SDK
    runtimes; production releases must be code-signed.
-9. The Windows app builds the unified upstream `seiza-cabi` crate directly from one reviewed Seiza Git commit; no C ABI implementation is forked in this repository.
-10. The native build emits its Cargo-resolved Seiza version and commit as packaged build metadata, and the About dialog reports both values.
+9. The Windows app builds the unified upstream `seiza-cabi` crate from
+   crates.io; no C ABI implementation is forked in this repository and no Cargo
+   dependency uses a Git source.
+10. `Cargo.lock` fixes the complete Seiza dependency graph. The native build
+    emits the resolved C ABI version and Cargo-packaged VCS commit as application
+    metadata, and the About dialog reports both values.
 
 ## Performance rules
 

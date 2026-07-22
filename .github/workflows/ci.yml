@@ -42,7 +42,7 @@ jobs:
         run: dotnet build Seiza.slnx -c Release --no-restore
 
       - name: Build all-users MSI
-        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=1.0.0
+        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.1.0
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7
@@ -52,4 +52,4 @@ jobs:
           if-no-files-found: error
 
       - name: Smoke-test Windows installer
-        run: .\.github\scripts\test-windows-installer.ps1 -Msi .\dist\seiza-1.0.0-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-installer.ps1 -Msi .\dist\seiza-0.1.0-windows-x86_64.msi
