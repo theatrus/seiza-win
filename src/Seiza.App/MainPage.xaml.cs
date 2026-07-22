@@ -118,7 +118,7 @@ public sealed partial class MainPage : Page, IDisposable
             }
             return;
         }
-        if (_currentPath is null || !SupportsFitsStretch(_currentMetadata))
+        if (_currentPath is null || !SupportsAstronomyProcessing(_currentMetadata))
         {
             return;
         }
@@ -932,24 +932,24 @@ public sealed partial class MainPage : Page, IDisposable
             ViewModel.HasSolution &&
             _overlayOptions.HasVisibleOverlays &&
             !ViewModel.IsExporting;
-        bool supportsFitsStretch = SupportsFitsStretch(_currentMetadata);
+        bool supportsAstronomyProcessing = SupportsAstronomyProcessing(_currentMetadata);
         FitsStretchConfiguration currentStretch = _stretchHistory.Current.Stages[^1];
         UndoStretchButton.IsEnabled =
-            supportsFitsStretch && _stretchHistory.CanUndo && !ViewModel.IsLoading;
+            supportsAstronomyProcessing && _stretchHistory.CanUndo && !ViewModel.IsLoading;
         RedoStretchButton.IsEnabled =
-            supportsFitsStretch && _stretchHistory.CanRedo && !ViewModel.IsLoading;
+            supportsAstronomyProcessing && _stretchHistory.CanRedo && !ViewModel.IsLoading;
         StretchButton.IsEnabled =
-            supportsFitsStretch && !ViewModel.IsLoading;
-        StretchButton.Label = supportsFitsStretch
+            supportsAstronomyProcessing && !ViewModel.IsLoading;
+        StretchButton.Label = supportsAstronomyProcessing
             ? _stretchHistory.Current.Stages.Count == 1
                 ? currentStretch.Type.Title()
                 : $"{_stretchHistory.Current.Stages.Count} stages"
             : "Stretch";
         ToolTipService.SetToolTip(
             StretchButton,
-            supportsFitsStretch
+            supportsAstronomyProcessing
                 ? $"Stretch: {currentStretch.Type.Title()}. {currentStretch.Type.Help()}"
-                : "Stretch controls are available for FITS images");
+                : "Processing controls are available for FITS and XISF images");
         WorkspaceSplitView.IsPaneOpen = _isInspectorOpen && ViewModel.HasImage;
         InspectorButton.Label = WorkspaceSplitView.IsPaneOpen
             ? "Hide inspector"
@@ -1040,8 +1040,9 @@ public sealed partial class MainPage : Page, IDisposable
     private static bool SupportsColorStretch(ImageMetadata? metadata) =>
         metadata?.ColorKind is "planar-rgb" or "bayer";
 
-    private static bool SupportsFitsStretch(ImageMetadata? metadata) =>
-        string.Equals(metadata?.Format, "FITS", StringComparison.OrdinalIgnoreCase);
+    private static bool SupportsAstronomyProcessing(ImageMetadata? metadata) =>
+        string.Equals(metadata?.Format, "FITS", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(metadata?.Format, "XISF", StringComparison.OrdinalIgnoreCase);
 
     private void Viewport_DragOver(object sender, DragEventArgs e)
     {

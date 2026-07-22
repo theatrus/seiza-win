@@ -32,7 +32,7 @@ test exist.
 
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
-| FITS, JPEG, PNG, and TIFF opening | Available | **Complete** | Keep the supported-extension lists synchronized. |
+| FITS, XISF, JPEG, PNG, and TIFF opening | Available | **Complete** | XISF uses the pinned upstream `seiza-xisf` decoder through `seiza-cabi`; keep the supported-extension lists synchronized. |
 | File and folder picker | Available | **Complete** | — |
 | Drop file/folder into the active viewer | Available | **Complete** | — |
 | Mixed-format folder collection and natural ordering | Available | **Complete** | — |
@@ -40,11 +40,12 @@ test exist.
 | Replace the active viewer contents when opening another item | Available | **Complete** | — |
 | Multiple document windows and file activation routing | Available | **Planned** | One process, one window per document collection, activation redirected into the running app. |
 | Thumbnail drawer | Available | **Planned** | Virtualized WinUI thumbnail rail with selection and accessibility names. |
-| Memory/disk thumbnail cache and adjacent prefetch | Available | **Planned** | Cache keys include source identity and the full FITS processing configuration; visible work wins over prefetch. |
+| Memory/disk thumbnail cache and adjacent prefetch | Available | **Planned** | Cache keys include source identity and the full astronomy processing configuration; visible work wins over prefetch. |
 | Cached preview while full resolution loads | Available | **Planned** | Never blank an already available preview during a full render. |
-| Mono FITS autostretch | Available | **Complete** | Runtime-tested against telescope FITS data. |
+| Mono FITS/XISF autostretch | Available | **Complete** | Runtime-tested against telescope FITS and XISF data. |
+| XISF linear processing | Available | **Complete** | Uses the same stretch stack, background correction, deconvolution, histograms, and source-header inspector as FITS; runtime-tested on telescope XISF data. |
 | Planar RGB and Bayer/OSC rendering | Available | **Partial** | Core path exists; add representative RGB and Bayer fixtures and visual QA. |
-| Seven FITS stretch methods | Available | **Partial** | Auto MTF and GHS are runtime-tested through the Windows editor; complete a visual fixture matrix for Percentile Asinh, Linear, Asinh, explicit MTF, and No Stretch. |
+| Seven astronomy-image stretch methods | Available | **Partial** | Auto MTF and GHS are runtime-tested through the Windows editor; complete a visual fixture matrix for Percentile Asinh, Linear, Asinh, explicit MTF, and No Stretch. |
 | Ordered stretch stages | Available | **Complete** | Modeless editor adds, selects, removes, and reorders stages; a GHS plus identity stack is runtime-tested through the upstream C ABI. |
 | Color strategies | Available | **Complete** | Linked Channels, Per Channel, and Preserve Luminance Color replace the old three-item RGB menu and share the macOS JSON contract. |
 | Background-gradient removal | Available | **Complete** | Runtime-tested as an interactive preview on a 261 MB planar-RGB FITS frame with explicit progress. |
@@ -58,7 +59,7 @@ test exist.
 | Fit, pan, wheel zoom, and toolbar zoom | Available | **Complete** | — |
 | Pointer-anchored pinch/touch zoom | Available | **Planned** | Add native manipulation handling without rerendering pixels. |
 | Image dimensions, format, and color-kind status | Available | **Complete** | — |
-| Image statistics and FITS header inspector | Available | **Complete** | Native right-side inspector includes all statistics plus searchable, selectable, and copyable FITS headers. |
+| Image statistics and source-header inspector | Available | **Complete** | Native right-side inspector includes all statistics plus searchable, selectable, and copyable FITS/XISF source headers. |
 | Detailed loading and native error states | Available | **Complete** | — |
 | Export stretched image without overlays | Available | **Complete** | Runtime-tested at the full 6,248 x 4,176 source resolution. |
 | Export with visible overlays | Available | **Complete** | Uses the same Win2D renderer and layer state as the live viewport. |
@@ -133,7 +134,7 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | Capability | macOS analogue | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
 | Product app icon | macOS app icon | **Complete** | The same Seiza artwork is supplied at Windows executable, taskbar, title-bar, Start, Store, tile, lock-screen, splash, and About sizes. |
-| FITS file registration and document icon | Finder association/icon available | **Complete** | All-users MSI registers `.fits`, `.fit`, and `.fts` with Windows Default Apps and the Seiza executable icon. |
+| Astronomy file registration and document icon | Finder association/icon available | **Complete** | All-users MSI registers `.fits`, `.fit`, `.fts`, and `.xisf` with Windows Default Apps and the Seiza executable icon. |
 | Stretched system preview | Quick Look extension available | **Planned** | Explorer Preview Pane handler in a separately hosted native component. |
 | Content thumbnails on file icons | Finder thumbnail provider (planned) | **Planned** | Explorer thumbnail provider, isolated from .NET, catalogs, and solving. |
 | Signed distributable | Signed/notarized universal DMG | **Partial** | Self-contained x64 MSI is complete and runtime-tested; production code signing and ARM64 remain. |
@@ -145,8 +146,6 @@ one Win2D drawing path between the live viewport and full-resolution export.
 
 These remain tracked beyond the current macOS parity surface:
 
-- XISF opening (shared core ready; Windows activation, extension handling, and
-  representative runtime fixtures remain);
 - native RGBA16 export (shared core ready; Windows high-bit-depth export remains);
 - transfer-curve visualization and direct curve editing;
 - pixel loupe and WCS-aware cursor sampling;
@@ -166,11 +165,11 @@ These remain tracked beyond the current macOS parity surface:
    protection, solution summary, and Settings remediation.
 3. **Complete: Overlay/export vertical slice** — common coordinate transform,
    layer menu, grid/center, catalog layers, and clean/composited export.
-4. **Complete: Current FITS processing interaction set** — modeless ordered
+4. **Complete: Current astronomy processing interaction set** — modeless ordered
    stages, live preview, background removal, light deconvolution, GHS image
    sampling, histograms, history, and full-resolution commit are implemented.
    The remaining stretch-method fixture matrix is tracked as visual QA.
-5. **In progress: Windows integration** — app identity, FITS registration,
+5. **In progress: Windows integration** — app identity, astronomy-file registration,
    the all-users self-contained WiX MSI, and installer CI are complete;
    multi-window activation, Explorer components, signing, and tagged releases
    remain.

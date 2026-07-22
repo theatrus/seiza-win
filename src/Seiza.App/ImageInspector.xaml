@@ -163,25 +163,25 @@
                     <TextBlock
                         VerticalAlignment="Center"
                         Style="{StaticResource SubtitleTextBlockStyle}"
-                        Text="FITS headers" />
+                        Text="Source headers" />
                     <Button
                         x:Name="CopyHeadersButton"
                         Grid.Column="1"
                         Click="CopyHeaders_Click"
                         Content="Copy visible"
                         IsEnabled="False"
-                        ToolTipService.ToolTip="Copy the currently visible FITS headers" />
+                        ToolTipService.ToolTip="Copy the currently visible source headers" />
                 </Grid>
                 <TextBox
                     x:Name="HeaderSearchBox"
-                    AutomationProperties.Name="Search FITS headers"
+                    AutomationProperties.Name="Search source headers"
                     Header="Search"
                     PlaceholderText="Keyword or value"
                     TextChanged="HeaderSearchBox_TextChanged" />
                 <TextBlock
                     x:Name="HeadersEmptyText"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="No FITS headers"
+                    Text="No source headers"
                     TextWrapping="Wrap" />
                 <ItemsRepeater x:Name="HeadersRepeater" ItemsSource="{x:Bind VisibleHeaders}">
                     <ItemsRepeater.ItemTemplate>

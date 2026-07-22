@@ -8,16 +8,16 @@ Rust image, catalog, and solving core used by Seiza on macOS.
 
 ## What it can do
 
-- Open FITS, PNG, JPEG, and TIFF images, folders, or dropped files; navigate
+- Open FITS, XISF, PNG, JPEG, and TIFF images, folders, or dropped files; navigate
   naturally sorted image sets without blocking the UI.
 - Fit, pan, and zoom a GPU-backed high-resolution viewport while overlay
   strokes, markers, and labels remain visually stable.
-- Stretch FITS data with Auto MTF, GHS, Percentile Asinh, Linear, Asinh,
+- Stretch FITS and XISF data with Auto MTF, GHS, Percentile Asinh, Linear, Asinh,
   explicit MTF, or no stretch; stack and reorder stages with live previews,
   undo, and redo.
-- Process linear FITS data with background-gradient removal, three color
+- Process linear astronomy data with background-gradient removal, three color
   strategies, and conservative Richardson-Lucy deconvolution.
-- Inspect image statistics, input/display RGB histograms, searchable FITS
+- Inspect image statistics, input/display RGB histograms, searchable source
   headers, processing provenance, and plate-solution quality.
 - Blind-solve locally using downloaded catalogs, then draw a WCS grid, field
   center, named and field stars, deep-sky catalog objects and contours,
@@ -27,9 +27,9 @@ Rust image, catalog, and solving core used by Seiza on macOS.
 - Download, verify, repair, and relocate Seiza catalogs from the native
   Catalog Settings window.
 
-| FITS processing | Catalog management |
+| Astronomy processing | Catalog management |
 | --- | --- |
-| ![Modeless FITS stretch controls with background correction and deconvolution](docs/images/fits-processing.png) | ![Catalog status, location, and installation controls](docs/images/catalog-settings.png) |
+| ![Modeless astronomy-image processing controls with background correction and deconvolution](docs/images/astronomy-processing.jpg) | ![Catalog status, location, and installation controls](docs/images/catalog-settings.png) |
 
 The maintained [feature-parity matrix](docs/FEATURE_PARITY.md) records the
 remaining macOS and Windows integration work.
@@ -38,7 +38,7 @@ remaining macOS and Windows integration work.
 
 Install the x64 MSI from a release or CI artifact. It installs Seiza for every
 user into `Program Files\Seiza for Windows`, adds a shared Start Menu shortcut,
-and registers `.fit`, `.fits`, and `.fts` with Windows Default Apps.
+and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows Default Apps.
 
 The MSI is fully self-contained. It includes .NET 10, the Windows App SDK/WinUI
 runtime, Win2D, and the pinned Seiza Rust core, so installation and first launch
@@ -78,7 +78,7 @@ The installer is written to `dist`. See the
 
 WinUI 3 and C# own Windows lifecycle, controls, accessibility, and settings.
 Win2D owns interactive image and vector-overlay presentation. The exact pinned
-upstream `seiza-cabi` Rust crate owns decoding, FITS processing, statistics,
+upstream `seiza-cabi` Rust crate owns decoding, FITS/XISF processing, statistics,
 catalogs, WCS, and solving; its version and 40-character source commit are
 shown in the About dialog.
 

@@ -136,7 +136,7 @@
                 Click="Stretch_Click"
                 IsEnabled="False"
                 Label="Stretch"
-                ToolTipService.ToolTip="Stretch controls are available for FITS images">
+                ToolTipService.ToolTip="Processing controls are available for FITS and XISF images">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE790;" />
                 </AppBarButton.Icon>
@@ -216,7 +216,7 @@
                 Click="Inspector_Click"
                 IsEnabled="{x:Bind ViewModel.HasImage, Mode=OneWay}"
                 Label="Inspector"
-                ToolTipService.ToolTip="Show image details, FITS headers, and plate-solve information">
+                ToolTipService.ToolTip="Show image details, source headers, and plate-solve information">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE700;" />
                 </AppBarButton.Icon>
@@ -322,7 +322,7 @@
                 <TextBlock
                     HorizontalAlignment="Center"
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                    Text="Open a FITS or standard image, choose a folder, or drop one here."
+                    Text="Open a FITS, XISF, or standard image; choose a folder; or drop one here."
                     TextAlignment="Center"
                     TextWrapping="Wrap" />
                 <TextBlock

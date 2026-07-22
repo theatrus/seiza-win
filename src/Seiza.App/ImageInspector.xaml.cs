@@ -41,7 +41,7 @@ public sealed partial class ImageInspector : UserControl
         ImageDetails.Add(new("Dimensions", $"{metadata.Width:N0} × {metadata.Height:N0}"));
         ImageDetails.Add(new("Format", metadata.Format));
         ImageDetails.Add(new("Encoding", FormatColorKind(metadata.ColorKind)));
-        if (string.Equals(metadata.Format, "FITS", StringComparison.OrdinalIgnoreCase))
+        if (SupportsAstronomyProcessing(metadata))
         {
             FitsStretchConfiguration current = processing.StretchStack.Stages[^1];
             string stretch = processing.StretchStack.Stages.Count == 1
@@ -237,7 +237,7 @@ public sealed partial class ImageInspector : UserControl
             ? Visibility.Visible
             : Visibility.Collapsed;
         HeadersEmptyText.Text = _allHeaders.Count == 0
-            ? "No FITS headers"
+            ? "No source headers"
             : "No headers match this search";
         HeadersEmptyText.Visibility = VisibleHeaders.Count == 0
             ? Visibility.Visible
@@ -266,6 +266,10 @@ public sealed partial class ImageInspector : UserControl
 
     private static bool SupportsColorStretch(ImageMetadata metadata) =>
         metadata.ColorKind is "planar-rgb" or "bayer";
+
+    private static bool SupportsAstronomyProcessing(ImageMetadata metadata) =>
+        string.Equals(metadata.Format, "FITS", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(metadata.Format, "XISF", StringComparison.OrdinalIgnoreCase);
 
     private static string FormatColorKind(string colorKind) => colorKind switch
     {

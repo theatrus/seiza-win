@@ -51,12 +51,17 @@
       <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities\FileAssociations" Name=".fit" Type="string" Value="Seiza.FitsFile" />
       <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities\FileAssociations" Name=".fits" Type="string" Value="Seiza.FitsFile" />
       <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities\FileAssociations" Name=".fts" Type="string" Value="Seiza.FitsFile" />
+      <RegistryValue Root="HKLM" Key="Software\Seiza\Capabilities\FileAssociations" Name=".xisf" Type="string" Value="Seiza.XisfFile" />
       <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.FitsFile" Type="string" Value="FITS astronomy image" />
       <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.FitsFile\DefaultIcon" Type="string" Value="[APPLICATIONFOLDER]Seiza.App.exe,0" />
       <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.FitsFile\shell\open\command" Type="string" Value="&quot;[APPLICATIONFOLDER]Seiza.App.exe&quot; &quot;%1&quot;" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.XisfFile" Type="string" Value="XISF astronomy image" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.XisfFile\DefaultIcon" Type="string" Value="[APPLICATIONFOLDER]Seiza.App.exe,0" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.XisfFile\shell\open\command" Type="string" Value="&quot;[APPLICATIONFOLDER]Seiza.App.exe&quot; &quot;%1&quot;" />
       <RegistryValue Root="HKLM" Key="Software\Classes\.fit\OpenWithProgids" Name="Seiza.FitsFile" Type="string" Value="" />
       <RegistryValue Root="HKLM" Key="Software\Classes\.fits\OpenWithProgids" Name="Seiza.FitsFile" Type="string" Value="" />
       <RegistryValue Root="HKLM" Key="Software\Classes\.fts\OpenWithProgids" Name="Seiza.FitsFile" Type="string" Value="" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\.xisf\OpenWithProgids" Name="Seiza.XisfFile" Type="string" Value="" />
     </Component>
 
     <Feature

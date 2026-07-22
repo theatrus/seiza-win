@@ -10,6 +10,7 @@ internal static class ImageFileService
         ".fits",
         ".fit",
         ".fts",
+        ".xisf",
         ".jpg",
         ".jpeg",
         ".jfif",

@@ -2,7 +2,7 @@
 
 The WiX 4 MSI installs Seiza for every user into `Program Files\Seiza for
 Windows`, adds a shared Start Menu shortcut, and registers Seiza with Windows
-Default Apps for `.fit`, `.fits`, and `.fts` files.
+Default Apps for `.fit`, `.fits`, `.fts`, and `.xisf` files.
 
 The payload is self-contained: it includes .NET 10, the Windows App SDK/WinUI
 runtime, Win2D, and the pinned Seiza Rust core. Installation and first launch do

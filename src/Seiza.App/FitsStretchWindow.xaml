@@ -3,7 +3,7 @@
     x:Class="Seiza.App.FitsStretchWindow"
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-    Title="FITS Stretch">
+    Title="Image Processing">
 
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -16,7 +16,7 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <TitleBar x:Name="StretchTitleBar" Title="FITS Stretch">
+        <TitleBar x:Name="StretchTitleBar" Title="Image Processing">
             <TitleBar.IconSource>
                 <ImageIconSource ImageSource="Assets/AppIcon.ico" />
             </TitleBar.IconSource>
@@ -104,7 +104,7 @@
                 <TextBlock
                     Margin="0,-6,0,0"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="Fit and subtract a smooth background from linear FITS samples before the first stretch stage."
+                    Text="Fit and subtract a smooth background from linear astronomy samples before the first stretch stage."
                     TextWrapping="Wrap" />
 
                 <ToggleSwitch
