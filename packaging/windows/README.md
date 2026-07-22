@@ -13,7 +13,7 @@ Build the installer from the repository root:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=1.0.0
+  -p:SeizaVersion=0.1.0
 ```
 
 The MSI is written to `dist`. The version must be a valid three-part MSI
@@ -25,5 +25,5 @@ validation:
 
 ```powershell
 .\.github\scripts\test-windows-installer.ps1 `
-  -Msi .\dist\seiza-1.0.0-windows-x86_64.msi
+  -Msi .\dist\seiza-0.1.0-windows-x86_64.msi
 ```
