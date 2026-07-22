@@ -78,4 +78,7 @@ internal static class ImageFileService
 
     public static bool IsSupportedImage(string path) =>
         SupportedExtensionSet.Contains(Path.GetExtension(path));
+
+    public static bool IsSupportedExtension(string? extension) =>
+        !string.IsNullOrWhiteSpace(extension) && SupportedExtensionSet.Contains(extension);
 }

@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using System.Numerics;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
@@ -22,13 +23,15 @@ public sealed partial class MainPage : Page, IDisposable
 
     private readonly List<string> _imagePaths = [];
     private readonly OverlayOptions _overlayOptions = new();
-    private readonly FitsStretchHistory _stretchHistory = new();
+    private readonly FitsImageProcessingHistory _processingHistory = new();
 
     private CanvasBitmap? _bitmap;
     private CanvasBitmap? _committedBitmap;
     private CancellationTokenSource? _loadCancellation;
     private CancellationTokenSource? _solveCancellation;
+    private CancellationTokenSource? _thumbnailCancellation;
     private ImageMetadata? _currentMetadata;
+    private SolveResult? _solveResult;
     private SolveOverlayRenderer? _overlayRenderer;
     private string? _currentPath;
     private Vector2 _offset;
@@ -42,17 +45,21 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _isDragging;
     private bool _isFitToWindow = true;
     private bool _isInspectorOpen;
+    private bool _isBrowserOpen;
+    private bool _syncingBrowserSelection;
     private bool _isPickingSymmetryPoint;
-    private bool _extractsBackground;
-    private FitsDeconvolutionConfiguration? _deconvolutionConfiguration;
     private FitsStretchWindow? _stretchWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
+
+    public ObservableCollection<ImageBrowserItemViewModel> BrowserItems { get; } = [];
 
     public MainPage()
     {
         InitializeComponent();
         ViewModel.PropertyChanged += (_, _) => UpdateVisualState();
+        InspectorControl.SolveRequested += InspectorControl_SolveRequested;
+        InspectorControl.ExportWcsRequested += InspectorControl_ExportWcsRequested;
         Unloaded += MainPage_Unloaded;
     }
 
@@ -73,6 +80,49 @@ public sealed partial class MainPage : Page, IDisposable
         if (path is not null)
         {
             await OpenFolderAsync(path);
+        }
+    }
+
+    private void ImageBrowser_Click(object sender, RoutedEventArgs e)
+    {
+        if (BrowserItems.Count <= 1)
+        {
+            return;
+        }
+
+        _isBrowserOpen = !_isBrowserOpen;
+        UpdateVisualState();
+        if (_isBrowserOpen)
+        {
+            SyncBrowserSelection(scrollIntoView: true);
+            _ = PrefetchThumbnailsAroundSelectionAsync();
+        }
+    }
+
+    private async void ImageBrowserList_SelectionChanged(
+        object sender,
+        SelectionChangedEventArgs e)
+    {
+        if (_syncingBrowserSelection ||
+            ImageBrowserList.SelectedIndex < 0 ||
+            ImageBrowserList.SelectedIndex == _selectedIndex)
+        {
+            return;
+        }
+
+        _selectedIndex = ImageBrowserList.SelectedIndex;
+        UpdateNavigationState();
+        await LoadImageAsync(_imagePaths[_selectedIndex]);
+    }
+
+    private async void ImageBrowserList_ContainerContentChanging(
+        ListViewBase sender,
+        ContainerContentChangingEventArgs args)
+    {
+        if (!args.InRecycleQueue && args.Item is ImageBrowserItemViewModel item)
+        {
+            CancellationToken cancellationToken = _thumbnailCancellation?.Token ?? default;
+            await item.EnsureLoadedAsync(cancellationToken);
         }
     }
 
@@ -124,11 +174,12 @@ public sealed partial class MainPage : Page, IDisposable
         }
 
         string path = _currentPath;
+        FitsImageProcessingConfiguration currentProcessing = _processingHistory.Current;
         var window = new FitsStretchWindow(
             Path.GetFileName(path),
-            _stretchHistory.Current,
-            _extractsBackground,
-            _deconvolutionConfiguration,
+            currentProcessing.StretchStack,
+            currentProcessing.ExtractsBackground,
+            currentProcessing.Deconvolution,
             SupportsColorStretch(_currentMetadata));
         _stretchWindow = window;
         window.PreviewRequested = request => PreviewStretchAsync(path, request);
@@ -150,26 +201,22 @@ public sealed partial class MainPage : Page, IDisposable
             bool requestedBackground = window.ResultExtractsBackground;
             FitsDeconvolutionConfiguration? requestedDeconvolution =
                 window.ResultDeconvolution;
-            bool changed = !_stretchHistory.Current.Equals(requestedStack) ||
-                _extractsBackground != requestedBackground ||
-                !Equals(_deconvolutionConfiguration, requestedDeconvolution);
+            var processing = new FitsImageProcessingConfiguration(
+                requestedStack,
+                requestedBackground,
+                requestedDeconvolution);
+            bool changed = !_processingHistory.Current.Equals(processing);
             if (!changed)
             {
                 return;
             }
 
-            var processing = new FitsImageProcessingConfiguration(
-                requestedStack,
-                requestedBackground,
-                requestedDeconvolution);
             if (await LoadImageAsync(
                 path,
                 preserveSolution: true,
                 processingOverride: processing))
             {
-                _stretchHistory.Replace(requestedStack);
-                _extractsBackground = requestedBackground;
-                _deconvolutionConfiguration = requestedDeconvolution?.Clone();
+                _processingHistory.Replace(processing);
                 if (_currentMetadata is not null)
                 {
                     InspectorControl.ShowMetadata(_currentMetadata, CurrentProcessing());
@@ -192,26 +239,32 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void UndoStretch_Click(object sender, RoutedEventArgs e)
     {
-        if (_currentPath is null || !_stretchHistory.Undo())
+        if (_currentPath is null || !_processingHistory.Undo())
         {
             return;
         }
-        if (!await LoadImageAsync(_currentPath, preserveSolution: true))
+        if (!await LoadImageAsync(
+            _currentPath,
+            preserveSolution: true,
+            processingOverride: _processingHistory.Current))
         {
-            _stretchHistory.Redo();
+            _processingHistory.Redo();
         }
         UpdateVisualState();
     }
 
     private async void RedoStretch_Click(object sender, RoutedEventArgs e)
     {
-        if (_currentPath is null || !_stretchHistory.Redo())
+        if (_currentPath is null || !_processingHistory.Redo())
         {
             return;
         }
-        if (!await LoadImageAsync(_currentPath, preserveSolution: true))
+        if (!await LoadImageAsync(
+            _currentPath,
+            preserveSolution: true,
+            processingOverride: _processingHistory.Current))
         {
-            _stretchHistory.Undo();
+            _processingHistory.Undo();
         }
         UpdateVisualState();
     }
@@ -231,7 +284,16 @@ public sealed partial class MainPage : Page, IDisposable
     private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
         App.ShowCatalogSettings();
 
-    private async void Solve_Click(object sender, RoutedEventArgs e)
+    private async void Solve_Click(object sender, RoutedEventArgs e) =>
+        await SolveCurrentAsync();
+
+    private async void InspectorControl_SolveRequested(object? sender, EventArgs e) =>
+        await SolveCurrentAsync();
+
+    private async void InspectorControl_ExportWcsRequested(object? sender, EventArgs e) =>
+        await ExportWcsAsync();
+
+    private async Task SolveCurrentAsync()
     {
         if (_bitmap is null || _currentPath is null || ViewModel.IsSolving)
         {
@@ -243,6 +305,7 @@ public sealed partial class MainPage : Page, IDisposable
         _solveCancellation = cancellation;
         int generation = _loadGeneration;
         string path = _currentPath;
+        _solveResult = null;
         _overlayRenderer = null;
         _isInspectorOpen = true;
         ViewModel.BeginSolving();
@@ -262,6 +325,7 @@ public sealed partial class MainPage : Page, IDisposable
                 return;
             }
 
+            _solveResult = result;
             _overlayRenderer = new SolveOverlayRenderer(result, _sourceWidth, _sourceHeight);
             ViewModel.CompleteSolve(result);
             InspectorControl.ShowSolveResult(result);
@@ -301,6 +365,24 @@ public sealed partial class MainPage : Page, IDisposable
             }
             cancellation.Dispose();
             UpdateVisualState();
+        }
+    }
+
+    private async Task ExportWcsAsync()
+    {
+        if (_solveResult is null || _currentPath is null)
+        {
+            return;
+        }
+
+        try
+        {
+            ViewModel.ErrorMessage = null;
+            await WcsExportService.PickAndSaveAsync(_currentPath, _solveResult.Wcs);
+        }
+        catch (Exception exception)
+        {
+            ViewModel.ErrorMessage = $"Couldn’t export WCS: {DescribeException(exception)}";
         }
     }
 
@@ -401,6 +483,103 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void ExportOverlays_Click(object sender, RoutedEventArgs e) =>
         await ExportAsync(true);
+
+    private async void CopyImage_Click(object sender, RoutedEventArgs e)
+    {
+        if (_bitmap is null)
+        {
+            return;
+        }
+
+        try
+        {
+            await ClipboardService.CopyImageAsync(_bitmap);
+        }
+        catch (Exception exception)
+        {
+            ViewModel.ErrorMessage = $"Couldn’t copy the image: {exception.Message}";
+        }
+    }
+
+    private async void PasteImage_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            ClipboardImageSource? source = await ClipboardService.GetImageAsync();
+            if (source is null)
+            {
+                ViewModel.ErrorMessage = "The clipboard doesn’t contain a supported image.";
+                return;
+            }
+
+            if (source.DiscoverSiblings)
+            {
+                await OpenImageAndDiscoverSiblingsAsync(source.Path);
+            }
+            else
+            {
+                SetCollection([source.Path], source.Path);
+                await LoadImageAsync(source.Path);
+            }
+        }
+        catch (Exception exception)
+        {
+            ViewModel.ErrorMessage = $"Couldn’t paste the image: {exception.Message}";
+        }
+    }
+
+    private void CopyAdjustments_Click(object sender, RoutedEventArgs e)
+    {
+        if (!SupportsAstronomyProcessing(_currentMetadata))
+        {
+            return;
+        }
+
+        try
+        {
+            ClipboardService.CopyProcessing(CurrentProcessing().ToClipboardJson());
+        }
+        catch (Exception exception)
+        {
+            ViewModel.ErrorMessage = $"Couldn’t copy the processing settings: {exception.Message}";
+        }
+    }
+
+    private async void PasteAdjustments_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentPath is null || !SupportsAstronomyProcessing(_currentMetadata))
+        {
+            return;
+        }
+
+        try
+        {
+            string? json = await ClipboardService.GetProcessingJsonAsync();
+            if (json is null)
+            {
+                ViewModel.ErrorMessage = "The clipboard doesn’t contain Seiza processing settings.";
+                return;
+            }
+
+            FitsImageProcessingConfiguration processing =
+                FitsImageProcessingConfiguration.FromClipboardJson(json);
+            if (processing.Equals(CurrentProcessing()))
+            {
+                return;
+            }
+
+            if (await LoadImageAsync(_currentPath, preserveSolution: true, processingOverride: processing))
+            {
+                _processingHistory.Replace(processing);
+                _isInspectorOpen = true;
+            }
+            UpdateVisualState();
+        }
+        catch (Exception exception)
+        {
+            ViewModel.ErrorMessage = $"Couldn’t paste the processing settings: {exception.Message}";
+        }
+    }
 
     private async Task ExportAsync(bool includeOverlays)
     {
@@ -507,6 +686,8 @@ public sealed partial class MainPage : Page, IDisposable
 
     private void SetCollection(IReadOnlyList<string> paths, string selectedPath)
     {
+        _thumbnailCancellation?.Cancel();
+        _thumbnailCancellation = null;
         _imagePaths.Clear();
         _imagePaths.AddRange(paths);
         _selectedIndex = _imagePaths.FindIndex(path =>
@@ -516,7 +697,24 @@ public sealed partial class MainPage : Page, IDisposable
             _selectedIndex = 0;
         }
 
+        _syncingBrowserSelection = true;
+        try
+        {
+            BrowserItems.Clear();
+            foreach (string path in _imagePaths)
+            {
+                BrowserItems.Add(new ImageBrowserItemViewModel(path));
+            }
+            ImageBrowserList.SelectedIndex = _selectedIndex;
+        }
+        finally
+        {
+            _syncingBrowserSelection = false;
+        }
+        _isBrowserOpen = BrowserItems.Count > 1;
+
         UpdateNavigationState();
+        UpdateVisualState();
     }
 
     private async Task<bool> LoadImageAsync(
@@ -578,9 +776,7 @@ public sealed partial class MainPage : Page, IDisposable
             _currentMetadata = image.Metadata;
             if (isNewImage && processingOverride is null)
             {
-                _stretchHistory.Reset();
-                _extractsBackground = false;
-                _deconvolutionConfiguration = null;
+                _processingHistory.Reset();
             }
             InspectorControl.ShowMetadata(image.Metadata, processing);
             ViewModel.CompleteLoading(path, image.Metadata);
@@ -590,6 +786,7 @@ public sealed partial class MainPage : Page, IDisposable
             }
 
             FitImageToWindow();
+            _ = PrefetchThumbnailsAroundSelectionAsync();
             return true;
         }
         catch (OperationCanceledException)
@@ -646,11 +843,7 @@ public sealed partial class MainPage : Page, IDisposable
     }
 
     private FitsImageProcessingConfiguration CurrentProcessing(bool interactivePreview = false) =>
-        new(
-            _stretchHistory.Current,
-            _extractsBackground,
-            _deconvolutionConfiguration,
-            interactivePreview);
+        _processingHistory.Current.Clone(interactivePreview);
 
     private void SetCommittedBitmap(CanvasBitmap bitmap)
     {
@@ -721,7 +914,8 @@ public sealed partial class MainPage : Page, IDisposable
     private void ImageCanvas_PointerPressed(object sender, PointerRoutedEventArgs e)
     {
         var point = e.GetCurrentPoint(ImageCanvas);
-        if (_bitmap is null || !point.Properties.IsLeftButtonPressed)
+        if (_bitmap is null || !point.Properties.IsLeftButtonPressed ||
+            e.Pointer.PointerDeviceType == Microsoft.UI.Input.PointerDeviceType.Touch)
         {
             return;
         }
@@ -847,6 +1041,55 @@ public sealed partial class MainPage : Page, IDisposable
         _isDragging = false;
     }
 
+    private void ImageCanvas_ManipulationStarted(
+        object sender,
+        ManipulationStartedRoutedEventArgs e)
+    {
+        if (_bitmap is null || _isPickingSymmetryPoint)
+        {
+            return;
+        }
+
+        _isDragging = false;
+        e.Handled = true;
+    }
+
+    private void ImageCanvas_ManipulationDelta(
+        object sender,
+        ManipulationDeltaRoutedEventArgs e)
+    {
+        if (_bitmap is null || _isPickingSymmetryPoint)
+        {
+            return;
+        }
+
+        Vector2 anchor = new((float)e.Position.X, (float)e.Position.Y);
+        Vector2 imagePoint = (anchor - _offset) / _scale;
+        float nextScale = Math.Clamp(
+            _scale * e.Delta.Scale,
+            MinimumScale,
+            MaximumScale);
+        Vector2 translation = new(
+            (float)e.Delta.Translation.X,
+            (float)e.Delta.Translation.Y);
+
+        _scale = nextScale;
+        _offset = anchor + translation - (imagePoint * _scale);
+        _isFitToWindow = false;
+        ImageCanvas.Invalidate();
+        e.Handled = true;
+    }
+
+    private void ImageCanvas_ManipulationCompleted(
+        object sender,
+        ManipulationCompletedRoutedEventArgs e)
+    {
+        if (_bitmap is not null && !_isPickingSymmetryPoint)
+        {
+            e.Handled = true;
+        }
+    }
+
     private void EndDrag(Microsoft.UI.Xaml.Input.Pointer pointer)
     {
         _isDragging = false;
@@ -898,6 +1141,74 @@ public sealed partial class MainPage : Page, IDisposable
         ViewModel.PositionText = _imagePaths.Count > 1 && _selectedIndex >= 0
             ? $"{_selectedIndex + 1:N0} of {_imagePaths.Count:N0}"
             : string.Empty;
+        SyncBrowserSelection(scrollIntoView: _isBrowserOpen);
+    }
+
+    private void SyncBrowserSelection(bool scrollIntoView)
+    {
+        if (_selectedIndex < 0 || _selectedIndex >= BrowserItems.Count)
+        {
+            return;
+        }
+
+        _syncingBrowserSelection = true;
+        try
+        {
+            ImageBrowserList.SelectedIndex = _selectedIndex;
+            if (scrollIntoView)
+            {
+                ImageBrowserList.ScrollIntoView(BrowserItems[_selectedIndex]);
+            }
+        }
+        finally
+        {
+            _syncingBrowserSelection = false;
+        }
+    }
+
+    private async Task PrefetchThumbnailsAroundSelectionAsync()
+    {
+        _thumbnailCancellation?.Cancel();
+        var cancellation = new CancellationTokenSource();
+        _thumbnailCancellation = cancellation;
+
+        try
+        {
+            var indexes = new List<int>();
+            if (_selectedIndex >= 0)
+            {
+                indexes.Add(_selectedIndex);
+                for (int distance = 1; distance <= 4; distance++)
+                {
+                    if (_selectedIndex - distance >= 0)
+                    {
+                        indexes.Add(_selectedIndex - distance);
+                    }
+                    if (_selectedIndex + distance < BrowserItems.Count)
+                    {
+                        indexes.Add(_selectedIndex + distance);
+                    }
+                }
+            }
+
+            foreach (int index in indexes)
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                await BrowserItems[index].EnsureLoadedAsync(cancellation.Token);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            // Selection changes intentionally supersede adjacent prefetching.
+        }
+        finally
+        {
+            if (ReferenceEquals(_thumbnailCancellation, cancellation))
+            {
+                _thumbnailCancellation = null;
+            }
+            cancellation.Dispose();
+        }
     }
 
     private void UpdateVisualState()
@@ -927,23 +1238,32 @@ public sealed partial class MainPage : Page, IDisposable
             _currentPath is not null &&
             !ViewModel.IsLoading &&
             !ViewModel.IsExporting;
+        CopyImageItem.IsEnabled = _bitmap is not null && !ViewModel.IsLoading;
         ExportImageItem.IsEnabled = !ViewModel.IsExporting;
         ExportOverlaysItem.IsEnabled =
             ViewModel.HasSolution &&
             _overlayOptions.HasVisibleOverlays &&
             !ViewModel.IsExporting;
         bool supportsAstronomyProcessing = SupportsAstronomyProcessing(_currentMetadata);
-        FitsStretchConfiguration currentStretch = _stretchHistory.Current.Stages[^1];
+        CopyAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
+        PasteAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
+        ImageBrowserButton.IsEnabled = BrowserItems.Count > 1;
+        ImageBrowserButton.Label = _isBrowserOpen ? "Hide images" : "Images";
+        ImageBrowserPane.Visibility = _isBrowserOpen && BrowserItems.Count > 1
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        FitsStretchStack stretchStack = _processingHistory.Current.StretchStack;
+        FitsStretchConfiguration currentStretch = stretchStack.Stages[^1];
         UndoStretchButton.IsEnabled =
-            supportsAstronomyProcessing && _stretchHistory.CanUndo && !ViewModel.IsLoading;
+            supportsAstronomyProcessing && _processingHistory.CanUndo && !ViewModel.IsLoading;
         RedoStretchButton.IsEnabled =
-            supportsAstronomyProcessing && _stretchHistory.CanRedo && !ViewModel.IsLoading;
+            supportsAstronomyProcessing && _processingHistory.CanRedo && !ViewModel.IsLoading;
         StretchButton.IsEnabled =
             supportsAstronomyProcessing && !ViewModel.IsLoading;
         StretchButton.Label = supportsAstronomyProcessing
-            ? _stretchHistory.Current.Stages.Count == 1
+            ? stretchStack.Stages.Count == 1
                 ? currentStretch.Type.Title()
-                : $"{_stretchHistory.Current.Stages.Count} stages"
+                : $"{stretchStack.Stages.Count} stages"
             : "Stretch";
         ToolTipService.SetToolTip(
             StretchButton,
@@ -959,6 +1279,7 @@ public sealed partial class MainPage : Page, IDisposable
     private void ResetSolveForImageChange()
     {
         _solveCancellation?.Cancel();
+        _solveResult = null;
         _overlayRenderer = null;
         ViewModel.ResetSolve();
         InspectorControl.ResetSolve();
@@ -1086,6 +1407,8 @@ public sealed partial class MainPage : Page, IDisposable
         _loadCancellation?.Cancel();
         _loadCancellation?.Dispose();
         _loadCancellation = null;
+        _thumbnailCancellation?.Cancel();
+        _thumbnailCancellation = null;
         EndSymmetryPointPicker(showEditor: false);
         _stretchWindow?.Close();
         _stretchWindow = null;

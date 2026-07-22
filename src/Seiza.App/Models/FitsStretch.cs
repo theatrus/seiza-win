@@ -309,7 +309,7 @@ internal sealed class FitsStretchStack : IEquatable<FitsStretchStack>
     }
 }
 
-internal sealed class FitsImageProcessingConfiguration
+internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImageProcessingConfiguration>
 {
     public FitsImageProcessingConfiguration(
         FitsStretchStack stretchStack,
@@ -331,6 +331,12 @@ internal sealed class FitsImageProcessingConfiguration
     public static FitsImageProcessingConfiguration Default { get; } = new(
         FitsStretchStack.Default,
         false);
+
+    public FitsImageProcessingConfiguration Clone(bool? interactivePreview = null) => new(
+        StretchStack,
+        ExtractsBackground,
+        Deconvolution,
+        interactivePreview ?? InteractivePreview);
 
     public string ToJson()
     {
@@ -379,6 +385,186 @@ internal sealed class FitsImageProcessingConfiguration
         }
         return Encoding.UTF8.GetString(stream.ToArray());
     }
+
+    public string ToClipboardJson()
+    {
+        using JsonDocument processing = JsonDocument.Parse(ToJson());
+        using var stream = new MemoryStream();
+        using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
+        {
+            writer.WriteStartObject();
+            writer.WriteString("schema", "org.seiza.image-processing");
+            writer.WriteNumber("version", 1);
+            writer.WritePropertyName("processing");
+            processing.RootElement.WriteTo(writer);
+            writer.WriteEndObject();
+        }
+        return Encoding.UTF8.GetString(stream.ToArray());
+    }
+
+    public static FitsImageProcessingConfiguration FromClipboardJson(string json)
+    {
+        using JsonDocument document = JsonDocument.Parse(
+            json,
+            new JsonDocumentOptions
+            {
+                AllowTrailingCommas = false,
+                CommentHandling = JsonCommentHandling.Disallow,
+                MaxDepth = 32,
+            });
+        JsonElement root = document.RootElement;
+        if (root.ValueKind != JsonValueKind.Object)
+        {
+            throw new FormatException("The clipboard does not contain a Seiza processing object.");
+        }
+
+        JsonElement processing = root;
+        if (root.TryGetProperty("schema", out JsonElement schema))
+        {
+            if (schema.GetString() != "org.seiza.image-processing" ||
+                !root.TryGetProperty("version", out JsonElement version) ||
+                version.GetInt32() != 1 ||
+                !root.TryGetProperty("processing", out processing))
+            {
+                throw new FormatException("This Seiza processing clipboard format is not supported.");
+            }
+        }
+
+        return FromJsonElement(processing);
+    }
+
+    public bool Equals(FitsImageProcessingConfiguration? other) => other is not null &&
+        StretchStack.Equals(other.StretchStack) &&
+        ExtractsBackground == other.ExtractsBackground &&
+        Equals(Deconvolution, other.Deconvolution) &&
+        InteractivePreview == other.InteractivePreview;
+
+    public override bool Equals(object? obj) => Equals(obj as FitsImageProcessingConfiguration);
+
+    public override int GetHashCode() => HashCode.Combine(
+        StretchStack,
+        ExtractsBackground,
+        Deconvolution,
+        InteractivePreview);
+
+    private static FitsImageProcessingConfiguration FromJsonElement(JsonElement root)
+    {
+        if (root.ValueKind != JsonValueKind.Object ||
+            !root.TryGetProperty("stretch", out JsonElement stretchElement) ||
+            stretchElement.ValueKind != JsonValueKind.Array)
+        {
+            throw new FormatException("The processing object must contain a stretch-stage array.");
+        }
+
+        var stages = new List<FitsStretchConfiguration>();
+        foreach (JsonElement stageElement in stretchElement.EnumerateArray())
+        {
+            if (stages.Count >= 64 ||
+                stageElement.ValueKind != JsonValueKind.Object ||
+                !stageElement.TryGetProperty("model", out JsonElement model) ||
+                model.ValueKind != JsonValueKind.Object ||
+                !model.TryGetProperty("type", out JsonElement typeElement))
+            {
+                throw new FormatException("The processing clipboard contains an invalid stretch stage.");
+            }
+
+            var stage = new FitsStretchConfiguration
+            {
+                Type = ParseStretchType(typeElement.GetString()),
+                ColorStrategy = stageElement.TryGetProperty("color_strategy", out JsonElement color)
+                    ? ParseColorStrategy(color.GetString())
+                    : FitsStretchColorStrategy.Unlinked,
+                MaxAnalysisSamples = ReadInt(stageElement, "max_analysis_samples", 200_000),
+                TargetMedian = ReadDouble(model, "target_median", 0.2),
+                ShadowsClip = ReadDouble(model, "shadows_clip", -2.8),
+                BlackPercentile = ReadDouble(model, "black_percentile", 0.01),
+                WhitePercentile = ReadDouble(model, "white_percentile", 0.995),
+                Strength = ReadDouble(model, "strength", 10.0),
+                Black = ReadDouble(model, "black", 0),
+                White = ReadDouble(model, "white", 1),
+                Shadows = ReadDouble(model, "shadows", 0),
+                Midtone = ReadDouble(model, "midtone", 0.25),
+                Highlights = ReadDouble(model, "highlights", 1),
+                StretchFactor = ReadDouble(model, "stretch_factor", 1),
+                LocalIntensity = ReadDouble(model, "local_intensity", 0),
+                SymmetryPoint = ReadDouble(model, "symmetry_point", 0),
+                ProtectShadows = ReadDouble(model, "protect_shadows", 0),
+                ProtectHighlights = ReadDouble(model, "protect_highlights", 1),
+            };
+            stages.Add(stage);
+        }
+        if (stages.Count == 0)
+        {
+            throw new FormatException("At least one stretch stage is required.");
+        }
+
+        bool extractsBackground = false;
+        if (root.TryGetProperty("background", out JsonElement background))
+        {
+            extractsBackground = background.ValueKind == JsonValueKind.Object &&
+                background.TryGetProperty("mode", out JsonElement mode) &&
+                mode.GetString() == "subtract";
+            if (!extractsBackground)
+            {
+                throw new FormatException("The background-processing mode is not supported.");
+            }
+        }
+
+        FitsDeconvolutionConfiguration? deconvolution = null;
+        if (root.TryGetProperty("deconvolution", out JsonElement deconvolutionElement))
+        {
+            if (deconvolutionElement.ValueKind != JsonValueKind.Object)
+            {
+                throw new FormatException("The deconvolution settings are invalid.");
+            }
+            deconvolution = new FitsDeconvolutionConfiguration
+            {
+                PsfFwhmPixels = ReadDouble(deconvolutionElement, "psf_fwhm_pixels", 3),
+                Iterations = ReadInt(deconvolutionElement, "iterations", 4),
+                Amount = ReadDouble(deconvolutionElement, "amount", 0.35),
+                NoiseFraction = ReadDouble(deconvolutionElement, "noise_fraction", 0.001),
+                MaxCorrection = ReadDouble(deconvolutionElement, "max_correction", 2),
+            };
+        }
+
+        var result = new FitsImageProcessingConfiguration(
+            new FitsStretchStack(stages),
+            extractsBackground,
+            deconvolution);
+        string? validationMessage = result.StretchStack.ValidationMessage ??
+            result.Deconvolution?.ValidationMessage;
+        if (validationMessage is not null)
+        {
+            throw new FormatException(validationMessage);
+        }
+        return result;
+    }
+
+    private static FitsStretchType ParseStretchType(string? value) => value switch
+    {
+        "auto-mtf" => FitsStretchType.AutoMtf,
+        "percentile-asinh" => FitsStretchType.PercentileAsinh,
+        "linear" => FitsStretchType.Linear,
+        "asinh" => FitsStretchType.Asinh,
+        "mtf" => FitsStretchType.Mtf,
+        "ghs" => FitsStretchType.Ghs,
+        "identity" => FitsStretchType.Identity,
+        _ => throw new FormatException($"Unknown stretch type '{value}'."),
+    };
+
+    private static FitsStretchColorStrategy ParseColorStrategy(string? value) => value switch
+    {
+        "linked" => FitsStretchColorStrategy.Linked,
+        "unlinked" => FitsStretchColorStrategy.Unlinked,
+        "luminance-preserving" => FitsStretchColorStrategy.LuminancePreserving,
+        _ => throw new FormatException($"Unknown color strategy '{value}'."),
+    };
+
+    private static double ReadDouble(JsonElement element, string name, double fallback) =>
+        element.TryGetProperty(name, out JsonElement value) ? value.GetDouble() : fallback;
+
+    private static int ReadInt(JsonElement element, string name, int fallback) =>
+        element.TryGetProperty(name, out JsonElement value) ? value.GetInt32() : fallback;
 
     private static void WriteStage(Utf8JsonWriter writer, FitsStretchConfiguration stage)
     {
@@ -435,38 +621,39 @@ internal sealed class FitsImageProcessingConfiguration
     }
 }
 
-internal sealed class FitsStretchHistory
+internal sealed class FitsImageProcessingHistory
 {
-    private readonly Stack<FitsStretchStack> _undo = [];
-    private readonly Stack<FitsStretchStack> _redo = [];
+    private readonly Stack<FitsImageProcessingConfiguration> _undo = [];
+    private readonly Stack<FitsImageProcessingConfiguration> _redo = [];
 
-    public FitsStretchStack Current { get; private set; } = FitsStretchStack.Default.Clone();
+    public FitsImageProcessingConfiguration Current { get; private set; } =
+        FitsImageProcessingConfiguration.Default.Clone();
 
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
     public void Reset()
     {
-        Current = FitsStretchStack.Default.Clone();
+        Current = FitsImageProcessingConfiguration.Default.Clone();
         _undo.Clear();
         _redo.Clear();
     }
 
-    public bool Replace(FitsStretchStack stack)
+    public bool Replace(FitsImageProcessingConfiguration processing)
     {
-        if (Current.Equals(stack))
+        if (Current.Equals(processing))
         {
             return false;
         }
         _undo.Push(Current.Clone());
-        Current = stack.Clone();
+        Current = processing.Clone();
         _redo.Clear();
         return true;
     }
 
     public bool Undo()
     {
-        if (!_undo.TryPop(out FitsStretchStack? previous))
+        if (!_undo.TryPop(out FitsImageProcessingConfiguration? previous))
         {
             return false;
         }
@@ -477,7 +664,7 @@ internal sealed class FitsStretchHistory
 
     public bool Redo()
     {
-        if (!_redo.TryPop(out FitsStretchStack? next))
+        if (!_redo.TryPop(out FitsImageProcessingConfiguration? next))
         {
             return false;
         }

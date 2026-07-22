@@ -8,10 +8,11 @@ Rust image, catalog, and solving core used by Seiza on macOS.
 
 ## What it can do
 
-- Open FITS, XISF, PNG, JPEG, and TIFF images, folders, or dropped files; navigate
-  naturally sorted image sets without blocking the UI.
-- Fit, pan, and zoom a GPU-backed high-resolution viewport while overlay
-  strokes, markers, and labels remain visually stable.
+- Open FITS, XISF, PNG, JPEG, and TIFF images, folders, or dropped files; browse
+  naturally sorted image sets in a cached thumbnail rail without blocking the UI.
+- Fit, pan, wheel-zoom, and pointer-anchored pinch-zoom a GPU-backed
+  high-resolution viewport. Overlay geometry and labels stay registered to image
+  pixels while line weights remain readable.
 - Stretch FITS and XISF data with Auto MTF, GHS, Percentile Asinh, Linear, Asinh,
   explicit MTF, or no stretch; stack and reorder stages with live previews,
   undo, and redo.
@@ -22,10 +23,15 @@ Rust image, catalog, and solving core used by Seiza on macOS.
 - Blind-solve locally using downloaded catalogs, then draw a WCS grid, field
   center, named and field stars, deep-sky catalog objects and contours,
   transients, and solar-system motion overlays when their catalogs are present.
+- Start solving from either the toolbar or the inspector, and export a solved
+  TAN/TAN-SIP header as a standards-compatible FITS `.wcs` file.
 - Export the full-resolution stretched image as PNG, JPEG, or TIFF, either
   clean or composited with the currently visible overlays.
+- Copy and paste rendered images or a versioned set of Seiza processing
+  adjustments through the Windows clipboard.
 - Download, verify, repair, and relocate Seiza catalogs from the native
-  Catalog Settings window.
+  Catalog Settings window. The recommended preset includes deep-sky objects,
+  transients, and solar-system bodies as well as solving data.
 
 | Astronomy processing | Catalog management |
 | --- | --- |

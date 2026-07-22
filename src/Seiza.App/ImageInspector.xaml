@@ -145,6 +145,20 @@
                         </DataTemplate>
                     </ItemsRepeater.ItemTemplate>
                 </ItemsRepeater>
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <Button
+                        x:Name="SidebarSolveButton"
+                        AutomationProperties.Name="Solve this image"
+                        Click="SidebarSolve_Click"
+                        Content="Solve" />
+                    <Button
+                        x:Name="ExportWcsButton"
+                        AutomationProperties.Name="Export WCS solution"
+                        Click="ExportWcs_Click"
+                        Content="Export WCS"
+                        ToolTipService.ToolTip="Save this plate solution as a FITS .wcs file"
+                        Visibility="Collapsed" />
+                </StackPanel>
                 <Button
                     x:Name="CatalogSettingsButton"
                     Click="CatalogSettings_Click"

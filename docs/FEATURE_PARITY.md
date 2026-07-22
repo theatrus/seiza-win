@@ -39,8 +39,8 @@ test exist.
 | Previous/next and arrow-key navigation | Available | **Complete** | — |
 | Replace the active viewer contents when opening another item | Available | **Complete** | — |
 | Multiple document windows and file activation routing | Available | **Planned** | One process, one window per document collection, activation redirected into the running app. |
-| Thumbnail drawer | Available | **Planned** | Virtualized WinUI thumbnail rail with selection and accessibility names. |
-| Memory/disk thumbnail cache and adjacent prefetch | Available | **Planned** | Cache keys include source identity and the full astronomy processing configuration; visible work wins over prefetch. |
+| Thumbnail drawer | Available | **Complete** | Runtime-tested virtualized WinUI rail on a mixed 26-image XISF/TIFF folder, with direct selection and accessible file names. |
+| Memory/disk thumbnail cache and adjacent prefetch | Available | **Complete** | Bounded memory LRU plus `%LOCALAPPDATA%` PNG cache keys source path, size, timestamp, thumbnail version, and dimension; visible rows and adjacent items share in-flight work. |
 | Cached preview while full resolution loads | Available | **Planned** | Never blank an already available preview during a full render. |
 | Mono FITS/XISF autostretch | Available | **Complete** | Runtime-tested against telescope FITS and XISF data. |
 | XISF linear processing | Available | **Complete** | Uses the same stretch stack, background correction, deconvolution, histograms, and source-header inspector as FITS; runtime-tested on telescope XISF data. |
@@ -57,7 +57,7 @@ test exist.
 | Input and display histogram inspector | Available | **Complete** | Native 256-bin RGB/mono plots use the macOS robust 98th-percentile interior-bin ceiling and expose accessible histogram names. |
 | Transfer-curve inspector | Not present | **Deferred** | Track as a shared future enhancement rather than a current macOS parity gap. |
 | Fit, pan, wheel zoom, and toolbar zoom | Available | **Complete** | — |
-| Pointer-anchored pinch/touch zoom | Available | **Planned** | Add native manipulation handling without rerendering pixels. |
+| Pointer-anchored pinch/touch zoom | Available | **Partial** | Native scale/translation manipulation preserves the touched image point without rerendering; final touch-hardware QA remains. |
 | Image dimensions, format, and color-kind status | Available | **Complete** | — |
 | Image statistics and source-header inspector | Available | **Complete** | Native right-side inspector includes all statistics plus searchable, selectable, and copyable FITS/XISF source headers. |
 | Detailed loading and native error states | Available | **Complete** | — |
@@ -65,8 +65,8 @@ test exist.
 | Export with visible overlays | Available | **Complete** | Uses the same Win2D renderer and layer state as the live viewport. |
 | PNG, JPEG, and TIFF export | Available | **Complete** | Native Save As picker selects the encoder from the chosen extension. |
 | 16-bit PNG/TIFF export | Available | **Core ready** | Expose the upstream RGBA16 render/export path without reducing processed samples to the 8-bit viewport. |
-| Copy/paste image | Available | **Planned** | Add native clipboard commands that copy the rendered image and accept supported image files or bitmap clipboard content as a new source. |
-| Copy/paste processing adjustments | Available | **Planned** | Round-trip the same versioned processing JSON used by the shared core, with validation and undo when adjustments are pasted. |
+| Copy/paste image | Available | **Complete** | Runtime-tested full 6,167 x 4,094 XISF render through the Windows bitmap clipboard, including Windows BMP/DIB normalization back to a PNG source. |
+| Copy/paste processing adjustments | Available | **Partial** | The versioned schema round-trips the ordered stretch stack, color strategy, background extraction, and deconvolution with validation and undo; final interactive clipboard QA remains. |
 
 ## Catalog settings and managed data
 
@@ -80,7 +80,7 @@ status/setup or an explicitly requested solve.
 | Choose and persist a custom catalog directory | Available | **Complete** | Full-trust WinUI folder picker persists the path in `%LOCALAPPDATA%\Seiza\settings.json`. |
 | Per-component status | Available | **Complete** | Star catalog, blind index, objects, transients, and minor bodies are reported independently. |
 | Separate solve-ready and overlay-ready status | Available | **Complete** | Native readiness cards distinguish the two capabilities. |
-| Setup presets | Available | **Complete** | Standard blind (recommended), Deepest blind, and All map directly to shared Rust. |
+| Setup presets | Available | **Complete** | Standard blind (recommended) and Deepest blind both include deep-sky objects, transients, and minor bodies by default; All adds every published star catalog and index. |
 | Download and install | Available | **Complete** | Shared Rust owns manifest, cache, download, and atomic install behavior. |
 | Verify or repair an existing install | Available | **Complete** | Retrying reuses files only after their size and digest are verified. |
 | Structured setup progress | Available | **Complete** | Preparing, manifest, downloading, verifying, installing, and complete are surfaced. |
@@ -104,6 +104,8 @@ contract while retaining Windows BGRA render output.
 | Solution quality summary | Available | **Complete** | Center RA/Dec, scale, matched/detected stars, RMS, elapsed time, and overlay counts. |
 | WCS/SIP result model | Available | **Complete** | Source-generated JSON models cover WCS, SIP, stars, objects, motion, contours, and availability. |
 | Solve only on explicit request | Available | **Complete** | Catalog and solve work starts only from the Solve command. |
+| Solve from the inspector | Available | **Complete** | Runtime-tested `Not solved` callout starts the same guarded solve flow and failures expose Try again plus catalog remediation when needed. |
+| Export FITS WCS sidecar | Available | **Complete** | Runtime-tested header-only `.wcs` export uses 80-byte FITS cards, 2,880-byte blocks, 1-based exported CRPIX, TAN/TAN-SIP types, CD matrix, and complete SIP coefficients. |
 | Stale-result protection during navigation | Available | **Complete** | Cancellation plus source path and load-generation checks prevent stale attachment. |
 | Cooperative cancellation and in-process catalog/index cache | Planned | **Deferred** | Add after the first correct end-to-end solve. |
 | Hinted solve before blind fallback | Planned | **Deferred** | Use trustworthy FITS header hints when available. |
@@ -125,10 +127,10 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | Current and historical transients | Available | **Complete** | Independent visibility using acquisition-time classification. |
 | Comets and asteroids | Available | **Complete** | Acquisition-time positions, distinct markers, motion direction, and arrows. |
 | Detected-star diagnostics | Available | **Complete** | Diagnostic split-cross layer is off by default. |
-| RA/Dec coordinate grid and labels | Available | **Complete** | Derived from solved WCS and cached per solution. |
+| RA/Dec coordinate grid and labels | Available | **Complete** | Derived from the solved 0-based WCS, including forward/inverse SIP distortion, and cached per solution. |
 | Field-center marker | Available | **Complete** | Drawn in the common solved-image coordinate space. |
 | Hide all overlays | Available | **Complete** | One accessible action without losing catalog filter preferences. |
-| Overlay transforms during pan/zoom | Available | **Complete** | Runtime-tested after a 6.20-second solve at Fit and two zoom levels: contours and object extents remain image-scaled while strokes, marker glyphs, label text, and halos remain screen-space stable. |
+| Overlay transforms during pan/zoom | Available | **Complete** | Runtime-tested after a 6.29-second XISF solve: centers, contours, extents, markers, and labels stay in the shared image-pixel transform and grow with zoom; only stroke width remains screen-stable. |
 | Catalog-aware palette and restrained styling | Available | **Complete** | Matches the semantic macOS palette with readable haloed labels. |
 | Satellite overlays | Planned | **Deferred** | Requires time span, observer, element epoch, and explicit provenance. |
 
@@ -153,7 +155,7 @@ These remain tracked beyond the current macOS parity surface:
 - pixel loupe and WCS-aware cursor sampling;
 - star-detection overlays with HFR/FWHM measurements;
 - compass, scale bar, and WCS cursor readout;
-- solve sidecar provenance and FITS WCS-card export;
+- optional source-FITS WCS injection with explicit provenance;
 - sequence comparison, blink/difference views, and registration;
 - multi-extension FITS image-HDU navigation;
 - lazy FITS cube slices with neighboring-slice preloading;

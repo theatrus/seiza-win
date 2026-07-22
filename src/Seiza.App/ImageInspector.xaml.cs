@@ -12,6 +12,10 @@ public sealed partial class ImageInspector : UserControl
 {
     private readonly List<InspectorEntry> _allHeaders = [];
 
+    public event EventHandler? SolveRequested;
+
+    public event EventHandler? ExportWcsRequested;
+
     public ObservableCollection<InspectorEntry> ImageDetails { get; } = [];
 
     public ObservableCollection<InspectorEntry> SolveDetails { get; } = [];
@@ -137,6 +141,9 @@ public sealed partial class ImageInspector : UserControl
         SolveStateText.Text = "Not solved";
         SolveProgressRing.IsActive = false;
         SolveProgressRing.Visibility = Visibility.Collapsed;
+        SidebarSolveButton.Content = "Solve";
+        SidebarSolveButton.Visibility = Visibility.Visible;
+        ExportWcsButton.Visibility = Visibility.Collapsed;
         CatalogSettingsButton.Visibility = Visibility.Collapsed;
     }
 
@@ -146,6 +153,8 @@ public sealed partial class ImageInspector : UserControl
         SolveStateText.Text = "Solving…";
         SolveProgressRing.Visibility = Visibility.Visible;
         SolveProgressRing.IsActive = true;
+        SidebarSolveButton.Visibility = Visibility.Collapsed;
+        ExportWcsButton.Visibility = Visibility.Collapsed;
         CatalogSettingsButton.Visibility = Visibility.Collapsed;
     }
 
@@ -155,6 +164,9 @@ public sealed partial class ImageInspector : UserControl
         SolveStateText.Text = message;
         SolveProgressRing.IsActive = false;
         SolveProgressRing.Visibility = Visibility.Collapsed;
+        SidebarSolveButton.Content = "Try again";
+        SidebarSolveButton.Visibility = Visibility.Visible;
+        ExportWcsButton.Visibility = Visibility.Collapsed;
         CatalogSettingsButton.Visibility = needsCatalogSetup
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -166,6 +178,8 @@ public sealed partial class ImageInspector : UserControl
         SolveStateText.Text = $"Solved in {result.ElapsedMilliseconds / 1000.0:0.00}s";
         SolveProgressRing.IsActive = false;
         SolveProgressRing.Visibility = Visibility.Collapsed;
+        SidebarSolveButton.Visibility = Visibility.Collapsed;
+        ExportWcsButton.Visibility = Visibility.Visible;
         CatalogSettingsButton.Visibility = Visibility.Collapsed;
 
         SolveDetails.Add(new("RA", $"{result.CenterRaDegrees:N5}°"));
@@ -263,6 +277,12 @@ public sealed partial class ImageInspector : UserControl
 
     private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
         App.ShowCatalogSettings();
+
+    private void SidebarSolve_Click(object sender, RoutedEventArgs e) =>
+        SolveRequested?.Invoke(this, EventArgs.Empty);
+
+    private void ExportWcs_Click(object sender, RoutedEventArgs e) =>
+        ExportWcsRequested?.Invoke(this, EventArgs.Empty);
 
     private static bool SupportsColorStretch(ImageMetadata metadata) =>
         metadata.ColorKind is "planar-rgb" or "bayer";
