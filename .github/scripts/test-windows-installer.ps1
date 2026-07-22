@@ -20,6 +20,7 @@ $programMenuDirectory = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu
 $shortcut = Join-Path $programMenuDirectory "Seiza.lnk"
 $registeredApplications = "Registry::HKEY_LOCAL_MACHINE\Software\RegisteredApplications"
 $fitsClass = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\Seiza.FitsFile"
+$xisfClass = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\Seiza.XisfFile"
 $installArguments = @(
     "/i",
     "`"$Msi`"",
@@ -71,6 +72,9 @@ try {
     if (-not (Test-Path -LiteralPath $fitsClass)) {
         throw "FITS file class was not installed"
     }
+    if (-not (Test-Path -LiteralPath $xisfClass)) {
+        throw "XISF file class was not installed"
+    }
 
     $appProcess = Start-Process -FilePath $installedApp -PassThru
     Start-Sleep -Seconds 3
@@ -97,6 +101,9 @@ finally {
         }
         if (Test-Path -LiteralPath $fitsClass) {
             throw "MSI uninstall left the FITS file class behind"
+        }
+        if (Test-Path -LiteralPath $xisfClass) {
+            throw "MSI uninstall left the XISF file class behind"
         }
     }
 }

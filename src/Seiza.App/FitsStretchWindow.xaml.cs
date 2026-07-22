@@ -45,7 +45,7 @@ public sealed partial class FitsStretchWindow : Window
         _stages = stack.Stages.Select(stage => stage.Clone()).ToList();
         _deconvolution = deconvolution?.Clone();
         _selectedStageIndex = _stages.Count - 1;
-        Title = $"FITS Stretch — {documentName}";
+        Title = $"Image Processing — {documentName}";
         StretchTitleBar.Title = Title;
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(StretchTitleBar);

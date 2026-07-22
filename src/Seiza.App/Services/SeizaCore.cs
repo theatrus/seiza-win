@@ -23,7 +23,7 @@ internal static unsafe class SeizaCore
         FitsImageProcessingConfiguration? processing = null)
     {
         nint error = 0;
-        nint rawHandle = IsFits(path)
+        nint rawHandle = IsAstronomyImage(path)
             ? NativeMethods.OpenRenderedImageWithStretchConfiguration(
                 path,
                 (processing ?? FitsImageProcessingConfiguration.Default).ToJson(),
@@ -70,8 +70,8 @@ internal static unsafe class SeizaCore
         return new RenderedImageData(bgra, width, height, metadata);
     }
 
-    private static bool IsFits(string path) =>
-        Path.GetExtension(path).ToLowerInvariant() is ".fits" or ".fit" or ".fts";
+    private static bool IsAstronomyImage(string path) =>
+        Path.GetExtension(path).ToLowerInvariant() is ".fits" or ".fit" or ".fts" or ".xisf";
 
     public static CatalogStatus GetCatalogStatus(string? catalogDirectory)
     {

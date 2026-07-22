@@ -25,15 +25,15 @@ public partial class CatalogSettingsViewModel : ObservableObject
         new(
             CatalogSetupPreset.StandardBlind,
             "Standard (recommended)",
-            "G≤17 stars, blind index, and all overlay catalogs."),
+            "G≤17 stars, blind index, deep-sky objects, transients, and solar-system bodies."),
         new(
             CatalogSetupPreset.DeepestBlind,
             "Deep",
-            "G≤20 stars for dense fields, plus blind index and overlays."),
+            "G≤20 stars and blind index, with the same complete overlay catalogs."),
         new(
             CatalogSetupPreset.All,
             "Everything",
-            "Every published Seiza star catalog, index, and overlay catalog."),
+            "All published Seiza star catalogs and indexes, plus every overlay catalog."),
     ];
 
     [ObservableProperty]

@@ -12,6 +12,10 @@ public sealed partial class ImageInspector : UserControl
 {
     private readonly List<InspectorEntry> _allHeaders = [];
 
+    public event EventHandler? SolveRequested;
+
+    public event EventHandler? ExportWcsRequested;
+
     public ObservableCollection<InspectorEntry> ImageDetails { get; } = [];
 
     public ObservableCollection<InspectorEntry> SolveDetails { get; } = [];
@@ -41,7 +45,7 @@ public sealed partial class ImageInspector : UserControl
         ImageDetails.Add(new("Dimensions", $"{metadata.Width:N0} × {metadata.Height:N0}"));
         ImageDetails.Add(new("Format", metadata.Format));
         ImageDetails.Add(new("Encoding", FormatColorKind(metadata.ColorKind)));
-        if (string.Equals(metadata.Format, "FITS", StringComparison.OrdinalIgnoreCase))
+        if (SupportsAstronomyProcessing(metadata))
         {
             FitsStretchConfiguration current = processing.StretchStack.Stages[^1];
             string stretch = processing.StretchStack.Stages.Count == 1
@@ -137,6 +141,9 @@ public sealed partial class ImageInspector : UserControl
         SolveStateText.Text = "Not solved";
         SolveProgressRing.IsActive = false;
         SolveProgressRing.Visibility = Visibility.Collapsed;
+        SidebarSolveButton.Content = "Solve";
+        SidebarSolveButton.Visibility = Visibility.Visible;
+        ExportWcsButton.Visibility = Visibility.Collapsed;
         CatalogSettingsButton.Visibility = Visibility.Collapsed;
     }
 
@@ -146,6 +153,8 @@ public sealed partial class ImageInspector : UserControl
         SolveStateText.Text = "Solving…";
         SolveProgressRing.Visibility = Visibility.Visible;
         SolveProgressRing.IsActive = true;
+        SidebarSolveButton.Visibility = Visibility.Collapsed;
+        ExportWcsButton.Visibility = Visibility.Collapsed;
         CatalogSettingsButton.Visibility = Visibility.Collapsed;
     }
 
@@ -155,6 +164,9 @@ public sealed partial class ImageInspector : UserControl
         SolveStateText.Text = message;
         SolveProgressRing.IsActive = false;
         SolveProgressRing.Visibility = Visibility.Collapsed;
+        SidebarSolveButton.Content = "Try again";
+        SidebarSolveButton.Visibility = Visibility.Visible;
+        ExportWcsButton.Visibility = Visibility.Collapsed;
         CatalogSettingsButton.Visibility = needsCatalogSetup
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -166,6 +178,8 @@ public sealed partial class ImageInspector : UserControl
         SolveStateText.Text = $"Solved in {result.ElapsedMilliseconds / 1000.0:0.00}s";
         SolveProgressRing.IsActive = false;
         SolveProgressRing.Visibility = Visibility.Collapsed;
+        SidebarSolveButton.Visibility = Visibility.Collapsed;
+        ExportWcsButton.Visibility = Visibility.Visible;
         CatalogSettingsButton.Visibility = Visibility.Collapsed;
 
         SolveDetails.Add(new("RA", $"{result.CenterRaDegrees:N5}°"));
@@ -237,7 +251,7 @@ public sealed partial class ImageInspector : UserControl
             ? Visibility.Visible
             : Visibility.Collapsed;
         HeadersEmptyText.Text = _allHeaders.Count == 0
-            ? "No FITS headers"
+            ? "No source headers"
             : "No headers match this search";
         HeadersEmptyText.Visibility = VisibleHeaders.Count == 0
             ? Visibility.Visible
@@ -264,8 +278,18 @@ public sealed partial class ImageInspector : UserControl
     private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
         App.ShowCatalogSettings();
 
+    private void SidebarSolve_Click(object sender, RoutedEventArgs e) =>
+        SolveRequested?.Invoke(this, EventArgs.Empty);
+
+    private void ExportWcs_Click(object sender, RoutedEventArgs e) =>
+        ExportWcsRequested?.Invoke(this, EventArgs.Empty);
+
     private static bool SupportsColorStretch(ImageMetadata metadata) =>
         metadata.ColorKind is "planar-rgb" or "bayer";
+
+    private static bool SupportsAstronomyProcessing(ImageMetadata metadata) =>
+        string.Equals(metadata.Format, "FITS", StringComparison.OrdinalIgnoreCase) ||
+        string.Equals(metadata.Format, "XISF", StringComparison.OrdinalIgnoreCase);
 
     private static string FormatColorKind(string colorKind) => colorKind switch
     {

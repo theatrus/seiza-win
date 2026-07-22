@@ -50,20 +50,22 @@ internal sealed class SolveOverlayRenderer
         float scaleY,
         Vector2 offset)
     {
-        // Positions, contours, and catalog extents stay in image space, but
-        // marker strokes are a screen-space affordance and must not breathe as
-        // the user zooms. Label fonts, halos, and marker radii below are also
-        // intentionally expressed in device-independent canvas units.
+        // Geometry, marker extents, and labels all originate in image space so
+        // they remain registered to the source while zooming. Only stroke width
+        // stays in screen space, keeping lines legible without changing bounds.
         const float stroke = ScreenStrokeWidth;
+        float markerScale = (MathF.Abs(scaleX) + MathF.Abs(scaleY)) / 2;
+        float sourceFontSize = MathF.Max((float)_sourceWidth / 75, 14);
+        float fontSize = sourceFontSize * markerScale;
 
         if (options.ShowCoordinateGrid)
         {
-            DrawGrid(drawingSession, scaleX, scaleY, offset, stroke);
+            DrawGrid(drawingSession, scaleX, scaleY, offset, stroke, markerScale);
         }
 
         if (options.ShowFieldStars)
         {
-            DrawFieldStars(drawingSession, scaleX, scaleY, offset, stroke);
+            DrawFieldStars(drawingSession, scaleX, scaleY, offset, stroke, markerScale);
         }
 
         foreach (SolveObjectPoint item in _result.ObjectPositions)
@@ -73,17 +75,27 @@ internal sealed class SolveOverlayRenderer
                 continue;
             }
 
-            DrawObject(drawingSession, item, options, scaleX, scaleY, offset, stroke);
+            DrawObject(
+                drawingSession,
+                item,
+                options,
+                scaleX,
+                scaleY,
+                offset,
+                stroke,
+                sourceFontSize,
+                fontSize,
+                markerScale);
         }
 
         if (options.ShowDetectedStars)
         {
-            DrawDetectedStars(drawingSession, scaleX, scaleY, offset, stroke);
+            DrawDetectedStars(drawingSession, scaleX, scaleY, offset, stroke, markerScale);
         }
 
         if (options.ShowFieldCenter)
         {
-            DrawFieldCenter(drawingSession, scaleX, scaleY, offset, stroke);
+            DrawFieldCenter(drawingSession, scaleX, scaleY, offset, stroke, fontSize);
         }
     }
 
@@ -92,8 +104,13 @@ internal sealed class SolveOverlayRenderer
         float scaleX,
         float scaleY,
         Vector2 offset,
-        float stroke)
+        float stroke,
+        float markerScale)
     {
+        float sourceGridFontSize = MathF.Max(
+            MathF.Min(MathF.Max((float)_sourceWidth / 60, 18), (float)_sourceWidth / 18),
+            6);
+        float fontSize = sourceGridFontSize * markerScale;
         foreach (GridLine line in _gridLines)
         {
             DrawPolyline(drawingSession, line.Points, GridColor, stroke, scaleX, scaleY, offset, false);
@@ -102,9 +119,10 @@ internal sealed class SolveOverlayRenderer
                 DrawLabel(
                     drawingSession,
                     line.Label,
-                    Transform(line.Points[0], scaleX, scaleY, offset) + new Vector2(4, 3),
+                    Transform(line.Points[0], scaleX, scaleY, offset) +
+                        new Vector2(MathF.Max(4, 4 * markerScale), MathF.Max(3, 3 * markerScale)),
                     GridLabelColor,
-                    11);
+                    fontSize);
             }
         }
     }
@@ -114,12 +132,13 @@ internal sealed class SolveOverlayRenderer
         float scaleX,
         float scaleY,
         Vector2 offset,
-        float stroke)
+        float stroke,
+        float markerScale)
     {
+        float radius = MathF.Max((float)_sourceWidth / 1300, 2.5f) * markerScale;
         foreach (SolveCatalogStarPoint star in _result.CatalogStarPositions)
         {
             Vector2 center = Transform(star.X, star.Y, scaleX, scaleY, offset);
-            float radius = Math.Clamp((float)((13.5 - star.Magnitude) * 0.4), 2.0f, 5.5f);
             drawingSession.DrawCircle(center, radius, FieldStarColor, stroke);
         }
     }
@@ -129,13 +148,14 @@ internal sealed class SolveOverlayRenderer
         float scaleX,
         float scaleY,
         Vector2 offset,
-        float stroke)
+        float stroke,
+        float markerScale)
     {
+        float outer = MathF.Max((float)_sourceWidth / 1300, 2.5f) * markerScale;
+        float inner = outer / 3;
         foreach (SolveImagePoint star in _result.DetectedStarPositions)
         {
             Vector2 center = Transform(star.X, star.Y, scaleX, scaleY, offset);
-            const float inner = 3;
-            const float outer = 7;
             drawingSession.DrawLine(center.X - outer, center.Y, center.X - inner, center.Y, DetectedStarColor, stroke);
             drawingSession.DrawLine(center.X + inner, center.Y, center.X + outer, center.Y, DetectedStarColor, stroke);
             drawingSession.DrawLine(center.X, center.Y - outer, center.X, center.Y - inner, DetectedStarColor, stroke);
@@ -148,11 +168,12 @@ internal sealed class SolveOverlayRenderer
         float scaleX,
         float scaleY,
         Vector2 offset,
-        float stroke)
+        float stroke,
+        float fontSize)
     {
         Vector2 center = Transform(_sourceWidth / 2, _sourceHeight / 2, scaleX, scaleY, offset);
-        const float radius = 11;
-        const float arm = 17;
+        float radius = fontSize;
+        float arm = radius * 1.7f;
         drawingSession.DrawCircle(center, radius, CenterColor, stroke);
         drawingSession.DrawLine(center.X - arm, center.Y, center.X - radius - 2, center.Y, CenterColor, stroke);
         drawingSession.DrawLine(center.X + radius + 2, center.Y, center.X + arm, center.Y, CenterColor, stroke);
@@ -179,27 +200,34 @@ internal sealed class SolveOverlayRenderer
         float scaleX,
         float scaleY,
         Vector2 offset,
-        float stroke)
+        float stroke,
+        float sourceFontSize,
+        float fontSize,
+        float markerScale)
     {
         Color color = GetObjectColor(item);
         Vector2 center = Transform(item.X, item.Y, scaleX, scaleY, offset);
         string kind = item.Kind.ToLowerInvariant();
-        float labelOffset = 10;
+        float sourceMajorRadius = MathF.Max((float)item.SemiMajorPixels, sourceFontSize);
+        float sourceMinorRadius = item.AngleDegrees is null
+            ? sourceMajorRadius
+            : MathF.Max((float)item.SemiMinorPixels, sourceFontSize);
+        float radiusX = sourceMajorRadius * MathF.Abs(scaleX);
+        float radiusY = sourceMinorRadius * MathF.Abs(scaleY);
+        float labelOffset = radiusX + (5 * markerScale);
 
         if (kind is "star" or "double-star" or "identified-star")
         {
-            DrawDiamond(drawingSession, center, 6, color, stroke);
+            DrawDiamond(drawingSession, center, radiusX, radiusY, color, stroke);
         }
         else if (kind is "comet" or "asteroid")
         {
-            DrawDiamond(drawingSession, center, 7, color, stroke);
-            DrawMotionVector(drawingSession, item, center, color, stroke);
+            DrawDiamond(drawingSession, center, radiusX, radiusY, color, stroke);
+            DrawMotionVector(drawingSession, item, center, color, stroke, scaleX, scaleY);
         }
         else if (kind == "transient")
         {
-            drawingSession.DrawCircle(center, 7, color, stroke);
-            drawingSession.DrawLine(center.X - 10, center.Y, center.X + 10, center.Y, color, stroke);
-            drawingSession.DrawLine(center.X, center.Y - 10, center.X, center.Y + 10, color, stroke);
+            DrawDiamond(drawingSession, center, radiusX, radiusY, color, stroke);
         }
         else
         {
@@ -228,8 +256,6 @@ internal sealed class SolveOverlayRenderer
             }
             else
             {
-                float radiusX = Math.Clamp((float)item.SemiMajorPixels * MathF.Abs(scaleX), 6, 120);
-                float radiusY = Math.Clamp((float)item.SemiMinorPixels * MathF.Abs(scaleY), 6, 120);
                 DrawRotatedEllipse(
                     drawingSession,
                     center,
@@ -238,7 +264,6 @@ internal sealed class SolveOverlayRenderer
                     (float)(item.AngleDegrees ?? 0),
                     color,
                     stroke);
-                labelOffset = radiusX + 5;
             }
         }
 
@@ -247,9 +272,9 @@ internal sealed class SolveOverlayRenderer
             DrawLabel(
                 drawingSession,
                 item.DisplayName,
-                center + new Vector2(labelOffset, -9),
+                center + new Vector2(labelOffset, -(fontSize * 0.6f)),
                 color,
-                12);
+                fontSize);
         }
     }
 
@@ -258,7 +283,9 @@ internal sealed class SolveOverlayRenderer
         SolveObjectPoint item,
         Vector2 center,
         Color color,
-        float stroke)
+        float stroke,
+        float scaleX,
+        float scaleY)
     {
         if (item.DirectionImageAngleDegrees is not double angle)
         {
@@ -266,26 +293,29 @@ internal sealed class SolveOverlayRenderer
         }
 
         double radians = angle * Math.PI / 180;
-        float length = Math.Clamp((float)(item.MotionArcsecPerHour ?? 0) * 0.4f, 10, 28);
+        float sourceLength = Math.Clamp((float)(item.MotionArcsecPerHour ?? 0) * 0.4f, 10, 28);
         Vector2 direction = new((float)Math.Cos(radians), (float)Math.Sin(radians));
-        Vector2 end = center + (direction * length);
+        Vector2 scaledDirection = new(direction.X * MathF.Abs(scaleX), direction.Y * MathF.Abs(scaleY));
+        Vector2 end = center + (scaledDirection * sourceLength);
         drawingSession.DrawLine(center, end, color, stroke);
         Vector2 side = new(-direction.Y, direction.X);
-        drawingSession.DrawLine(end, end - (direction * 5) + (side * 3), color, stroke);
-        drawingSession.DrawLine(end, end - (direction * 5) - (side * 3), color, stroke);
+        Vector2 scaledSide = new(side.X * MathF.Abs(scaleX), side.Y * MathF.Abs(scaleY));
+        drawingSession.DrawLine(end, end - (scaledDirection * 5) + (scaledSide * 3), color, stroke);
+        drawingSession.DrawLine(end, end - (scaledDirection * 5) - (scaledSide * 3), color, stroke);
     }
 
     private static void DrawDiamond(
         CanvasDrawingSession drawingSession,
         Vector2 center,
-        float radius,
+        float radiusX,
+        float radiusY,
         Color color,
         float stroke)
     {
-        Vector2 top = center + new Vector2(0, -radius);
-        Vector2 right = center + new Vector2(radius, 0);
-        Vector2 bottom = center + new Vector2(0, radius);
-        Vector2 left = center + new Vector2(-radius, 0);
+        Vector2 top = center + new Vector2(0, -radiusY);
+        Vector2 right = center + new Vector2(radiusX, 0);
+        Vector2 bottom = center + new Vector2(0, radiusY);
+        Vector2 left = center + new Vector2(-radiusX, 0);
         drawingSession.DrawLine(top, right, color, stroke);
         drawingSession.DrawLine(right, bottom, color, stroke);
         drawingSession.DrawLine(bottom, left, color, stroke);
@@ -481,8 +511,20 @@ internal sealed class SolveOverlayRenderer
             return false;
         }
 
-        double dx = x + 1 - wcs.Crpix[0];
-        double dy = y + 1 - wcs.Crpix[1];
+        double dx = x - wcs.Crpix[0];
+        double dy = y - wcs.Crpix[1];
+        if (wcs.Sip is { } forwardSip)
+        {
+            (double correctionX, double correctionY) = EvaluateSip(
+                forwardSip.A,
+                forwardSip.B,
+                forwardSip.Order,
+                minimumTotal: 2,
+                dx,
+                dy);
+            dx += correctionX;
+            dy += correctionY;
+        }
         double xi = ((wcs.Cd[0][0] * dx) + (wcs.Cd[0][1] * dy)) * Math.PI / 180;
         double eta = ((wcs.Cd[1][0] * dx) + (wcs.Cd[1][1] * dy)) * Math.PI / 180;
         double ra0 = wcs.Crval[0] * Math.PI / 180;
@@ -536,11 +578,56 @@ internal sealed class SolveOverlayRenderer
 
         double dx = ((wcs.Cd[1][1] * xi) - (wcs.Cd[0][1] * eta)) / determinant;
         double dy = ((-wcs.Cd[1][0] * xi) + (wcs.Cd[0][0] * eta)) / determinant;
-        double x = dx + wcs.Crpix[0] - 1;
-        double y = dy + wcs.Crpix[1] - 1;
+        if (wcs.Sip is { } inverseSip)
+        {
+            (double correctionX, double correctionY) = EvaluateSip(
+                inverseSip.Ap,
+                inverseSip.Bp,
+                inverseSip.Order,
+                minimumTotal: 0,
+                dx,
+                dy);
+            dx += correctionX;
+            dy += correctionY;
+        }
+        double x = dx + wcs.Crpix[0];
+        double y = dy + wcs.Crpix[1];
         point = new Vector2((float)x, (float)y);
         return float.IsFinite(point.X) && float.IsFinite(point.Y);
     }
+
+    private static (double X, double Y) EvaluateSip(
+        IReadOnlyList<double> xCoefficients,
+        IReadOnlyList<double> yCoefficients,
+        int order,
+        int minimumTotal,
+        double x,
+        double y)
+    {
+        double correctionX = 0;
+        double correctionY = 0;
+        int index = 0;
+        for (int p = 0; p <= order; p++)
+        {
+            for (int q = 0; q <= order - p; q++)
+            {
+                if (p + q < minimumTotal)
+                {
+                    continue;
+                }
+
+                double monomial = Math.Pow(x, p) * Math.Pow(y, q);
+                correctionX += GetCoefficient(xCoefficients, index) * monomial;
+                correctionY += GetCoefficient(yCoefficients, index) * monomial;
+                index++;
+            }
+        }
+
+        return (correctionX, correctionY);
+    }
+
+    private static double GetCoefficient(IReadOnlyList<double> coefficients, int index) =>
+        index < coefficients.Count ? coefficients[index] : 0;
 
     private bool IsNearImage(Vector2 point) =>
         point.X >= -(_sourceWidth * 0.1) &&

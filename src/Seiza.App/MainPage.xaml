@@ -7,6 +7,7 @@
     xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
     xmlns:local="using:Seiza.App"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+    xmlns:viewModels="using:Seiza.App.ViewModels"
     mc:Ignorable="d">
 
     <Grid>
@@ -41,6 +42,50 @@
                 <AppBarButton.KeyboardAccelerators>
                     <KeyboardAccelerator Key="O" Modifiers="Control,Shift" />
                 </AppBarButton.KeyboardAccelerators>
+            </AppBarButton>
+
+            <AppBarButton
+                x:Name="ImageBrowserButton"
+                Click="ImageBrowser_Click"
+                IsEnabled="False"
+                Label="Images"
+                ToolTipService.ToolTip="Show or hide the image browser">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE8B9;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarButton
+                Label="Clipboard"
+                ToolTipService.ToolTip="Copy or paste images and processing settings">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE8C8;" />
+                </AppBarButton.Icon>
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem x:Name="CopyImageItem" Click="CopyImage_Click" IsEnabled="False" Text="Copy image">
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="C" Modifiers="Control" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Click="PasteImage_Click" Text="Paste image">
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="V" Modifiers="Control" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem x:Name="CopyAdjustmentsItem" Click="CopyAdjustments_Click" IsEnabled="False" Text="Copy processing settings">
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="C" Modifiers="Control,Shift" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem x:Name="PasteAdjustmentsItem" Click="PasteAdjustments_Click" IsEnabled="False" Text="Paste processing settings">
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="V" Modifiers="Control,Shift" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
             </AppBarButton>
 
             <AppBarSeparator />
@@ -136,7 +181,7 @@
                 Click="Stretch_Click"
                 IsEnabled="False"
                 Label="Stretch"
-                ToolTipService.ToolTip="Stretch controls are available for FITS images">
+                ToolTipService.ToolTip="Processing controls are available for FITS and XISF images">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE790;" />
                 </AppBarButton.Icon>
@@ -216,7 +261,7 @@
                 Click="Inspector_Click"
                 IsEnabled="{x:Bind ViewModel.HasImage, Mode=OneWay}"
                 Label="Inspector"
-                ToolTipService.ToolTip="Show image details, FITS headers, and plate-solve information">
+                ToolTipService.ToolTip="Show image details, source headers, and plate-solve information">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE700;" />
                 </AppBarButton.Icon>
@@ -285,7 +330,88 @@
                 </Border>
             </SplitView.Pane>
             <SplitView.Content>
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+
+                    <Border
+                        x:Name="ImageBrowserPane"
+                        Width="224"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="0,0,1,0"
+                        Visibility="Collapsed">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Grid Padding="12,8,6,8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel VerticalAlignment="Center" Orientation="Horizontal" Spacing="8">
+                                    <TextBlock FontWeight="SemiBold" Text="Images" />
+                                    <TextBlock
+                                        Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                        Text="{x:Bind BrowserItems.Count, Mode=OneWay}" />
+                                </StackPanel>
+                                <Button
+                                    Grid.Column="1"
+                                    AutomationProperties.Name="Close image browser"
+                                    Click="ImageBrowser_Click"
+                                    Style="{StaticResource SubtleButtonStyle}">
+                                    <FontIcon Glyph="&#xE711;" />
+                                </Button>
+                            </Grid>
+                            <ListView
+                                x:Name="ImageBrowserList"
+                                Grid.Row="1"
+                                ContainerContentChanging="ImageBrowserList_ContainerContentChanging"
+                                ItemsSource="{x:Bind BrowserItems}"
+                                SelectionChanged="ImageBrowserList_SelectionChanged"
+                                SelectionMode="Single">
+                                <ListView.ItemContainerStyle>
+                                    <Style TargetType="ListViewItem">
+                                        <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                                        <Setter Property="Margin" Value="4" />
+                                        <Setter Property="Padding" Value="5" />
+                                    </Style>
+                                </ListView.ItemContainerStyle>
+                                <ListView.ItemTemplate>
+                                    <DataTemplate x:DataType="viewModels:ImageBrowserItemViewModel">
+                                        <StackPanel Spacing="6">
+                                            <Border
+                                                Height="104"
+                                                Background="#F2080A0F"
+                                                CornerRadius="5">
+                                                <Grid>
+                                                    <Image Source="{x:Bind Thumbnail, Mode=OneWay}" Stretch="Uniform" />
+                                                    <ProgressRing
+                                                        Width="24"
+                                                        Height="24"
+                                                        HorizontalAlignment="Center"
+                                                        VerticalAlignment="Center"
+                                                        IsActive="{x:Bind IsLoading, Mode=OneWay}" />
+                                                </Grid>
+                                            </Border>
+                                            <TextBlock
+                                                FontSize="12"
+                                                Text="{x:Bind FileName}"
+                                                TextTrimming="CharacterEllipsis"
+                                                ToolTipService.ToolTip="{x:Bind Path}" />
+                                        </StackPanel>
+                                    </DataTemplate>
+                                </ListView.ItemTemplate>
+                            </ListView>
+                        </Grid>
+                    </Border>
+
         <Grid
+            Grid.Column="1"
             AllowDrop="True"
             Background="#FF080A0F"
             DragOver="Viewport_DragOver"
@@ -294,6 +420,10 @@
                 x:Name="ImageCanvas"
                 ClearColor="#FF080A0F"
                 Draw="ImageCanvas_Draw"
+                ManipulationCompleted="ImageCanvas_ManipulationCompleted"
+                ManipulationDelta="ImageCanvas_ManipulationDelta"
+                ManipulationMode="Scale,TranslateX,TranslateY"
+                ManipulationStarted="ImageCanvas_ManipulationStarted"
                 PointerCaptureLost="ImageCanvas_PointerCaptureLost"
                 PointerMoved="ImageCanvas_PointerMoved"
                 PointerPressed="ImageCanvas_PointerPressed"
@@ -322,7 +452,7 @@
                 <TextBlock
                     HorizontalAlignment="Center"
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                    Text="Open a FITS or standard image, choose a folder, or drop one here."
+                    Text="Open a FITS, XISF, or standard image; choose a folder; or drop one here."
                     TextAlignment="Center"
                     TextWrapping="Wrap" />
                 <TextBlock
@@ -424,6 +554,7 @@
                 </StackPanel>
             </Border>
         </Grid>
+                </Grid>
             </SplitView.Content>
         </SplitView>
 
