@@ -1,16 +1,26 @@
-using Windows.Storage;
+using System.Text.Json;
 
 namespace Seiza.App.Services;
 
 internal static class CatalogSettingsStore
 {
-    private const string CatalogDirectoryKey = "CatalogDirectory";
+    private static readonly string SettingsDirectory = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "Seiza");
+    private static readonly string SettingsPath = Path.Combine(SettingsDirectory, "settings.json");
+    private static readonly JsonSerializerOptions SerializerOptions = new() { WriteIndented = true };
 
     public static string? LoadCatalogDirectory()
     {
         try
         {
-            return ApplicationData.Current.LocalSettings.Values[CatalogDirectoryKey] as string;
+            if (!File.Exists(SettingsPath))
+            {
+                return null;
+            }
+
+            string json = File.ReadAllText(SettingsPath);
+            return JsonSerializer.Deserialize<Settings>(json)?.CatalogDirectory;
         }
         catch
         {
@@ -20,13 +30,22 @@ internal static class CatalogSettingsStore
 
     public static void SaveCatalogDirectory(string? path)
     {
-        if (string.IsNullOrWhiteSpace(path))
+        Directory.CreateDirectory(SettingsDirectory);
+
+        string temporaryPath = SettingsPath + ".tmp";
+        try
         {
-            ApplicationData.Current.LocalSettings.Values.Remove(CatalogDirectoryKey);
+            string json = JsonSerializer.Serialize(
+                new Settings(string.IsNullOrWhiteSpace(path) ? null : path),
+                SerializerOptions);
+            File.WriteAllText(temporaryPath, json);
+            File.Move(temporaryPath, SettingsPath, overwrite: true);
         }
-        else
+        finally
         {
-            ApplicationData.Current.LocalSettings.Values[CatalogDirectoryKey] = path;
+            File.Delete(temporaryPath);
         }
     }
+
+    private sealed record Settings(string? CatalogDirectory);
 }
