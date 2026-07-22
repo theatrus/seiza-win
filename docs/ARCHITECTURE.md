@@ -21,7 +21,7 @@ Seiza.App (WinUI 3 / C#)
                                            `-- seiza
 ```
 
-A later, separately hosted Rust COM DLL will provide Explorer FITS thumbnails
+A later, separately hosted Rust COM DLL will provide Explorer astronomy-image thumbnails
 and Preview Pane integration. It must stay independent of WinUI, .NET, catalog
 loading, and plate solving because Explorer loads it out of process.
 
@@ -35,7 +35,7 @@ loading, and plate solving because Explorer loads it out of process.
 6. Pixel buffers cross through opaque handles; versioned JSON carries metadata and solve records.
 7. The process hosts multiple document windows and redirects new file activations into the existing process.
 8. Distribution is an all-users, self-contained WiX 4 MSI with Windows Default
-   Apps registration for FITS files. The MSI carries .NET and Windows App SDK
+   Apps registration for FITS and XISF files. The MSI carries .NET and Windows App SDK
    runtimes; production releases must be code-signed.
 9. The Windows app builds the unified upstream `seiza-cabi` crate directly from one reviewed Seiza Git commit; no C ABI implementation is forked in this repository.
 10. The native build emits its Cargo-resolved Seiza version and commit as packaged build metadata, and the About dialog reports both values.

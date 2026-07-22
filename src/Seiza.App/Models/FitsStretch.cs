@@ -43,7 +43,7 @@ internal static class FitsStretchTypeExtensions
         FitsStretchType.Ghs =>
             "Apply a manual Generalized Hyperbolic Stretch with protection boundaries.",
         FitsStretchType.Identity =>
-            "Clamp normalized FITS samples to the display range without a stretch curve.",
+            "Clamp normalized astronomy samples to the display range without a stretch curve.",
         _ => throw new ArgumentOutOfRangeException(nameof(type)),
     };
 

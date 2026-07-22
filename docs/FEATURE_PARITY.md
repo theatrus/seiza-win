@@ -64,6 +64,9 @@ test exist.
 | Export stretched image without overlays | Available | **Complete** | Runtime-tested at the full 6,248 x 4,176 source resolution. |
 | Export with visible overlays | Available | **Complete** | Uses the same Win2D renderer and layer state as the live viewport. |
 | PNG, JPEG, and TIFF export | Available | **Complete** | Native Save As picker selects the encoder from the chosen extension. |
+| 16-bit PNG/TIFF export | Available | **Core ready** | Expose the upstream RGBA16 render/export path without reducing processed samples to the 8-bit viewport. |
+| Copy/paste image | Available | **Planned** | Add native clipboard commands that copy the rendered image and accept supported image files or bitmap clipboard content as a new source. |
+| Copy/paste processing adjustments | Available | **Planned** | Round-trip the same versioned processing JSON used by the shared core, with validation and undo when adjustments are pasted. |
 
 ## Catalog settings and managed data
 
@@ -146,7 +149,6 @@ one Win2D drawing path between the live viewport and full-resolution export.
 
 These remain tracked beyond the current macOS parity surface:
 
-- native RGBA16 export (shared core ready; Windows high-bit-depth export remains);
 - transfer-curve visualization and direct curve editing;
 - pixel loupe and WCS-aware cursor sampling;
 - star-detection overlays with HFR/FWHM measurements;
