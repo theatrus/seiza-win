@@ -4,14 +4,22 @@ Seiza is a fast, native Windows astronomy image viewer and plate-solving app.
 It combines a modern WinUI 3 interface and GPU-backed viewport with the same
 Rust image, catalog, and solving core used by Seiza on macOS.
 
-[Download Seiza 0.1.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.1.0/seiza-0.1.0-windows-x86_64.msi)
+[Download Seiza 0.1.1 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.1.1/seiza-0.1.1-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza 0.1.0 release highlights
+## Seiza 0.1.1 release highlights
 
-This first Windows preview is already a capable native astronomy workflow:
+This point release cleans up installation alongside the Seiza CLI and updates
+the Rust core:
+
+- The app now appears as **Seiza for Windows** in Apps & Features, distinct
+  from the renamed Seiza CLI installer. Existing installs upgrade in place.
+- Updated Seiza core (0.12.1) with the N.I.N.A.-exact u16 stretch family and
+  float auto-stretch.
+
+The 0.1.0 preview highlights still apply:
 
 - GPU-backed FITS and XISF viewing with a cached thumbnail browser and
   image-anchored pan, wheel zoom, and pinch zoom.
@@ -60,8 +68,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.1.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.1.0/seiza-0.1.0-windows-x86_64.msi).
-Its [SHA-256 checksum](https://github.com/theatrus/seiza-win/releases/download/v0.1.0/seiza-0.1.0-windows-x86_64.msi.sha256)
+Download the [Seiza 0.1.1 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.1.1/seiza-0.1.1-windows-x86_64.msi).
+Its [SHA-256 checksum](https://github.com/theatrus/seiza-win/releases/download/v0.1.1/seiza-0.1.1-windows-x86_64.msi.sha256)
 is published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
