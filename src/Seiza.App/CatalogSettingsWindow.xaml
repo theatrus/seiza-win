@@ -7,7 +7,7 @@
     xmlns:local="using:Seiza.App"
     xmlns:models="using:Seiza.App.ViewModels"
     xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-    Title="Catalog Settings — Seiza"
+    Title="Settings — Seiza"
     mc:Ignorable="d">
     <Window.SystemBackdrop>
         <MicaBackdrop />
@@ -19,7 +19,7 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <TitleBar x:Name="SettingsTitleBar" Title="Catalog Settings">
+        <TitleBar x:Name="SettingsTitleBar" Title="Settings">
             <TitleBar.IconSource>
                 <ImageIconSource ImageSource="Assets/AppIcon.ico" />
             </TitleBar.IconSource>
@@ -35,6 +35,7 @@
                 HorizontalAlignment="Stretch"
                 RowSpacing="20">
                 <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
@@ -301,6 +302,42 @@
                                 Text="Verification reads every selected file completely and checks its SHA-256 digest before installation. Large catalogs may take several minutes."
                                 TextWrapping="Wrap" />
                         </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Row="5" Spacing="12">
+                    <TextBlock
+                        Style="{StaticResource SubtitleTextBlockStyle}"
+                        Text="Software updates" />
+                    <Border
+                        Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <Grid ColumnSpacing="16">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Spacing="8">
+                                <ToggleSwitch
+                                    x:Name="AutomaticUpdateChecksToggle"
+                                    Header="Automatically check for updates"
+                                    OffContent="Off"
+                                    OnContent="On"
+                                    Toggled="AutomaticUpdateChecks_Toggled" />
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Updates and the update feed are signed with Seiza’s Sparkle key. Installation uses the standard Windows Installer and may request administrator approval."
+                                    TextWrapping="Wrap" />
+                            </StackPanel>
+                            <Button
+                                Grid.Column="1"
+                                VerticalAlignment="Center"
+                                Click="CheckForUpdates_Click"
+                                Content="Check now" />
+                        </Grid>
                     </Border>
                 </StackPanel>
             </Grid>

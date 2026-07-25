@@ -4,6 +4,7 @@ namespace Seiza.App.Services;
 
 internal static class CatalogSettingsStore
 {
+    private static readonly object SyncRoot = new();
     private static readonly string SettingsDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
         "Seiza");
@@ -12,32 +13,85 @@ internal static class CatalogSettingsStore
 
     public static string? LoadCatalogDirectory()
     {
-        try
+        lock (SyncRoot)
         {
-            if (!File.Exists(SettingsPath))
-            {
-                return null;
-            }
-
-            string json = File.ReadAllText(SettingsPath);
-            return JsonSerializer.Deserialize<Settings>(json)?.CatalogDirectory;
-        }
-        catch
-        {
-            return null;
+            return LoadSettings().CatalogDirectory;
         }
     }
 
     public static void SaveCatalogDirectory(string? path)
+    {
+        lock (SyncRoot)
+        {
+            Settings settings = LoadSettings() with
+            {
+                CatalogDirectory = string.IsNullOrWhiteSpace(path) ? null : path,
+            };
+            SaveSettings(settings);
+        }
+    }
+
+    public static bool LoadAutomaticallyCheckForUpdates()
+    {
+        lock (SyncRoot)
+        {
+            return LoadSettings().AutomaticallyCheckForUpdates;
+        }
+    }
+
+    public static void SaveAutomaticallyCheckForUpdates(bool value)
+    {
+        lock (SyncRoot)
+        {
+            SaveSettings(LoadSettings() with { AutomaticallyCheckForUpdates = value });
+        }
+    }
+
+    public static string? LoadSkippedUpdateVersion()
+    {
+        lock (SyncRoot)
+        {
+            return LoadSettings().SkippedUpdateVersion;
+        }
+    }
+
+    public static void SaveSkippedUpdateVersion(string? version)
+    {
+        lock (SyncRoot)
+        {
+            SaveSettings(LoadSettings() with
+            {
+                SkippedUpdateVersion = string.IsNullOrWhiteSpace(version) ? null : version,
+            });
+        }
+    }
+
+    private static Settings LoadSettings()
+    {
+        try
+        {
+            if (!File.Exists(SettingsPath))
+            {
+                return new Settings();
+            }
+
+            string json = File.ReadAllText(SettingsPath);
+            return JsonSerializer.Deserialize<Settings>(json) ?? new Settings();
+        }
+        catch
+        {
+            return new Settings();
+        }
+    }
+
+    private static void SaveSettings(Settings settings)
     {
         Directory.CreateDirectory(SettingsDirectory);
 
         string temporaryPath = SettingsPath + ".tmp";
         try
         {
-            string json = JsonSerializer.Serialize(
-                new Settings(string.IsNullOrWhiteSpace(path) ? null : path),
-                SerializerOptions);
+            string json = JsonSerializer.Serialize(settings, SerializerOptions);
             File.WriteAllText(temporaryPath, json);
             File.Move(temporaryPath, SettingsPath, overwrite: true);
         }
@@ -47,5 +101,12 @@ internal static class CatalogSettingsStore
         }
     }
 
-    private sealed record Settings(string? CatalogDirectory);
+    private sealed record Settings
+    {
+        public string? CatalogDirectory { get; init; }
+
+        public bool AutomaticallyCheckForUpdates { get; init; } = true;
+
+        public string? SkippedUpdateVersion { get; init; }
+    }
 }

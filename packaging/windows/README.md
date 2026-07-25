@@ -27,3 +27,9 @@ validation:
 .\.github\scripts\test-windows-installer.ps1 `
   -Msi .\dist\seiza-0.1.0-windows-x86_64.msi
 ```
+
+Tagged releases use `.github/workflows/release.yml` to build and smoke-test
+this MSI, sign it for the in-app updater, generate `appcast.xml` and its
+detached signature, and publish all release assets. See
+[`docs/AUTO_UPDATE.md`](../../docs/AUTO_UPDATE.md) for the required signing
+environment and release procedure.

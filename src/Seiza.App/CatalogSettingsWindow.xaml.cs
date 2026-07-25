@@ -1,6 +1,7 @@
 using System.ComponentModel;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using Seiza.App.Services;
 using Seiza.App.ViewModels;
 using Windows.Graphics;
 
@@ -23,6 +24,8 @@ public sealed partial class CatalogSettingsWindow : Window
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         ContentRoot.Loaded += ContentRoot_Loaded;
         Closed += CatalogSettingsWindow_Closed;
+        AutomaticUpdateChecksToggle.IsOn =
+            CatalogSettingsStore.LoadAutomaticallyCheckForUpdates();
         UpdateVisualState();
     }
 
@@ -52,6 +55,13 @@ public sealed partial class CatalogSettingsWindow : Window
 
     private async void Install_Click(object sender, RoutedEventArgs e) =>
         await ViewModel.StartSetupAsync();
+
+    private void AutomaticUpdateChecks_Toggled(object sender, RoutedEventArgs e) =>
+        CatalogSettingsStore.SaveAutomaticallyCheckForUpdates(
+            AutomaticUpdateChecksToggle.IsOn);
+
+    private async void CheckForUpdates_Click(object sender, RoutedEventArgs e) =>
+        await App.Updates.CheckForUpdatesAsync(ContentRoot, userInitiated: true);
 
     private void ViewModel_PropertyChanged(object? sender, PropertyChangedEventArgs e) =>
         UpdateVisualState();

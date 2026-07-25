@@ -1,0 +1,149 @@
+name: Release Windows installer
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+
+jobs:
+  windows:
+    if: github.repository == 'theatrus/seiza-win' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    environment: signing
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: true
+      SPARKLE_PUBLIC_KEY: Jk4K7QO9ohQbi455S888/lnSiqXB6a5sB4wEuEZjaQ0=
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt
+
+      - name: Validate release tag and notes
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+)$') {
+            throw "Release tag must have the form vMAJOR.MINOR.PATCH"
+          }
+          $version = $Matches[1]
+          [xml] $project = Get-Content src\Seiza.App\Seiza.App.csproj
+          $projectVersion = $project.SelectSingleNode('/Project/PropertyGroup/Version').InnerText
+          if ($version -ne $projectVersion) {
+            throw "Tag version $version does not match app version $projectVersion"
+          }
+          $notes = "docs\releases\$($env:GITHUB_REF_NAME).md"
+          if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) {
+            throw "Release notes are required at $notes"
+          }
+          if (-not (Select-String -Quiet -LiteralPath src\Seiza.App\Services\UpdateController.cs -SimpleMatch $env:SPARKLE_PUBLIC_KEY)) {
+            throw "The release key does not match the public key compiled into the app"
+          }
+          "SEIZA_VERSION=$version" >> $env:GITHUB_ENV
+          "RELEASE_NOTES=$notes" >> $env:GITHUB_ENV
+
+      - name: Check Rust formatting
+        run: cargo fmt --all --check
+
+      - name: Test Rust core
+        run: .\scripts\build-rust.ps1 -Test
+
+      - name: Restore application and release tools
+        run: |
+          dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
+          dotnet tool restore
+
+      - name: Build all-users MSI
+        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=${{ env.SEIZA_VERSION }}
+
+      - name: Smoke-test Windows installer
+        run: .\.github\scripts\test-windows-installer.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
+
+      - name: Generate signed Sparkle appcast
+        shell: pwsh
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SPARKLE_PRIVATE_KEY)) {
+            throw "SPARKLE_ED_PRIVATE_KEY is not configured in the signing environment"
+          }
+          $msi = Resolve-Path ".\dist\seiza-$($env:SEIZA_VERSION)-windows-x86_64.msi"
+          $releaseBase = "https://github.com/$($env:GITHUB_REPOSITORY)/releases/download/$($env:GITHUB_REF_NAME)"
+          $appcastNotes = Join-Path $env:RUNNER_TEMP "seiza-appcast-notes"
+          New-Item -ItemType Directory -Force -Path $appcastNotes | Out-Null
+          Copy-Item -LiteralPath $env:RELEASE_NOTES -Destination (Join-Path $appcastNotes "$($env:SEIZA_VERSION).md")
+          dotnet tool run netsparkle-generate-appcast -- `
+            --single-file $msi `
+            --file-version $env:SEIZA_VERSION `
+            --appcast-output-directory .\dist `
+            --base-url $releaseBase `
+            --change-log-path $appcastNotes `
+            --product-name "Seiza for Windows" `
+            --os windows-x64 `
+            --description-tag "Seiza for Windows updates" `
+            --link-tag "https://github.com/$($env:GITHUB_REPOSITORY)/releases/latest/download/appcast.xml" `
+            --use-ed25519-signature-attribute `
+            --human-readable true
+
+          $appcast = ".\dist\appcast.xml"
+          $appcastSignature = "$appcast.signature"
+          if (-not (Test-Path -LiteralPath $appcast -PathType Leaf) -or
+              -not (Test-Path -LiteralPath $appcastSignature -PathType Leaf)) {
+            throw "NetSparkle did not produce the signed appcast and detached signature"
+          }
+          [xml] $feed = Get-Content -LiteralPath $appcast -Raw
+          $expectedUrl = "$releaseBase/$([System.IO.Path]::GetFileName($msi))"
+          if ([string] $feed.rss.channel.item.enclosure.url -ne $expectedUrl) {
+            throw "Appcast download URL does not match the release asset"
+          }
+
+      - name: Produce checksums
+        shell: pwsh
+        run: |
+          $files = @(
+            ".\dist\seiza-$($env:SEIZA_VERSION)-windows-x86_64.msi",
+            ".\dist\appcast.xml",
+            ".\dist\appcast.xml.signature"
+          )
+          $lines = foreach ($file in $files) {
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $file
+            "$($hash.Hash.ToLowerInvariant()) *$([System.IO.Path]::GetFileName($file))"
+          }
+          $lines | Set-Content -LiteralPath .\dist\SHA256SUMS.txt -Encoding utf8NoBOM
+
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v7
+        with:
+          name: seiza-${{ env.SEIZA_VERSION }}-windows-release
+          path: |
+            dist/seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi
+            dist/appcast.xml
+            dist/appcast.xml.signature
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+
+      - name: Publish GitHub release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME `
+            --verify-tag `
+            --title "Seiza for Windows $($env:GITHUB_REF_NAME)" `
+            --notes-file $env:RELEASE_NOTES `
+            ".\dist\seiza-$($env:SEIZA_VERSION)-windows-x86_64.msi" `
+            .\dist\appcast.xml `
+            .\dist\appcast.xml.signature `
+            .\dist\SHA256SUMS.txt

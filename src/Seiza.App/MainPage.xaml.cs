@@ -48,6 +48,7 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _isBrowserOpen;
     private bool _syncingBrowserSelection;
     private bool _isPickingSymmetryPoint;
+    private bool _didCheckForUpdates;
     private FitsStretchWindow? _stretchWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
@@ -60,7 +61,19 @@ public sealed partial class MainPage : Page, IDisposable
         ViewModel.PropertyChanged += (_, _) => UpdateVisualState();
         InspectorControl.SolveRequested += InspectorControl_SolveRequested;
         InspectorControl.ExportWcsRequested += InspectorControl_ExportWcsRequested;
+        Loaded += MainPage_Loaded;
         Unloaded += MainPage_Unloaded;
+    }
+
+    private async void MainPage_Loaded(object sender, RoutedEventArgs e)
+    {
+        if (_didCheckForUpdates)
+        {
+            return;
+        }
+
+        _didCheckForUpdates = true;
+        await App.Updates.CheckForUpdatesAsync(this, userInitiated: false);
     }
 
     internal Task OpenPathAsync(string path) => OpenImageAndDiscoverSiblingsAsync(path);
@@ -283,6 +296,9 @@ public sealed partial class MainPage : Page, IDisposable
 
     private void CatalogSettings_Click(object sender, RoutedEventArgs e) =>
         App.ShowCatalogSettings();
+
+    private async void CheckForUpdates_Click(object sender, RoutedEventArgs e) =>
+        await App.Updates.CheckForUpdatesAsync(this, userInitiated: true);
 
     private async void Solve_Click(object sender, RoutedEventArgs e) =>
         await SolveCurrentAsync();

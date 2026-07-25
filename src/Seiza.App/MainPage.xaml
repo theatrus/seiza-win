@@ -271,8 +271,8 @@
 
             <AppBarButton
                 Click="CatalogSettings_Click"
-                Label="Catalogs"
-                ToolTipService.ToolTip="Catalog settings">
+                Label="Settings"
+                ToolTipService.ToolTip="Seiza settings">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE713;" />
                 </AppBarButton.Icon>
@@ -281,12 +281,18 @@
             <AppBarSeparator />
 
             <AppBarButton
-                Click="About_Click"
-                Label="About"
-                ToolTipService.ToolTip="About Seiza">
+                Label="More"
+                ToolTipService.ToolTip="Updates and app information">
                 <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE946;" />
+                    <FontIcon Glyph="&#xE712;" />
                 </AppBarButton.Icon>
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Click="CheckForUpdates_Click" Text="Check for updates…" />
+                        <MenuFlyoutSeparator />
+                        <MenuFlyoutItem Click="About_Click" Text="About Seiza" />
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
             </AppBarButton>
         </CommandBar>
 
