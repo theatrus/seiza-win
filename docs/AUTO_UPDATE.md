@@ -57,9 +57,9 @@ Every updater-enabled release publishes these assets:
 - `appcast.xml.signature`
 - `SHA256SUMS.txt`
 
-Version 0.1.0 predates the updater feed. The first release produced by the new
-workflow seeds the feed; the following release is the first end-to-end in-app
-upgrade.
+Versions 0.1.0 and 0.1.1 predate the updater feed. The first release produced
+by the new workflow seeds the feed; the following release is the first
+end-to-end in-app upgrade.
 
 ## Local verification
 
