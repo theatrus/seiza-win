@@ -1426,9 +1426,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "seiza"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b0bd93deb16fe8cd7615535785cbfcc463ec3790c3b2be862d4a74f3b26d594f"
+checksum = "525faedc07014b8dd1fc7de1407016bb59a96395ec67b23b7d1eb05219017ce5"
 dependencies = [
  "directories",
  "image",
@@ -1460,9 +1460,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.12.1"
+version = "0.12.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4497df6a9d6971e41d1482ae2254fb44c1de9bcfab63b20f08cd7457953eb2df"
+checksum = "3922fa931b0da120f42bb03b2b6335a21e583142a4eaa0e9c5f3fd61a78125ac"
 dependencies = [
  "cbindgen",
  "image",

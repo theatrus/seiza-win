@@ -16,7 +16,7 @@ the Rust core:
 
 - The app now appears as **Seiza for Windows** in Apps & Features, distinct
   from the renamed Seiza CLI installer. Existing installs upgrade in place.
-- Updated Seiza core (0.12.1) with the N.I.N.A.-exact u16 stretch family and
+- Updated Seiza core (0.12.2) with the N.I.N.A.-exact u16 stretch family and
   float auto-stretch.
 
 The 0.1.0 preview highlights still apply:

@@ -6,4 +6,4 @@ rust-version = "1.89"
 publish = false
 
 [dependencies]
-seiza-cabi-upstream = { package = "seiza-cabi", version = "0.12.1" }
+seiza-cabi-upstream = { package = "seiza-cabi", version = "0.12.2" }
