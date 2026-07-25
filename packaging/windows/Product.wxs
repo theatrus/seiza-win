@@ -1,7 +1,7 @@
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs"
      xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
   <Package
-      Name="Seiza"
+      Name="Seiza for Windows"
       Manufacturer="Seiza"
       Version="$(var.SeizaVersion)"
       UpgradeCode="9E48A749-B21A-4EB9-9417-B1A5AA61D2F6"
@@ -10,7 +10,7 @@
       Scope="perMachine"
       Compressed="yes">
     <SummaryInformation Description="Seiza native astronomy image viewer and plate solver" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Seiza is already installed." />
+    <MajorUpgrade DowngradeErrorMessage="A newer version of Seiza for Windows is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -66,7 +66,7 @@
 
     <Feature
         Id="MainFeature"
-        Title="Seiza"
+        Title="Seiza for Windows"
         Description="Seiza application and self-contained runtimes"
         Level="1"
         AllowAbsent="no"
