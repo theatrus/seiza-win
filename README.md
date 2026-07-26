@@ -56,8 +56,10 @@ The 0.1.0 preview highlights still apply:
 - Copy and paste rendered images or a versioned set of Seiza processing
   adjustments through the Windows clipboard.
 - Download, verify, repair, and relocate Seiza catalogs from the native
-  Catalog Settings window. The recommended preset includes deep-sky objects,
+  Settings window. The recommended preset includes deep-sky objects,
   transients, and solar-system bodies as well as solving data.
+- Check the signed Sparkle feed automatically or on demand, then download,
+  verify, and open an in-place MSI update without visiting the Releases page.
 
 | Astronomy processing | Catalog management |
 | --- | --- |
@@ -104,11 +106,13 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.1.0
+  -p:SeizaVersion=0.1.1
 ```
 
 The installer is written to `dist`. See the
 [installer notes](packaging/windows/README.md) for its layout and smoke test.
+The [signed update guide](docs/AUTO_UPDATE.md) documents appcast generation and
+the tag-driven release workflow.
 
 ## Architecture
 

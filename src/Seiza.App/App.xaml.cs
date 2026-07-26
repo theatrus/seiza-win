@@ -4,6 +4,7 @@ using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
 using Microsoft.UI.Xaml.Media;
 using Microsoft.UI.Xaml.Navigation;
+using Seiza.App.Services;
 
 // To learn more about WinUI, the WinUI project structure,
 // and more about our project templates, see: http://aka.ms/winui-project-info.
@@ -16,6 +17,8 @@ namespace Seiza.App;
 public partial class App : Application
 {
     private static CatalogSettingsWindow? _catalogSettingsWindow;
+
+    internal static UpdateController Updates { get; } = new();
 
     /// <summary>
     /// The main application window. Use <c>App.Window</c> from any class that needs
@@ -69,6 +72,7 @@ public partial class App : Application
         var mainWindow = new MainWindow();
         Window = mainWindow;
         DispatcherQueue = Microsoft.UI.Dispatching.DispatcherQueue.GetForCurrentThread();
+        Window.Closed += (_, _) => Updates.Dispose();
         Window.Activate();
 
         string launchPath = args.Arguments.Trim().Trim('"');
