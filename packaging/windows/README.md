@@ -13,19 +13,24 @@ Build the installer from the repository root:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.1.2
+  -p:SeizaVersion=0.1.3
 ```
 
 The MSI is written to `dist`. The version must be a valid three-part MSI
 version. WiX and its UI/Heat extensions stay pinned to 4.0.6 to match the main
 Seiza installer.
 
+The interactive installer's selected-by-default **Launch Seiza** option uses
+WiX's unelevated shell action so an all-users install opens Seiza in the
+signed-in user's desktop session. CI verifies the generated MSI custom-action
+and Finish-button tables before running the elevated smoke test.
+
 An elevated install/launch/uninstall smoke test is available for local and CI
 validation:
 
 ```powershell
 .\.github\scripts\test-windows-installer.ps1 `
-  -Msi .\dist\seiza-0.1.2-windows-x86_64.msi
+  -Msi .\dist\seiza-0.1.3-windows-x86_64.msi
 ```
 
 Tagged releases use `.github/workflows/release.yml` to build and smoke-test
