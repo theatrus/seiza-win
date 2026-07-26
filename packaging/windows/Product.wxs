@@ -86,18 +86,29 @@
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch Seiza" />
     <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOX" Value="1" />
     <CustomAction
+        Id="SetLaunchSeizaTarget"
+        Property="WixUnelevatedShellExecTarget"
+        Value="[APPLICATIONFOLDER]Seiza.App.exe" />
+    <CustomAction
         Id="LaunchSeiza"
-        Directory="APPLICATIONFOLDER"
-        ExeCommand="Seiza.App.exe"
+        BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)"
+        DllEntry="WixUnelevatedShellExec"
         Execute="immediate"
-        Return="asyncNoWait"
-        Impersonate="yes" />
+        Return="check" />
     <UI>
       <Publish
           Dialog="ExitDialog"
           Control="Finish"
           Event="DoAction"
+          Value="SetLaunchSeizaTarget"
+          Order="1"
+          Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+      <Publish
+          Dialog="ExitDialog"
+          Control="Finish"
+          Event="DoAction"
           Value="LaunchSeiza"
+          Order="2"
           Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
     </UI>
   </Package>

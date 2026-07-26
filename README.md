@@ -4,23 +4,21 @@ Seiza is a fast, native Windows astronomy image viewer and plate-solving app.
 It combines a modern WinUI 3 interface and GPU-backed viewport with the same
 Rust image, catalog, and solving core used by Seiza on macOS.
 
-[Download Seiza 0.1.2 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.1.2/seiza-0.1.2-windows-x86_64.msi)
+[Download Seiza 0.1.3 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.1.3/seiza-0.1.3-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza 0.1.2 release highlights
+## Seiza 0.1.3 release highlights
 
-This is the first update-capable Seiza for Windows release:
+This is the first release delivered through Seiza's signed in-app updater:
 
-- Seiza can check for updates automatically at startup or on demand from the
-  **More** menu and **Settings**.
-- Downloads, the Sparkle appcast, and its detached signature are verified with
-  Ed25519 before Seiza opens the existing all-users MSI upgrade.
-- Update prompts, progress, cancellation, skipped versions, and errors use a
-  native WinUI interface.
-- The tag-driven release pipeline now builds and smoke-tests the installer,
-  signs the Sparkle feed, publishes checksums, and creates the GitHub release.
+- Fixed the installer's selected-by-default **Launch Seiza** action so Finish
+  opens the installed app in the signed-in user's desktop session.
+- The launch now uses WiX's unelevated shell action with the app's full
+  installed path instead of a directory-relative executable command.
+- Seiza 0.1.2 users can discover, verify, and install this release from
+  **More > Check for updates** or **Settings > Check now**.
 
 The earlier preview highlights still apply:
 
@@ -73,8 +71,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.1.2 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.1.2/seiza-0.1.2-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.1.2/SHA256SUMS.txt)
+Download the [Seiza 0.1.3 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.1.3/seiza-0.1.3-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.1.3/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -109,7 +107,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.1.2
+  -p:SeizaVersion=0.1.3
 ```
 
 The installer is written to `dist`. See the
