@@ -18,6 +18,9 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     private readonly ImageStackCalibration _calibration = new();
     private CancellationTokenSource? _stackCancellation;
     private IReadOnlyList<ImageStackGroup> _groups = [];
+    private bool _allowClose;
+    private bool _closed;
+    private bool _closeWhenIdle;
     private bool _initializing = true;
     private bool _loaded;
     private bool _running;
@@ -45,6 +48,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             presenter.IsMinimizable = false;
         }
         ContentRoot.Loaded += ContentRoot_Loaded;
+        AppWindow.Closing += AppWindow_Closing;
         Closed += Window_Closed;
         _initializing = false;
         RefreshGroupsAndValidation();
@@ -343,7 +347,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
-        if (_running)
+        if (_running || _closed)
         {
             return;
         }
@@ -356,14 +360,24 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             return;
         }
 
-        IReadOnlyDictionary<string, string>? outputs = await PickOutputsAsync();
-        if (outputs is null)
+        ImageStackOutputSelection? outputSelection = await PickOutputsAsync();
+        if (outputSelection is null || _closed)
         {
+            if (outputSelection is not null)
+            {
+                CleanupPlaceholderOutputs(outputSelection.PlaceholderPaths);
+            }
             return;
         }
+        IReadOnlyDictionary<string, string> outputs = outputSelection.Outputs;
         string[] existing = outputs.Values.Where(File.Exists).ToArray();
         if (SplitsOutput && existing.Length > 0 && !await ConfirmOverwriteAsync(existing))
         {
+            return;
+        }
+        if (_closed)
+        {
+            CleanupPlaceholderOutputs(outputSelection.PlaceholderPaths);
             return;
         }
 
@@ -385,13 +399,21 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         }
 
         _running = true;
+        _allowClose = false;
+        _closeWhenIdle = false;
         ConfigurationPanel.Visibility = Visibility.Collapsed;
         ProgressPanel.Visibility = Visibility.Visible;
         StartButton.Visibility = Visibility.Collapsed;
         FooterHintText.Text = "You can cancel safely between frames.";
-        _stackCancellation = new CancellationTokenSource();
+        var cancellation = new CancellationTokenSource();
+        _stackCancellation = cancellation;
+        bool wroteOutputs = false;
         var progress = new Progress<ImageStackProgress>(update =>
         {
+            if (_closed)
+            {
+                return;
+            }
             StackProgressBar.Value = update.FractionCompleted;
             ProgressMessageText.Text = update.Message;
             ProgressCountsText.Text =
@@ -404,26 +426,57 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             ImageStackBatchResult result = await ImageStackService.StackBatchAsync(
                 jobs,
                 progress,
-                _stackCancellation.Token);
+                cancellation.Token);
+            wroteOutputs = true;
+            _running = false;
             _completion.TrySetResult(result);
+            _allowClose = true;
             Close();
+        }
+        catch (ImageStackBatchCanceledException exception)
+        {
+            if (!_closeWhenIdle)
+            {
+                RestoreAfterFailure(exception.Message, InfoBarSeverity.Informational);
+            }
         }
         catch (OperationCanceledException)
         {
-            RestoreAfterFailure("Stacking was cancelled.", InfoBarSeverity.Informational);
+            if (!_closeWhenIdle)
+            {
+                RestoreAfterFailure(
+                    "Stacking was cancelled. No output was written.",
+                    InfoBarSeverity.Informational);
+            }
         }
         catch (Exception exception)
         {
-            RestoreAfterFailure(exception.Message, InfoBarSeverity.Error);
+            if (!_closeWhenIdle)
+            {
+                RestoreAfterFailure(exception.Message, InfoBarSeverity.Error);
+            }
         }
         finally
         {
-            _stackCancellation?.Dispose();
-            _stackCancellation = null;
+            if (!wroteOutputs)
+            {
+                CleanupPlaceholderOutputs(outputSelection.PlaceholderPaths);
+            }
+            if (ReferenceEquals(_stackCancellation, cancellation))
+            {
+                _stackCancellation = null;
+            }
+            cancellation.Dispose();
+            if (_closeWhenIdle && !_closed)
+            {
+                _running = false;
+                _allowClose = true;
+                Close();
+            }
         }
     }
 
-    private async Task<IReadOnlyDictionary<string, string>?> PickOutputsAsync()
+    private async Task<ImageStackOutputSelection?> PickOutputsAsync()
     {
         if (!SplitsOutput)
         {
@@ -435,13 +488,30 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             };
             picker.FileTypeChoices.Add("FITS image", [".fits"]);
             WinRT.Interop.InitializeWithWindow.Initialize(picker, WindowHandle);
+            DateTimeOffset pickerOpenedAt = DateTimeOffset.UtcNow;
             StorageFile? file = await picker.PickSaveFileAsync();
-            return file is null
-                ? null
-                : new Dictionary<string, string>(StringComparer.Ordinal)
+            if (file is null)
+            {
+                return null;
+            }
+
+            bool isNewPlaceholder = false;
+            try
+            {
+                var properties = await file.GetBasicPropertiesAsync();
+                isNewPlaceholder = properties.Size == 0 &&
+                    file.DateCreated >= pickerOpenedAt.AddSeconds(-2);
+            }
+            catch
+            {
+                // Failure cleanup is best-effort; never reject a valid picker result.
+            }
+            return new ImageStackOutputSelection(
+                new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     [_groups[0].Id] = file.Path,
-                };
+                },
+                isNewPlaceholder ? [file.Path] : []);
         }
 
         var folderPicker = new FolderPicker
@@ -458,10 +528,14 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         }
 
         string baseName = SafeBaseName(OutputBaseNameBox.Text);
-        return _groups.ToDictionary(
-            group => group.Id,
-            group => Path.Combine(folder.Path, $"{baseName}-{SafeBaseName(group.FilenameSuffix)}.fits"),
-            StringComparer.Ordinal);
+        return new ImageStackOutputSelection(
+            _groups.ToDictionary(
+                group => group.Id,
+                group => Path.Combine(
+                    folder.Path,
+                    $"{baseName}-{SafeBaseName(group.FilenameSuffix)}.fits"),
+                StringComparer.Ordinal),
+            []);
     }
 
     private async Task<bool> ConfirmOverwriteAsync(string[] paths)
@@ -488,6 +562,11 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private void RestoreAfterFailure(string message, InfoBarSeverity severity)
     {
+        if (_closed)
+        {
+            return;
+        }
+        _closeWhenIdle = false;
         _running = false;
         ConfigurationPanel.Visibility = Visibility.Visible;
         ProgressPanel.Visibility = Visibility.Collapsed;
@@ -512,10 +591,45 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         Close();
     }
 
+    private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
+    {
+        if (!_running || _allowClose)
+        {
+            return;
+        }
+
+        args.Cancel = true;
+        _closeWhenIdle = true;
+        CancelButton.IsEnabled = false;
+        FooterHintText.Text = "Closing after the current frame…";
+        _stackCancellation?.Cancel();
+    }
+
     private void Window_Closed(object sender, WindowEventArgs args)
     {
+        _closed = true;
+        AppWindow.Closing -= AppWindow_Closing;
         Dispose();
         _completion.TrySetResult(null);
+    }
+
+    private static void CleanupPlaceholderOutputs(IEnumerable<string> paths)
+    {
+        foreach (string path in paths)
+        {
+            try
+            {
+                var file = new FileInfo(path);
+                if (file.Exists && file.Length == 0)
+                {
+                    file.Delete();
+                }
+            }
+            catch
+            {
+                // A failed stack must not be masked by best-effort picker cleanup.
+            }
+        }
     }
 
     public void Dispose()
@@ -527,4 +641,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     }
 
     private sealed record StackFrameChoice(string Path, string DisplayName);
+
+    private sealed record ImageStackOutputSelection(
+        IReadOnlyDictionary<string, string> Outputs,
+        IReadOnlyList<string> PlaceholderPaths);
 }

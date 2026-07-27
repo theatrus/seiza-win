@@ -63,6 +63,7 @@
                             <ToggleSwitch
                                 x:Name="SplitByFilterToggle"
                                 Header="Split stacks by filename filter"
+                                IsOn="True"
                                 OffContent="Create one stack"
                                 OnContent="Create one stack per filter"
                                 Toggled="SplitByFilterToggle_Toggled" />

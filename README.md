@@ -20,6 +20,26 @@ Rust image, catalog, and solving core used by Seiza on macOS.
 - Stacking runs off the UI thread with per-frame progress, accepted/rejected
   counts, cancellation between frames, and automatic opening of the result.
 
+### Directory image stacking
+
+Open a folder containing FITS or XISF light frames, then choose **Stack** from
+the toolbar. Select the exposures to include and a reference frame, then tune
+normalization, pixel rejection, registration limits, or optional calibration
+masters. When filenames contain multiple filter names, Seiza enables a
+separate output per filter by default so incompatible channels are not mixed.
+
+| Frame and reference selection | Registration and rejection controls |
+| --- | --- |
+| ![Selecting light frames and a reference for directory image stacking](docs/images/directory-image-stacking.png) | ![Normalization, pixel rejection, calibration, and registration controls](docs/images/directory-image-stacking-options.png) |
+
+Seiza reports per-frame progress without blocking the viewer, writes an
+unstretched 32-bit floating-point FITS result, and opens the completed stack
+automatically. Cancellation is safe between frames; if a multi-filter batch
+stops after an earlier output was written, Seiza identifies the files that were
+already saved.
+
+![A completed full-resolution FITS stack reopened automatically in Seiza for Windows](docs/images/directory-image-stacking-result.png)
+
 ## Seiza 0.1.3 release highlights
 
 This is the first release delivered through Seiza's signed in-app updater:

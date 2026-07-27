@@ -319,6 +319,42 @@ internal sealed record ImageStackBatchResult(IReadOnlyList<ImageStackResult> Res
     public IReadOnlyList<string> OutputPaths => Results.Select(result => result.OutputPath).ToArray();
 }
 
+internal sealed class ImageStackBatchCanceledException : OperationCanceledException
+{
+    public ImageStackBatchCanceledException(
+        IReadOnlyList<string> completedOutputPaths,
+        CancellationToken cancellationToken)
+        : base(MessageFor(completedOutputPaths), cancellationToken)
+    {
+        CompletedOutputPaths = completedOutputPaths;
+    }
+
+    public IReadOnlyList<string> CompletedOutputPaths { get; }
+
+    private static string MessageFor(IReadOnlyList<string> paths) => paths.Count == 0
+        ? "Stacking was cancelled. No output was written."
+        : $"Stacking was cancelled. Already saved: {DisplayNames(paths)}.";
+
+    private static string DisplayNames(IEnumerable<string> paths) =>
+        string.Join(", ", paths.Select(Path.GetFileName));
+}
+
+internal sealed class ImageStackBatchFailureException : Exception
+{
+    public ImageStackBatchFailureException(
+        Exception innerException,
+        IReadOnlyList<string> completedOutputPaths)
+        : base(
+            $"{innerException.Message} Already saved: " +
+            $"{string.Join(", ", completedOutputPaths.Select(Path.GetFileName))}.",
+            innerException)
+    {
+        CompletedOutputPaths = completedOutputPaths;
+    }
+
+    public IReadOnlyList<string> CompletedOutputPaths { get; }
+}
+
 internal sealed record StackOptionsPayload(
     [property: JsonPropertyName("registration")] StackRegistrationPayload Registration,
     [property: JsonPropertyName("normalization")] StackNormalizationPayload Normalization,

@@ -33,20 +33,36 @@ internal static class ImageStackService
 
         foreach (ImageStackJob job in jobs)
         {
-            cancellationToken.ThrowIfCancellationRequested();
-            ImageStackResult result = Stack(
-                job.Request,
-                update => progress?.Report(update with
-                {
-                    Message = jobs.Count > 1
-                        ? $"{job.Group.Title}: {update.Message}"
-                        : update.Message,
-                    CompletedFrames = completedBeforeJob + update.CompletedFrames,
-                    TotalFrames = totalFrames,
-                    AcceptedFrames = acceptedBeforeJob + update.AcceptedFrames,
-                    RejectedFrames = rejectedBeforeJob + update.RejectedFrames,
-                }),
-                cancellationToken);
+            ImageStackResult result;
+            try
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                result = Stack(
+                    job.Request,
+                    update => progress?.Report(update with
+                    {
+                        Message = jobs.Count > 1
+                            ? $"{job.Group.Title}: {update.Message}"
+                            : update.Message,
+                        CompletedFrames = completedBeforeJob + update.CompletedFrames,
+                        TotalFrames = totalFrames,
+                        AcceptedFrames = acceptedBeforeJob + update.AcceptedFrames,
+                        RejectedFrames = rejectedBeforeJob + update.RejectedFrames,
+                    }),
+                    cancellationToken);
+            }
+            catch (OperationCanceledException)
+            {
+                throw new ImageStackBatchCanceledException(
+                    results.Select(item => item.OutputPath).ToArray(),
+                    cancellationToken);
+            }
+            catch (Exception exception) when (results.Count > 0)
+            {
+                throw new ImageStackBatchFailureException(
+                    exception,
+                    results.Select(item => item.OutputPath).ToArray());
+            }
             results.Add(result);
             completedBeforeJob += job.Request.Inputs.Count;
             acceptedBeforeJob += result.AcceptedFrames;
