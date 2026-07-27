@@ -9,6 +9,38 @@ Rust image, catalog, and solving core used by Seiza on macOS.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
+## Current development highlights
+
+- Directory image stacking now registers and combines selected FITS or XISF
+  light frames into an unstretched 32-bit floating-point FITS image.
+- Stacks can be split automatically by filename filter, with an independent
+  reference frame for each filter group. Global or local normalization,
+  delta-sigma rejection, registration limits, and bias/dark/flat calibration
+  masters match the macOS workflow.
+- Stacking runs off the UI thread with per-frame progress, accepted/rejected
+  counts, cancellation between frames, and automatic opening of the result.
+
+### Directory image stacking
+
+Open a folder containing FITS or XISF light frames, then choose **Stack** from
+the toolbar. Select the exposures to include and a reference frame, then tune
+normalization, pixel rejection, registration limits, or optional calibration
+masters. When filenames contain multiple filter names, Seiza enables a
+separate output per filter by default so incompatible channels are not mixed.
+
+| Frame and reference selection | Registration and rejection controls |
+| --- | --- |
+| ![Selecting light frames and a reference for directory image stacking](docs/images/directory-image-stacking.png) | ![Normalization, pixel rejection, calibration, and registration controls](docs/images/directory-image-stacking-options.png) |
+
+Seiza reports per-frame progress without blocking the viewer, writes an
+unstretched 32-bit floating-point FITS result, and opens the completed stack
+automatically. Completed files are published atomically, so a failed or
+cancelled write cannot replace an existing output with a partial file. Seiza
+also validates every output in a multi-filter batch before stacking begins and
+identifies any files that were already saved if a later stack is cancelled.
+
+![A completed full-resolution FITS stack reopened automatically in Seiza for Windows](docs/images/directory-image-stacking-result.png)
+
 ## Seiza 0.1.3 release highlights
 
 This is the first release delivered through Seiza's signed in-app updater:
@@ -37,6 +69,9 @@ The earlier preview highlights still apply:
 
 - Open FITS, XISF, PNG, JPEG, and TIFF images, folders, or dropped files; browse
   naturally sorted image sets in a cached thumbnail rail without blocking the UI.
+- Register and stack selected FITS or XISF frames from an opened folder, with
+  optional per-filter outputs, calibration masters, normalization, pixel
+  rejection, reference selection, progress, and cancellation.
 - Fit, pan, wheel-zoom, and pointer-anchored pinch-zoom a GPU-backed
   high-resolution viewport. Overlay geometry and labels stay registered to image
   pixels while line weights remain readable.

@@ -1,0 +1,250 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="Seiza.App.ImageStackWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="Stack Images">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="ContentRoot">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TitleBar x:Name="StackTitleBar" Title="Stack Images">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <ScrollViewer
+            Grid.Row="1"
+            Margin="24"
+            HorizontalScrollBarVisibility="Disabled"
+            VerticalScrollBarVisibility="Auto">
+            <StackPanel Spacing="18">
+                <StackPanel x:Name="ConfigurationPanel" Spacing="18">
+                    <StackPanel Spacing="4">
+                        <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="Directory image stacking" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Register and combine selected FITS or XISF light frames into an unstretched 32-bit floating-point FITS image."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Border
+                        Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <StackPanel Spacing="10">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Light frames" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Click="SelectAll_Click" Content="All" />
+                                <Button Grid.Column="2" Click="SelectNone_Click" Content="None" />
+                            </Grid>
+                            <ListView
+                                x:Name="FrameList"
+                                Height="190"
+                                DisplayMemberPath="DisplayName"
+                                SelectionChanged="FrameList_SelectionChanged"
+                                SelectionMode="Multiple" />
+                            <ToggleSwitch
+                                x:Name="SplitByFilterToggle"
+                                Header="Split stacks by filename filter"
+                                IsOn="True"
+                                OffContent="Create one stack"
+                                OnContent="Create one stack per filter"
+                                Toggled="SplitByFilterToggle_Toggled" />
+                            <TextBlock
+                                x:Name="FilterHintText"
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <StackPanel Spacing="10">
+                            <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Reference frames" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="Each stack is registered to its reference frame. Choose a sharp, representative exposure."
+                                TextWrapping="Wrap" />
+                            <StackPanel x:Name="ReferencePanel" Spacing="8" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <StackPanel Spacing="12">
+                            <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Stacking" />
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Normalization" VerticalAlignment="Center" />
+                                <ComboBox x:Name="NormalizationPicker" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed">
+                                    <ComboBoxItem Content="None" Tag="None" />
+                                    <ComboBoxItem Content="Global" Tag="Global" IsSelected="True" />
+                                    <ComboBoxItem Content="Local" Tag="Local" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid x:Name="LocalTileRow" ColumnSpacing="12" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Local tile size" VerticalAlignment="Center" />
+                                <NumberBox x:Name="LocalTileSizeBox" Grid.Column="1" Minimum="16" Maximum="4096" SmallChange="16" Value="256" ValueChanged="Options_ValueChanged" />
+                            </Grid>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Pixel rejection" VerticalAlignment="Center" />
+                                <ComboBox x:Name="RejectionPicker" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed">
+                                    <ComboBoxItem Content="None" Tag="None" />
+                                    <ComboBoxItem Content="Delta sigma" Tag="DeltaSigma" IsSelected="True" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid x:Name="RejectionOptionsPanel" ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <NumberBox x:Name="SigmaLowBox" Header="Low sigma" Minimum="0.1" Maximum="20" SmallChange="0.1" Value="3" ValueChanged="Options_ValueChanged" />
+                                <NumberBox x:Name="SigmaHighBox" Grid.Column="1" Header="High sigma" Minimum="0.1" Maximum="20" SmallChange="0.1" Value="3" ValueChanged="Options_ValueChanged" />
+                                <NumberBox x:Name="WarmupBox" Grid.Column="2" Header="Warmup frames" Minimum="2" Maximum="100" SmallChange="1" Value="5" ValueChanged="Options_ValueChanged" />
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+
+                    <Expander Header="Calibration masters">
+                        <StackPanel Margin="0,12,0,0" Spacing="10">
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Master bias" VerticalAlignment="Center" />
+                                <TextBlock x:Name="BiasPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <Button Grid.Column="2" Click="ChooseBias_Click" Content="Choose…" />
+                                <Button Grid.Column="3" Click="ClearBias_Click" Content="Clear" />
+                            </Grid>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Master dark" VerticalAlignment="Center" />
+                                <TextBlock x:Name="DarkPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <Button Grid.Column="2" Click="ChooseDark_Click" Content="Choose…" />
+                                <Button Grid.Column="3" Click="ClearDark_Click" Content="Clear" />
+                            </Grid>
+                            <Grid ColumnSpacing="8">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Master flat" VerticalAlignment="Center" />
+                                <TextBlock x:Name="FlatPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                <Button Grid.Column="2" Click="ChooseFlat_Click" Content="Choose…" />
+                                <Button Grid.Column="3" Click="ClearFlat_Click" Content="Clear" />
+                            </Grid>
+                            <ToggleSwitch x:Name="DarkExposureToggle" Header="Override master-dark exposure" Toggled="Options_Changed" />
+                            <NumberBox
+                                x:Name="DarkExposureBox"
+                                Header="Master-dark exposure (seconds)"
+                                IsEnabled="False"
+                                Minimum="0.001"
+                                Maximum="86400"
+                                SmallChange="1"
+                                Value="300"
+                                ValueChanged="Options_ValueChanged" />
+                        </StackPanel>
+                    </Expander>
+
+                    <Expander Header="Advanced registration limits">
+                        <StackPanel Margin="0,12,0,0" Spacing="10">
+                            <NumberBox x:Name="RegistrationRmsBox" Header="Maximum registration RMS (pixels)" Minimum="0.01" Maximum="100" SmallChange="0.1" Value="2" ValueChanged="Options_ValueChanged" />
+                            <NumberBox x:Name="DriftPixelsBox" Header="Maximum drift (pixels)" Minimum="1" Maximum="100000" SmallChange="1" Value="256" ValueChanged="Options_ValueChanged" />
+                            <NumberBox x:Name="DriftFractionBox" Header="Maximum drift (image fraction)" Minimum="0" Maximum="1" SmallChange="0.01" Value="0.15" ValueChanged="Options_ValueChanged" />
+                            <NumberBox x:Name="MinimumOverlapBox" Header="Minimum overlap (image fraction)" Minimum="0" Maximum="1" SmallChange="0.01" Value="0.6" ValueChanged="Options_ValueChanged" />
+                        </StackPanel>
+                    </Expander>
+
+                    <StackPanel x:Name="SplitOutputPanel" Spacing="6" Visibility="Collapsed">
+                        <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Output base name" />
+                        <TextBox x:Name="OutputBaseNameBox" Text="stacked" TextChanged="OutputBaseNameBox_TextChanged" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Filter names are appended automatically; you will choose the output folder next." TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <InfoBar x:Name="ValidationInfoBar" IsClosable="False" IsOpen="False" Severity="Error" />
+                </StackPanel>
+
+                <StackPanel x:Name="ProgressPanel" Spacing="12" Visibility="Collapsed">
+                    <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="Stacking images" />
+                    <ProgressBar x:Name="StackProgressBar" Minimum="0" Maximum="1" />
+                    <TextBlock x:Name="ProgressMessageText" TextWrapping="Wrap" />
+                    <TextBlock x:Name="ProgressCountsText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                </StackPanel>
+            </StackPanel>
+        </ScrollViewer>
+
+        <Grid
+            Grid.Row="2"
+            Padding="24,16"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0"
+            ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                x:Name="FooterHintText"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="The reference frame is included in the stack."
+                TextWrapping="Wrap"
+                VerticalAlignment="Center" />
+            <Button x:Name="CancelButton" Grid.Column="1" Click="Cancel_Click" Content="Cancel" />
+            <Button
+                x:Name="StartButton"
+                Grid.Column="2"
+                Click="Start_Click"
+                Content="Choose output and stack…"
+                Style="{ThemeResource AccentButtonStyle}" />
+        </Grid>
+    </Grid>
+</Window>

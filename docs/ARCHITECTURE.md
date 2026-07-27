@@ -30,7 +30,8 @@ loading, and plate solving because Explorer loads it out of process.
 1. The supported first release is Windows 11 x64. ARM64 follows after parity.
 2. WinUI 3 owns application chrome and standard interactions.
 3. Win2D owns interactive image and vector-overlay presentation.
-4. Rust owns FITS/XISF decoding, stretching, statistics, WCS, solving, and catalog data.
+4. Rust owns FITS/XISF decoding, stretching, statistics, registration/stacking,
+   WCS, solving, and catalog data.
 5. No Rust layout, allocator-owned string, or panic crosses the C ABI.
 6. Pixel buffers cross through opaque handles; versioned JSON carries metadata and solve records.
 7. The process hosts multiple document windows and redirects new file activations into the existing process.
@@ -54,6 +55,10 @@ loading, and plate solving because Explorer loads it out of process.
 - Keep cached previews visible while full-resolution work is in flight.
 - Render interactive processing drafts through the shared JSON C ABI at a bounded 2,048-pixel dimension, cancel stale UI results, and retain the committed full-resolution bitmap until Save succeeds.
 - Keep the shared pixel pipeline ordered as background correction, optional light deconvolution, then display stretch; the Windows shell only edits and serializes configuration.
+- Keep image registration, normalization, rejection, calibration, and stack
+  accumulation in Rust. The Windows shell may group filenames and schedule
+  batches, but it only crosses the C ABI once per input frame and cancels at
+  frame boundaries.
 
 ## Porting sequence
 
@@ -65,9 +70,11 @@ The detailed status and acceptance criteria live in
 3. **Complete:** bind the solve response, add the explicit Solve workflow, and present solution quality.
 4. **Complete:** draw the solved overlay scene in Win2D with layer and catalog controls.
 5. **Complete:** match the current macOS astronomy processing interactions with the stackable editor, GHS image sampling, input/display histograms, and live light deconvolution.
-6. **Complete:** build an all-users, self-contained WiX MSI, include both
+6. **Complete:** register and stack directory FITS/XISF light frames with
+   filter grouping, calibration, progress, cancellation, and 32-bit FITS output.
+7. **Complete:** build an all-users, self-contained WiX MSI, include both
    runtimes, register FITS and XISF files, and exercise install/launch/uninstall in CI.
-7. **Next:** add thumbnails/cache, multi-window activation, Explorer preview
+8. **Next:** add cached previews during full-resolution loads, multi-window activation, Explorer preview
    integration, signing, and tagged release automation.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view

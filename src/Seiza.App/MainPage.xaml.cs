@@ -50,6 +50,7 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _isPickingSymmetryPoint;
     private bool _didCheckForUpdates;
     private FitsStretchWindow? _stretchWindow;
+    private ImageStackWindow? _stackWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
 
@@ -93,6 +94,61 @@ public sealed partial class MainPage : Page, IDisposable
         if (path is not null)
         {
             await OpenFolderAsync(path);
+        }
+    }
+
+    private async void StackImages_Click(object sender, RoutedEventArgs e)
+    {
+        if (_stackWindow is not null)
+        {
+            _stackWindow.Activate();
+            return;
+        }
+
+        string[] paths = _imagePaths.Where(ImageFileService.IsStackableImage).ToArray();
+        if (paths.Length < 2)
+        {
+            return;
+        }
+
+        var window = new ImageStackWindow(paths);
+        _stackWindow = window;
+        UpdateVisualState();
+        window.Activate();
+        try
+        {
+            ImageStackBatchResult? result = await window.Completion;
+            if (result is null || result.OutputPaths.Count == 0)
+            {
+                return;
+            }
+
+            await OpenImageAndDiscoverSiblingsAsync(result.OutputPaths[0]);
+            if (result.Results.Count > 1 || result.RejectedFrames > 0)
+            {
+                string outputs = string.Join(
+                    Environment.NewLine,
+                    result.Results.Select(item =>
+                        $"{Path.GetFileName(item.OutputPath)}: " +
+                        $"{item.AcceptedFrames} accepted, {item.RejectedFrames} rejected"));
+                var dialog = new ContentDialog
+                {
+                    XamlRoot = XamlRoot,
+                    Title = result.Results.Count == 1 ? "Stack complete" : "Stacks complete",
+                    Content = outputs,
+                    CloseButtonText = "Done",
+                    DefaultButton = ContentDialogButton.Close,
+                };
+                await dialog.ShowAsync();
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_stackWindow, window))
+            {
+                _stackWindow = null;
+            }
+            UpdateVisualState();
         }
     }
 
@@ -1264,6 +1320,10 @@ public sealed partial class MainPage : Page, IDisposable
         CopyAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         PasteAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         ImageBrowserButton.IsEnabled = BrowserItems.Count > 1;
+        StackImagesButton.IsEnabled =
+            _stackWindow is null &&
+            !ViewModel.IsLoading &&
+            _imagePaths.Count(ImageFileService.IsStackableImage) >= 2;
         ImageBrowserButton.Label = _isBrowserOpen ? "Hide images" : "Images";
         ImageBrowserPane.Visibility = _isBrowserOpen && BrowserItems.Count > 1
             ? Visibility.Visible
@@ -1428,6 +1488,8 @@ public sealed partial class MainPage : Page, IDisposable
         EndSymmetryPointPicker(showEditor: false);
         _stretchWindow?.Close();
         _stretchWindow = null;
+        _stackWindow?.Close();
+        _stackWindow = null;
         if (!ReferenceEquals(_bitmap, _committedBitmap))
         {
             _bitmap?.Dispose();

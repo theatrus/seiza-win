@@ -79,6 +79,59 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName, EntryPoint = "seiza_rendered_image_free")]
     internal static partial void FreeRenderedImage(nint image);
 
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_live_stacker_open_fits",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint OpenLiveStacker(
+        string referencePath,
+        string? biasPath,
+        string? darkPath,
+        string? flatPath,
+        double darkExposureSeconds,
+        string optionsJson,
+        out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_live_stacker_push_fits_json",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint PushLiveStackerFrameJson(
+        nint stacker,
+        string path,
+        out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_accepted_frames")]
+    internal static partial uint GetLiveStackerAcceptedFrames(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_rejected_frames")]
+    internal static partial uint GetLiveStackerRejectedFrames(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_finish")]
+    internal static partial nint FinishLiveStacker(ref nint stacker, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_free")]
+    internal static partial void FreeLiveStacker(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_stack_snapshot_accepted_frames")]
+    internal static partial uint GetStackSnapshotAcceptedFrames(nint snapshot);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_stack_snapshot_rejected_frames")]
+    internal static partial uint GetStackSnapshotRejectedFrames(nint snapshot);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_stack_snapshot_write_fits",
+        StringMarshalling = StringMarshalling.Utf8)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool WriteStackSnapshotFits(
+        nint snapshot,
+        string path,
+        out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_stack_snapshot_free")]
+    internal static partial void FreeStackSnapshot(nint snapshot);
+
     [LibraryImport(LibraryName, EntryPoint = "seiza_string_free")]
     internal static partial void FreeString(nint value);
 }

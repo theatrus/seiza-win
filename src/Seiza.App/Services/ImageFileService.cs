@@ -22,6 +22,10 @@ internal static class ImageFileService
     private static readonly HashSet<string> SupportedExtensionSet =
         new(SupportedExtensions, StringComparer.OrdinalIgnoreCase);
 
+    private static readonly HashSet<string> StackableExtensionSet = new(
+        [".fits", ".fit", ".fts", ".xisf"],
+        StringComparer.OrdinalIgnoreCase);
+
     public static async Task<string?> PickImageAsync()
     {
         FileOpenPicker picker = new()
@@ -78,6 +82,9 @@ internal static class ImageFileService
 
     public static bool IsSupportedImage(string path) =>
         SupportedExtensionSet.Contains(Path.GetExtension(path));
+
+    public static bool IsStackableImage(string path) =>
+        StackableExtensionSet.Contains(Path.GetExtension(path));
 
     public static bool IsSupportedExtension(string? extension) =>
         !string.IsNullOrWhiteSpace(extension) && SupportedExtensionSet.Contains(extension);
