@@ -43,10 +43,13 @@ dotnet tool restore
 
 For a release:
 
-1. Set the app version in `src/Seiza.App/Seiza.App.csproj`.
-2. Add `docs/releases/vMAJOR.MINOR.PATCH.md`.
-3. Merge the release commit and tag it `vMAJOR.MINOR.PATCH`.
-4. Push the tag. `.github/workflows/release.yml` tests the core, builds and
+1. Choose the shared Seiza marketing version with `seiza-mac`. Public Windows
+   and macOS releases from the same product generation use the same semantic
+   version; platform-specific build numbers remain independent.
+2. Set the app version in `src/Seiza.App/Seiza.App.csproj`.
+3. Add `docs/releases/vMAJOR.MINOR.PATCH.md`.
+4. Merge the release commit and tag it `vMAJOR.MINOR.PATCH`.
+5. Push the tag. `.github/workflows/release.yml` tests the core, builds and
    smoke-tests the all-users MSI, creates the signed appcast, produces
    checksums, and publishes the GitHub release.
 
