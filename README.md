@@ -9,6 +9,17 @@ Rust image, catalog, and solving core used by Seiza on macOS.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
+## Current development highlights
+
+- Directory image stacking now registers and combines selected FITS or XISF
+  light frames into an unstretched 32-bit floating-point FITS image.
+- Stacks can be split automatically by filename filter, with an independent
+  reference frame for each filter group. Global or local normalization,
+  delta-sigma rejection, registration limits, and bias/dark/flat calibration
+  masters match the macOS workflow.
+- Stacking runs off the UI thread with per-frame progress, accepted/rejected
+  counts, cancellation between frames, and automatic opening of the result.
+
 ## Seiza 0.1.3 release highlights
 
 This is the first release delivered through Seiza's signed in-app updater:
@@ -37,6 +48,9 @@ The earlier preview highlights still apply:
 
 - Open FITS, XISF, PNG, JPEG, and TIFF images, folders, or dropped files; browse
   naturally sorted image sets in a cached thumbnail rail without blocking the UI.
+- Register and stack selected FITS or XISF frames from an opened folder, with
+  optional per-filter outputs, calibration masters, normalization, pixel
+  rejection, reference selection, progress, and cancellation.
 - Fit, pan, wheel-zoom, and pointer-anchored pinch-zoom a GPU-backed
   high-resolution viewport. Overlay geometry and labels stay registered to image
   pixels while line weights remain readable.

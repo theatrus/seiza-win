@@ -3,8 +3,8 @@
 `seiza-cabi.dll` deliberately exposes a small C ABI rather than Rust symbols.
 The same API is statically linked by the macOS app and dynamically loaded by
 the Windows app. Its implementation lives in the upstream Seiza workspace;
-this repository pins that crate by Git commit and builds it directly rather
-than maintaining a Windows fork.
+this repository resolves the published crates.io crate through `Cargo.lock`
+rather than maintaining a Windows fork or using a Git dependency.
 
 Rules:
 
@@ -16,6 +16,13 @@ Rules:
 - FITS and XISF processing use the shared `seiza_rendered_image_open_with_stretch_config` JSON contract so ordered stretch stages, color strategy, background subtraction, light deconvolution, and interactive-preview intent stay platform-neutral.
 - Catalog status is returned as owned JSON; catalog setup runs synchronously on a worker thread and reports borrowed progress JSON through a callback.
 - Rust owns manifest resolution, download caching, full SHA-256 verification, and atomic catalog installation.
+- A live stacker handle owns registration, calibrated accumulation,
+  normalization, rejection state, and its accepted/rejected counters. Each
+  pushed frame returns an owned JSON disposition; finishing consumes the live
+  handle and returns a snapshot that can write an unstretched 32-bit FITS file.
+- Cancellation is cooperative at the shell boundary between frame pushes.
+  Live stacker, snapshot, disposition, and error allocations are always freed
+  by their matching ABI function.
 - ABI additions are backward-compatible. Breaking changes require an ABI version bump.
 
 The Windows interop layer uses source-generated `LibraryImport` declarations,

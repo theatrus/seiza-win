@@ -45,6 +45,17 @@
             </AppBarButton>
 
             <AppBarButton
+                x:Name="StackImagesButton"
+                Click="StackImages_Click"
+                IsEnabled="False"
+                Label="Stack"
+                ToolTipService.ToolTip="Register and stack the FITS or XISF images in this folder">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE8FD;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarButton
                 x:Name="ImageBrowserButton"
                 Click="ImageBrowser_Click"
                 IsEnabled="False"

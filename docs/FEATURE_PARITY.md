@@ -8,12 +8,12 @@ merely because its Rust implementation exists.
 ## Baseline
 
 - macOS reference: `main` at
-  [`5b110ed`](https://github.com/theatrus/seiza-mac/commit/5b110edd813af485d18810d48173d6ec3dcc303b)
-- Seiza core reference: crates.io `seiza-cabi 0.12.0` from
-  [`badb6e8`](https://github.com/theatrus/seiza/commit/badb6e8664d96a2253e0e99c40341e66de805f9f)
+  [`7f6d566`](https://github.com/theatrus/seiza-mac/commit/7f6d566)
+- Seiza core reference: crates.io `seiza-cabi 0.12.2` from
+  [`8df7a81`](https://github.com/theatrus/seiza/commit/8df7a81d5daa2236f651317bd5be7d76b58efc78)
 - Windows reference: `main` at
-  [`069bce6`](https://github.com/theatrus/seiza-win/commit/069bce6)
-- Last audited: 2026-07-21
+  [`7ec56f5`](https://github.com/theatrus/seiza-win/commit/7ec56f58a645a97d621a98092b4a0d2906fc80fd)
+- Last audited: 2026-07-26
 
 Update this baseline and the affected rows whenever the macOS app gains a
 feature or changes an interaction. A Windows feature is **Complete** only after
@@ -67,6 +67,7 @@ test exist.
 | 16-bit PNG/TIFF export | Available | **Core ready** | Expose the upstream RGBA16 render/export path without reducing processed samples to the 8-bit viewport. |
 | Copy/paste image | Available | **Complete** | Runtime-tested full 6,167 x 4,094 XISF render through the Windows bitmap clipboard, including Windows BMP/DIB normalization back to a PNG source. |
 | Copy/paste processing adjustments | Available | **Partial** | The versioned schema round-trips the ordered stretch stack, color strategy, background extraction, and deconvolution with validation and undo; final interactive clipboard QA remains. |
+| Directory image stacking | Available | **Complete** | Native WinUI frame/reference selection, filename-filter grouping, normalization, delta-sigma rejection, calibration masters, registration limits, progress/cancel, 32-bit FITS output, and automatic result opening match macOS. Runtime-tested through `seiza-cabi 0.12.2` by registering two 6,248 x 4,176 telescope FITS frames and reopening the 104,371,200-byte output. |
 
 ## Catalog settings and managed data
 
