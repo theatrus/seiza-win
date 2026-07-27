@@ -252,7 +252,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         {
             return "Every filter stack needs at least two selected frames.";
         }
-        if (SplitsOutput && string.IsNullOrWhiteSpace(SafeBaseName(OutputBaseNameBox.Text)))
+        if (SplitsOutput &&
+            string.IsNullOrWhiteSpace(ImageStackOutputNaming.SafeBaseName(OutputBaseNameBox.Text)))
         {
             return "Enter an output base name.";
         }
@@ -527,14 +528,9 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             return null;
         }
 
-        string baseName = SafeBaseName(OutputBaseNameBox.Text);
+        string baseName = ImageStackOutputNaming.SafeBaseName(OutputBaseNameBox.Text);
         return new ImageStackOutputSelection(
-            _groups.ToDictionary(
-                group => group.Id,
-                group => Path.Combine(
-                    folder.Path,
-                    $"{baseName}-{SafeBaseName(group.FilenameSuffix)}.fits"),
-                StringComparer.Ordinal),
+            ImageStackOutputNaming.SplitOutputPaths(folder.Path, baseName, _groups),
             []);
     }
 
@@ -551,13 +547,6 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             DefaultButton = ContentDialogButton.Close,
         };
         return await dialog.ShowAsync() == ContentDialogResult.Primary;
-    }
-
-    private static string SafeBaseName(string value)
-    {
-        string name = Path.GetFileNameWithoutExtension(value.Trim());
-        char[] invalid = Path.GetInvalidFileNameChars();
-        return string.Concat(name.Where(character => !invalid.Contains(character))).Trim();
     }
 
     private void RestoreAfterFailure(string message, InfoBarSeverity severity)

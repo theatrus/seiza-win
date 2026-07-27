@@ -16,5 +16,6 @@
 
   <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Models\ImageStacking.cs" Link="Models\ImageStacking.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\AtomicOutputFile.cs" Link="Services\AtomicOutputFile.cs" />
   </ItemGroup>
 </Project>

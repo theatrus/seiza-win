@@ -34,9 +34,10 @@ separate output per filter by default so incompatible channels are not mixed.
 
 Seiza reports per-frame progress without blocking the viewer, writes an
 unstretched 32-bit floating-point FITS result, and opens the completed stack
-automatically. Cancellation is safe between frames; if a multi-filter batch
-stops after an earlier output was written, Seiza identifies the files that were
-already saved.
+automatically. Completed files are published atomically, so a failed or
+cancelled write cannot replace an existing output with a partial file. Seiza
+also validates every output in a multi-filter batch before stacking begins and
+identifies any files that were already saved if a later stack is cancelled.
 
 ![A completed full-resolution FITS stack reopened automatically in Seiza for Windows](docs/images/directory-image-stacking-result.png)
 

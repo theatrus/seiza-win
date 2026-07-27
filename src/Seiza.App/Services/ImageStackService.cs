@@ -20,10 +20,7 @@ internal static class ImageStackService
         IProgress<ImageStackProgress>? progress,
         CancellationToken cancellationToken)
     {
-        if (jobs.Count == 0)
-        {
-            throw new ArgumentException("Choose at least two images to stack.", nameof(jobs));
-        }
+        ImageStackValidation.ValidateBatch(jobs);
 
         int totalFrames = jobs.Sum(job => job.Request.Inputs.Count);
         int completedBeforeJob = 0;
@@ -77,7 +74,6 @@ internal static class ImageStackService
         Action<ImageStackProgress>? progress,
         CancellationToken cancellationToken)
     {
-        Validate(request);
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Invoke(new ImageStackProgress(
             ImageStackProgressPhase.Preparing,
@@ -189,11 +185,19 @@ internal static class ImageStackService
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                error = 0;
-                if (!NativeMethods.WriteStackSnapshotFits(snapshot, request.OutputPath, out error))
-                {
-                    throw ReadError(error, "The Seiza core could not write the stacked image.");
-                }
+                AtomicOutputFile.Write(
+                    request.OutputPath,
+                    stagingPath =>
+                    {
+                        error = 0;
+                        if (!NativeMethods.WriteStackSnapshotFits(snapshot, stagingPath, out error))
+                        {
+                            throw ReadError(
+                                error,
+                                "The Seiza core could not write the stacked image.");
+                        }
+                    },
+                    cancellationToken);
 
                 return new ImageStackResult(
                     request.OutputPath,
@@ -213,34 +217,6 @@ internal static class ImageStackService
             {
                 NativeMethods.FreeLiveStacker(stacker);
             }
-        }
-    }
-
-    private static void Validate(ImageStackRequest request)
-    {
-        if (request.Inputs.Count < 2)
-        {
-            throw new ArgumentException("Choose at least two images to stack.", nameof(request));
-        }
-        string? validationMessage = request.Options.ValidationMessage
-            ?? request.Calibration.ValidationMessage(request.Inputs);
-        if (validationMessage is not null)
-        {
-            throw new ArgumentException(validationMessage, nameof(request));
-        }
-
-        string output = Path.GetFullPath(request.OutputPath);
-        IEnumerable<string> sources = request.Inputs.Concat(new[]
-        {
-            request.Calibration.BiasPath,
-            request.Calibration.DarkPath,
-            request.Calibration.FlatPath,
-        }.OfType<string>());
-        if (sources.Select(Path.GetFullPath).Contains(output, StringComparer.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException(
-                "Choose an output file that is not an input or calibration file.",
-                nameof(request));
         }
     }
 

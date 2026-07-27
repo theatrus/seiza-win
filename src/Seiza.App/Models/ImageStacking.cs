@@ -273,6 +273,38 @@ internal static class ImageStackGrouping
     }
 }
 
+internal static class ImageStackOutputNaming
+{
+    public static string SafeBaseName(string value)
+    {
+        string name = Path.GetFileNameWithoutExtension(value.Trim());
+        char[] invalid = Path.GetInvalidFileNameChars();
+        return string.Concat(name.Where(character => !invalid.Contains(character))).Trim();
+    }
+
+    public static IReadOnlyDictionary<string, string> SplitOutputPaths(
+        string folderPath,
+        string baseName,
+        IReadOnlyList<ImageStackGroup> groups)
+    {
+        string safeBaseName = SafeBaseName(baseName);
+        var outputs = new Dictionary<string, string>(StringComparer.Ordinal);
+        var usedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (ImageStackGroup group in groups)
+        {
+            string suffix = SafeBaseName(group.FilenameSuffix);
+            string stem = $"{safeBaseName}-{suffix}";
+            string output = Path.Combine(folderPath, $"{stem}.fits");
+            for (int discriminator = 2; !usedPaths.Add(Path.GetFullPath(output)); discriminator++)
+            {
+                output = Path.Combine(folderPath, $"{stem}-{discriminator}.fits");
+            }
+            outputs.Add(group.Id, output);
+        }
+        return outputs;
+    }
+}
+
 internal sealed record ImageStackRequest(
     IReadOnlyList<string> Inputs,
     string OutputPath,
@@ -280,6 +312,64 @@ internal sealed record ImageStackRequest(
     ImageStackCalibration Calibration);
 
 internal sealed record ImageStackJob(ImageStackGroup Group, ImageStackRequest Request);
+
+internal static class ImageStackValidation
+{
+    public static void ValidateBatch(IReadOnlyList<ImageStackJob> jobs)
+    {
+        if (jobs.Count == 0)
+        {
+            throw new ArgumentException("Choose at least one stack group.", nameof(jobs));
+        }
+
+        foreach (ImageStackJob job in jobs)
+        {
+            ValidateRequest(job.Request);
+        }
+
+        string[] outputs = jobs
+            .Select(job => Path.GetFullPath(job.Request.OutputPath))
+            .ToArray();
+        if (outputs.Distinct(StringComparer.OrdinalIgnoreCase).Count() != outputs.Length)
+        {
+            throw new ArgumentException(
+                "Each filter stack must use a different output file.",
+                nameof(jobs));
+        }
+
+        var sources = new HashSet<string>(
+            jobs.SelectMany(job => SourcePaths(job.Request)).Select(Path.GetFullPath),
+            StringComparer.OrdinalIgnoreCase);
+        if (outputs.Any(sources.Contains))
+        {
+            throw new ArgumentException(
+                "Choose output files that are not input or calibration files in this batch.",
+                nameof(jobs));
+        }
+    }
+
+    private static void ValidateRequest(ImageStackRequest request)
+    {
+        if (request.Inputs.Count < 2)
+        {
+            throw new ArgumentException("Choose at least two images to stack.", nameof(request));
+        }
+        string? validationMessage = request.Options.ValidationMessage
+            ?? request.Calibration.ValidationMessage(request.Inputs);
+        if (validationMessage is not null)
+        {
+            throw new ArgumentException(validationMessage, nameof(request));
+        }
+    }
+
+    private static IEnumerable<string> SourcePaths(ImageStackRequest request) =>
+        request.Inputs.Concat(new[]
+        {
+            request.Calibration.BiasPath,
+            request.Calibration.DarkPath,
+            request.Calibration.FlatPath,
+        }.OfType<string>());
+}
 
 internal sealed record ImageStackDisposition(
     [property: JsonPropertyName("source")] string? Source,
