@@ -2,6 +2,7 @@
 
 #[cfg(windows)]
 mod com_server;
+mod limits;
 mod renderer;
 
 pub use renderer::{RenderedThumbnail, render_thumbnail};

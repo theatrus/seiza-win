@@ -67,6 +67,10 @@ A future Preview Pane handler should follow the same boundary.
 - Preserve Explorer thumbnail aspect ratio, never upscale source pixels, cap
   requested output dimensions, and rely on Explorer's thumbnail cache rather
   than adding process-global catalog or app caches to the shell extension.
+- Preflight FITS/XISF dimensions, sample storage, compression, and RGB/Bayer
+  expansion before decoding. Reject any request whose conservative peak
+  working-set estimate exceeds 1.5 GiB; process isolation is not a substitute
+  for bounding attacker-controlled allocations.
 - Render interactive processing drafts through the shared JSON C ABI at a bounded 2,048-pixel dimension, cancel stale UI results, and retain the committed full-resolution bitmap until Save succeeds.
 - Keep the shared pixel pipeline ordered as background correction, optional light deconvolution, then display stretch; the Windows shell only edits and serializes configuration.
 - Keep image registration, normalization, rejection, calibration, and stack

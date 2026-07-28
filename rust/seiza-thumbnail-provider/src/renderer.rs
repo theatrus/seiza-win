@@ -1,5 +1,7 @@
 use seiza_fits::{FitsImage, StretchParams, statistics_u16, stretch_u16_to_u8};
 
+use crate::limits::validate_image_budget;
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RenderedThumbnail {
     pub width: u32,
@@ -12,6 +14,7 @@ pub fn render_thumbnail(bytes: &[u8], max_dimension: u32) -> Result<RenderedThum
     if max_dimension == 0 {
         return Err("thumbnail dimension must be greater than zero".into());
     }
+    validate_image_budget(bytes)?;
 
     let image = if bytes.starts_with(b"XISF0100") {
         seiza_xisf::from_bytes(bytes).map_err(|error| error.to_string())?

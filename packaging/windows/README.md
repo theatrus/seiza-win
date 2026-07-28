@@ -13,7 +13,9 @@ not need a network connection or separate runtime installers.
 Explorer supplies file contents through `IInitializeWithStream` and loads the
 handler in its default isolated `dllhost.exe`. The installer deliberately does
 not set `DisableProcessIsolation`; the handler has no WinUI, .NET, catalog, or
-solver dependency.
+solver dependency. A native post-finalize custom action broadcasts
+`SHCNE_ASSOCCHANGED` after install, repair, and uninstall so Explorer reloads
+the handler and invalidates stale icon and thumbnail cache entries immediately.
 
 Build the installer from the repository root:
 
@@ -31,8 +33,9 @@ The interactive installer's selected-by-default **Launch Seiza** option uses
 WiX's unelevated shell action so an all-users install opens Seiza in the
 signed-in user's desktop session. CI verifies the generated MSI custom-action
 and Finish-button tables before running the elevated smoke test.
-The smoke test also verifies the provider DLL, COM class, extension mappings,
-and complete registration removal on uninstall.
+The smoke test also verifies the provider DLL, COM class, all four extension
+mappings, the Shell-notification action, and complete registration removal on
+uninstall.
 
 An elevated install/launch/uninstall smoke test is available for local and CI
 validation:

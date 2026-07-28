@@ -97,6 +97,19 @@
       <ComponentRef Id="SeizaThumbnailProviderRegistration" />
     </Feature>
 
+    <Binary
+        Id="SeizaThumbnailProviderCustomActions"
+        SourceFile="$(var.PublishDir)SeizaThumbnailProvider.dll" />
+    <CustomAction
+        Id="NotifyShellAssociations"
+        BinaryRef="SeizaThumbnailProviderCustomActions"
+        DllEntry="NotifyShellAssociations"
+        Execute="immediate"
+        Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="NotifyShellAssociations" After="InstallFinalize" />
+    </InstallExecuteSequence>
+
     <Icon Id="SeizaAppIcon" SourceFile="$(var.RepoRoot)src\Seiza.App\Assets\AppIcon.ico" />
     <Property Id="ARPPRODUCTICON" Value="SeizaAppIcon" />
     <Property Id="WIXUI_INSTALLDIR" Value="APPLICATIONFOLDER" />

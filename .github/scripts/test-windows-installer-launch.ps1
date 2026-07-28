@@ -94,4 +94,32 @@ if ($events.Count -ne 3 -or
     throw "ExitDialog Finish events do not resolve, launch, and then close in the required order"
 }
 
-Write-Output "Installer Finish action resolves and launches Seiza unelevated."
+$notifyView = Open-MsiView @'
+SELECT `Action`, `Type`, `Source`, `Target`
+FROM `CustomAction`
+WHERE `Action`='NotifyShellAssociations'
+'@
+$notify = Fetch-MsiRecord $notifyView
+if ($null -eq $notify) {
+    throw "NotifyShellAssociations custom action is missing"
+}
+if ($notify.IntegerData(2) -ne 1 -or
+    $notify.StringData(3) -ne "SeizaThumbnailProviderCustomActions" -or
+    $notify.StringData(4) -ne "NotifyShellAssociations") {
+    throw "NotifyShellAssociations does not call the embedded native provider DLL"
+}
+
+$notifySequenceView = Open-MsiView @'
+SELECT `Action`, `Condition`, `Sequence`
+FROM `InstallExecuteSequence`
+WHERE `Action`='NotifyShellAssociations'
+'@
+$notifySequence = Fetch-MsiRecord $notifySequenceView
+if ($null -eq $notifySequence) {
+    throw "NotifyShellAssociations is missing from InstallExecuteSequence"
+}
+if ($notifySequence.IntegerData(3) -le 6600) {
+    throw "NotifyShellAssociations must run after InstallFinalize"
+}
+
+Write-Output "Installer Finish launch and Shell-association notification actions are correctly sequenced."

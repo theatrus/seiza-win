@@ -24,7 +24,14 @@ $xisfClass = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\Seiza.XisfFile"
 $thumbnailProviderId = "{E8D56C6C-4E30-4C89-889A-D022180B710A}"
 $thumbnailHandlerId = "{E357FCCD-A995-4576-B01F-234630154E96}"
 $thumbnailClass = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\CLSID\$thumbnailProviderId"
-$fitsThumbnailHandler = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\SystemFileAssociations\.fits\shellex\$thumbnailHandlerId"
+$thumbnailHandlers = @(
+    ".fit",
+    ".fits",
+    ".fts",
+    ".xisf"
+) | ForEach-Object {
+    "Registry::HKEY_LOCAL_MACHINE\Software\Classes\SystemFileAssociations\$_\shellex\$thumbnailHandlerId"
+}
 $installArguments = @(
     "/i",
     "`"$Msi`"",
@@ -87,9 +94,11 @@ try {
     if ($registeredThumbnailDll -ne (Join-Path $installDirectory "SeizaThumbnailProvider.dll")) {
         throw "Explorer thumbnail provider points to '$registeredThumbnailDll'"
     }
-    $registeredFitsHandler = (Get-Item -LiteralPath $fitsThumbnailHandler).GetValue("")
-    if ($registeredFitsHandler -ne $thumbnailProviderId) {
-        throw "FITS thumbnail handler points to '$registeredFitsHandler'"
+    foreach ($thumbnailHandler in $thumbnailHandlers) {
+        $registeredHandler = (Get-Item -LiteralPath $thumbnailHandler).GetValue("")
+        if ($registeredHandler -ne $thumbnailProviderId) {
+            throw "Thumbnail handler '$thumbnailHandler' points to '$registeredHandler'"
+        }
     }
 
     $appProcess = Start-Process -FilePath $installedApp -PassThru
@@ -124,8 +133,10 @@ finally {
         if (Test-Path -LiteralPath $thumbnailClass) {
             throw "MSI uninstall left the thumbnail provider COM class behind"
         }
-        if (Test-Path -LiteralPath $fitsThumbnailHandler) {
-            throw "MSI uninstall left the FITS thumbnail handler behind"
+        foreach ($thumbnailHandler in $thumbnailHandlers) {
+            if (Test-Path -LiteralPath $thumbnailHandler) {
+                throw "MSI uninstall left '$thumbnailHandler' behind"
+            }
         }
     }
 }

@@ -1564,6 +1564,7 @@ dependencies = [
 name = "seiza-thumbnail-provider"
 version = "0.1.0"
 dependencies = [
+ "quick-xml",
  "seiza-fits",
  "seiza-xisf",
  "windows",

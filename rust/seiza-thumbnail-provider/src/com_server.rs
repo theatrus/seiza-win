@@ -18,7 +18,8 @@ use windows::Win32::UI::Shell::PropertiesSystem::{
     IInitializeWithStream, IInitializeWithStream_Impl,
 };
 use windows::Win32::UI::Shell::{
-    IThumbnailProvider, IThumbnailProvider_Impl, WTS_ALPHATYPE, WTSAT_ARGB,
+    IThumbnailProvider, IThumbnailProvider_Impl, SHCNE_ASSOCCHANGED, SHCNF_FLUSH, SHCNF_IDLIST,
+    SHChangeNotify, WTS_ALPHATYPE, WTSAT_ARGB,
 };
 use windows::core::{BOOL, Error, GUID, HRESULT, IUnknown, Interface, Ref, Result, implement};
 
@@ -259,6 +260,20 @@ pub extern "system" fn DllCanUnloadNow() -> HRESULT {
     } else {
         S_FALSE
     }
+}
+
+/// WiX custom-action entry point used after install, repair, and uninstall.
+///
+/// Windows requires installers that change Shell handlers to invalidate the
+/// association and thumbnail caches. The MSI embeds this native DLL in its
+/// Binary table, so the notification remains callable after the installed copy
+/// has been removed during uninstall.
+#[unsafe(no_mangle)]
+pub unsafe extern "system" fn NotifyShellAssociations(_install_handle: u32) -> u32 {
+    unsafe {
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST | SHCNF_FLUSH, None, None);
+    }
+    0
 }
 
 #[cfg(test)]
