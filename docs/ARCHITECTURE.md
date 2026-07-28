@@ -19,11 +19,18 @@ Seiza.App (WinUI 3 / C#)
                                            |-- seiza-xisf
                                            |-- image
                                            `-- seiza
+
+Windows Explorer / dllhost.exe
+    `-- IThumbnailProvider -- SeizaThumbnailProvider.dll (Rust)
+                              |-- bounded IStream input
+                              |-- seiza-fits / seiza-xisf decode
+                              `-- autostretched top-down BGRA HBITMAP
 ```
 
-A later, separately hosted Rust COM DLL will provide Explorer astronomy-image thumbnails
-and Preview Pane integration. It must stay independent of WinUI, .NET, catalog
-loading, and plate solving because Explorer loads it out of process.
+The Explorer thumbnail provider is a separately hosted Rust COM DLL, independent
+of WinUI, .NET, catalog loading, and plate solving. Windows loads it through an
+isolated `dllhost.exe`; the MSI intentionally does not disable process isolation.
+A future Preview Pane handler should follow the same boundary.
 
 ## Locked decisions
 
@@ -44,6 +51,10 @@ loading, and plate solving because Explorer loads it out of process.
 10. `Cargo.lock` fixes the complete Seiza dependency graph. The native build
     emits the resolved C ABI version and Cargo-packaged VCS commit as application
     metadata, and the About dialog reports both values.
+11. Explorer content thumbnails use `IThumbnailProvider` plus
+    `IInitializeWithStream` in a native Rust DLL. The handler accepts bounded
+    stream input, never loads app/runtime/catalog state, and remains in Windows'
+    default out-of-process shell-extension host.
 
 ## Performance rules
 
@@ -53,6 +64,9 @@ loading, and plate solving because Explorer loads it out of process.
 - Bound background concurrency and memory use.
 - Add a tiled rendering API only after measurements show full-image upload is a bottleneck.
 - Keep cached previews visible while full-resolution work is in flight.
+- Preserve Explorer thumbnail aspect ratio, never upscale source pixels, cap
+  requested output dimensions, and rely on Explorer's thumbnail cache rather
+  than adding process-global catalog or app caches to the shell extension.
 - Render interactive processing drafts through the shared JSON C ABI at a bounded 2,048-pixel dimension, cancel stale UI results, and retain the committed full-resolution bitmap until Save succeeds.
 - Keep the shared pixel pipeline ordered as background correction, optional light deconvolution, then display stretch; the Windows shell only edits and serializes configuration.
 - Keep image registration, normalization, rejection, calibration, and stack
@@ -74,8 +88,12 @@ The detailed status and acceptance criteria live in
    filter grouping, calibration, progress, cancellation, and 32-bit FITS output.
 7. **Complete:** build an all-users, self-contained WiX MSI, include both
    runtimes, register FITS and XISF files, and exercise install/launch/uninstall in CI.
-8. **Next:** add cached previews during full-resolution loads, multi-window activation, Explorer preview
-   integration, signing, and tagged release automation.
+8. **Complete:** render native FITS/XISF content thumbnails through a bounded,
+   stream-based Rust COM provider registered by the MSI and isolated in
+   `dllhost.exe`.
+9. **Next:** add cached previews during full-resolution loads, multi-window
+   activation, Explorer Preview Pane integration, signing, and tagged release
+   automation.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.
