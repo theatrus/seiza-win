@@ -43,15 +43,18 @@ dotnet tool restore
 
 For a release:
 
-1. Choose the shared Seiza marketing version with `seiza-mac`. Public Windows
-   and macOS releases from the same product generation use the same semantic
-   version; platform-specific build numbers remain independent.
+1. Choose the next Windows semantic version. Windows and macOS keep the same
+   semantic-version major, while minor and patch versions may advance
+   independently for platform-specific features and fixes.
 2. Set the app version in `src/Seiza.App/Seiza.App.csproj`.
 3. Add `docs/releases/vMAJOR.MINOR.PATCH.md`.
 4. Merge the release commit and tag it `vMAJOR.MINOR.PATCH`.
 5. Push the tag. `.github/workflows/release.yml` tests the core, builds and
    smoke-tests the all-users MSI, creates the signed appcast, produces
    checksums, and publishes the GitHub release.
+
+The complete operational checklist and failure policy live in
+[`RELEASING.md`](RELEASING.md).
 
 Every updater-enabled release publishes these assets:
 
