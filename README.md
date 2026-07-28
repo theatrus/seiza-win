@@ -4,14 +4,38 @@ Seiza is a fast, native Windows astronomy image viewer and plate-solving app.
 It combines a modern WinUI 3 interface and GPU-backed viewport with the same
 Rust image, catalog, and solving core used by Seiza on macOS.
 
-[Download Seiza 0.5.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.5.0/seiza-0.5.0-windows-x86_64.msi)
+[Download Seiza 0.5.1 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.5.1/seiza-0.5.1-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza 0.5.0 release highlights
+## Seiza 0.5.1 release highlights
 
-- Directory image stacking now registers and combines selected FITS or XISF
+- Windows File Explorer now renders native content thumbnails for FITS and
+  XISF files without starting the WinUI app.
+- The isolated Rust thumbnail provider applies Auto MTF to mono, RGB, and
+  Bayer data, preserves image aspect ratio, and participates in Explorer's
+  normal thumbnail cache.
+- Format-aware preflight accounting rejects files whose conservative decode
+  peak would exceed 1.5 GiB, including compressed expansion, before allocating
+  the image. A typical 150 MB 16-bit mono FITS remains within the supported
+  path.
+
+### Explorer content thumbnails
+
+The all-users MSI registers Seiza's native thumbnail provider for `.fit`,
+`.fits`, `.fts`, and `.xisf`. Explorer hosts the provider in an isolated
+`dllhost.exe`; the component does not load WinUI, .NET, catalogs, or solving
+code. Install, repair, and uninstall notify the shell immediately so stale
+associations and cached icons are refreshed without a restart.
+
+| FITS capture sequence | XISF processing folder |
+| --- | --- |
+| ![Autostretched FITS content thumbnails in Windows File Explorer](docs/images/explorer-fits-thumbnails.png) | ![Mono and color XISF content thumbnails in Windows File Explorer](docs/images/explorer-xisf-thumbnails.png) |
+
+## Directory image stacking
+
+- Directory image stacking registers and combines selected FITS or XISF
   light frames into an unstretched 32-bit floating-point FITS image.
 - Stacks can be split automatically by filename filter, with an independent
   reference frame for each filter group. Global or local normalization,
@@ -19,8 +43,6 @@ Rust image, catalog, and solving core used by Seiza on macOS.
   masters match the macOS workflow.
 - Stacking runs off the UI thread with per-frame progress, accepted/rejected
   counts, cancellation between frames, and automatic opening of the result.
-
-### Directory image stacking
 
 Open a folder containing FITS or XISF light frames, then choose **Stack** from
 the toolbar. Select the exposures to include and a reference frame, then tune
@@ -53,12 +75,10 @@ post-install launch behavior:
 - Installed copies can discover, verify, and install later releases from
   **More > Check for updates** or **Settings > Check now**.
 
-The earlier preview highlights still apply:
+Other preview highlights still apply:
 
 - GPU-backed FITS and XISF viewing with a cached thumbnail browser and
   image-anchored pan, wheel zoom, and pinch zoom.
-- Native Explorer content thumbnails for FITS and XISF files, rendered by an
-  isolated Rust shell extension without starting the WinUI app.
 - Seven stretch models, ordered adjustment stages, RGB strategies, background
   extraction, live histograms, and Richardson-Lucy deconvolution.
 - Local plate solving with WCS grids, deep-sky contours, named and field stars,
@@ -102,16 +122,6 @@ The earlier preview highlights still apply:
 - Check the signed Sparkle feed automatically or on demand, then download,
   verify, and open an in-place MSI update without visiting the Releases page.
 
-### Explorer content thumbnails
-
-The MSI registers Seiza's native thumbnail provider for FITS and XISF files.
-Explorer renders autostretched previews without launching the app, including
-mono, RGB, and Bayer data, and keeps the results in its normal thumbnail cache.
-
-| FITS capture sequence | XISF processing folder |
-| --- | --- |
-| ![Autostretched FITS content thumbnails in Windows File Explorer](docs/images/explorer-fits-thumbnails.png) | ![Mono and color XISF content thumbnails in Windows File Explorer](docs/images/explorer-xisf-thumbnails.png) |
-
 | Astronomy processing | Catalog management |
 | --- | --- |
 | ![Modeless astronomy-image processing controls with background correction and deconvolution](docs/images/astronomy-processing.jpg) | ![Catalog status, location, and installation controls](docs/images/catalog-settings.png) |
@@ -121,8 +131,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.5.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.5.0/seiza-0.5.0-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.5.0/SHA256SUMS.txt)
+Download the [Seiza 0.5.1 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.5.1/seiza-0.5.1-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.5.1/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -134,9 +144,10 @@ runtime, Win2D, and the Cargo-locked Seiza Rust core, so installation and first
 launch do not download or bootstrap a separate runtime. Windows will request
 administrator approval because this is an all-users installation.
 
-System requirements are Windows 11 24H2 or newer on an x64 computer. Release
-signing is still on the roadmap, so Windows may show an unknown-publisher
-warning for this preview installer.
+System requirements are Windows 11 24H2 or newer on an x64 computer.
+Authenticode signing is still on the roadmap, so Windows may show an
+unknown-publisher warning for this preview installer. The in-app updater uses
+independent Ed25519 signatures to verify its feed and MSI download.
 
 ## Build and test
 
@@ -158,13 +169,14 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.5.0
+  -p:SeizaVersion=0.5.1
 ```
 
 The installer is written to `dist`. See the
 [installer notes](packaging/windows/README.md) for its layout and smoke test.
-The [signed update guide](docs/AUTO_UPDATE.md) documents appcast generation and
-the tag-driven release workflow.
+The maintainer [release guide](docs/RELEASING.md) covers versioning, validation,
+tagging, publication, and recovery. The [signed update guide](docs/AUTO_UPDATE.md)
+documents the updater trust model and appcast generation.
 
 ## Architecture
 

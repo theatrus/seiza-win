@@ -22,7 +22,7 @@ Build the installer from the repository root:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.5.0
+  -p:SeizaVersion=0.5.1
 ```
 
 The MSI is written to `dist`. The version must be a valid three-part MSI
@@ -42,11 +42,12 @@ validation:
 
 ```powershell
 .\.github\scripts\test-windows-installer.ps1 `
-  -Msi .\dist\seiza-0.5.0-windows-x86_64.msi
+  -Msi .\dist\seiza-0.5.1-windows-x86_64.msi
 ```
 
 Tagged releases use `.github/workflows/release.yml` to build and smoke-test
 this MSI, sign it for the in-app updater, generate `appcast.xml` and its
 detached signature, and publish all release assets. See
-[`docs/AUTO_UPDATE.md`](../../docs/AUTO_UPDATE.md) for the required signing
-environment and release procedure.
+[`docs/RELEASING.md`](../../docs/RELEASING.md) for the complete maintainer
+checklist and [`docs/AUTO_UPDATE.md`](../../docs/AUTO_UPDATE.md) for the updater
+trust model and signing environment.

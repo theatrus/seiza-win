@@ -144,7 +144,7 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | Stretched system preview | Quick Look extension available | **Planned** | Explorer Preview Pane handler in a separately hosted native component. |
 | Content thumbnails on file icons | Finder content thumbnails | **Complete** | The all-users MSI registers a stream-based native Rust `IThumbnailProvider` for FITS and XISF. It runs in Windows' isolated shell host, autostretches mono/RGB/Bayer pixels, preserves aspect ratio without upscaling, and is runtime-tested on telescope files in Explorer. |
 | Signed distributable | Signed/notarized universal DMG | **Partial** | Self-contained x64 MSI is complete and runtime-tested; production code signing and ARM64 remain. |
-| Release automation | macOS release workflows | **Partial** | CI builds and smoke-tests the MSI and uploads it as an artifact; add signing, tags, and a protected release environment. |
+| Release automation | macOS release workflows | **Complete** | Version tags build and smoke-test the MSI, sign the Sparkle appcast and enclosure in the protected `signing` environment, produce checksums, and publish the GitHub release. |
 | Native accessibility | SwiftUI/AppKit accessibility | **Partial** | Core controls are named; add automated coverage for inspector, Settings, and overlay controls. |
 | About and native-core provenance | About panel | **Complete** | Reports the Windows app version plus the exact Seiza crate version and 40-character source commit resolved by Cargo. |
 
@@ -176,5 +176,5 @@ These remain tracked beyond the current macOS parity surface:
    The remaining stretch-method fixture matrix is tracked as visual QA.
 5. **In progress: Windows integration** — app identity, astronomy-file registration,
    Explorer FITS/XISF thumbnails, the all-users self-contained WiX MSI, and
-   installer CI are complete; multi-window activation, Preview Pane integration,
-   signing, and tagged releases remain.
+   installer CI and tag-driven releases are complete; multi-window activation,
+   Preview Pane integration, and Authenticode signing remain.

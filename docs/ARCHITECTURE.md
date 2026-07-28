@@ -96,8 +96,7 @@ The detailed status and acceptance criteria live in
    stream-based Rust COM provider registered by the MSI and isolated in
    `dllhost.exe`.
 9. **Next:** add cached previews during full-resolution loads, multi-window
-   activation, Explorer Preview Pane integration, signing, and tagged release
-   automation.
+   activation, Explorer Preview Pane integration, and Authenticode signing.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.
