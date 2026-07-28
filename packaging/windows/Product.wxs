@@ -64,6 +64,25 @@
       <RegistryValue Root="HKLM" Key="Software\Classes\.xisf\OpenWithProgids" Name="Seiza.XisfFile" Type="string" Value="" />
     </Component>
 
+    <!-- Explorer loads this native Rust COM server in an isolated dllhost.exe.
+         Do not set DisableProcessIsolation: corrupt inputs must not run in Explorer. -->
+    <Component Directory="APPLICATIONFOLDER" Id="SeizaThumbnailProviderRegistration" Guid="3D4BC8F0-3E45-478F-9114-11F69C96D201">
+      <RegistryValue
+          Root="HKLM"
+          Key="Software\Classes\CLSID\{E8D56C6C-4E30-4C89-889A-D022180B710A}\InprocServer32"
+          Type="string"
+          Value="[APPLICATIONFOLDER]SeizaThumbnailProvider.dll"
+          KeyPath="yes" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{E8D56C6C-4E30-4C89-889A-D022180B710A}\InprocServer32" Name="ThreadingModel" Type="string" Value="Apartment" />
+
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.FitsFile\shellex\{E357FCCD-A995-4576-B01F-234630154E96}" Type="string" Value="{E8D56C6C-4E30-4C89-889A-D022180B710A}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.XisfFile\shellex\{E357FCCD-A995-4576-B01F-234630154E96}" Type="string" Value="{E8D56C6C-4E30-4C89-889A-D022180B710A}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.fit\shellex\{E357FCCD-A995-4576-B01F-234630154E96}" Type="string" Value="{E8D56C6C-4E30-4C89-889A-D022180B710A}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.fits\shellex\{E357FCCD-A995-4576-B01F-234630154E96}" Type="string" Value="{E8D56C6C-4E30-4C89-889A-D022180B710A}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.fts\shellex\{E357FCCD-A995-4576-B01F-234630154E96}" Type="string" Value="{E8D56C6C-4E30-4C89-889A-D022180B710A}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.xisf\shellex\{E357FCCD-A995-4576-B01F-234630154E96}" Type="string" Value="{E8D56C6C-4E30-4C89-889A-D022180B710A}" />
+    </Component>
+
     <Feature
         Id="MainFeature"
         Title="Seiza for Windows"
@@ -75,7 +94,21 @@
       <ComponentGroupRef Id="PublishedAppFiles" />
       <ComponentRef Id="SeizaStartMenuShortcut" />
       <ComponentRef Id="SeizaFileAssociations" />
+      <ComponentRef Id="SeizaThumbnailProviderRegistration" />
     </Feature>
+
+    <Binary
+        Id="SeizaThumbnailProviderCustomActions"
+        SourceFile="$(var.PublishDir)SeizaThumbnailProvider.dll" />
+    <CustomAction
+        Id="NotifyShellAssociations"
+        BinaryRef="SeizaThumbnailProviderCustomActions"
+        DllEntry="NotifyShellAssociations"
+        Execute="immediate"
+        Return="check" />
+    <InstallExecuteSequence>
+      <Custom Action="NotifyShellAssociations" After="InstallFinalize" />
+    </InstallExecuteSequence>
 
     <Icon Id="SeizaAppIcon" SourceFile="$(var.RepoRoot)src\Seiza.App\Assets\AppIcon.ico" />
     <Property Id="ARPPRODUCTICON" Value="SeizaAppIcon" />

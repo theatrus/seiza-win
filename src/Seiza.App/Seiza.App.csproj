@@ -25,6 +25,7 @@
     <RustProfile Condition="'$(Configuration)' == 'Release'">release</RustProfile>
     <RustProfile Condition="'$(Configuration)' != 'Release'">debug</RustProfile>
     <SeizaNativeDll>$(RepositoryRoot)target\$(RustProfile)\seiza_cabi.dll</SeizaNativeDll>
+    <SeizaThumbnailProviderDll>$(RepositoryRoot)target\$(RustProfile)\seiza_thumbnail_provider.dll</SeizaThumbnailProviderDll>
     <SeizaBuildInfo>$(RepositoryRoot)target\seiza-build-info.json</SeizaBuildInfo>
   </PropertyGroup>
 
@@ -35,6 +36,11 @@
   <ItemGroup>
     <Content Include="$(SeizaNativeDll)">
       <Link>seiza_cabi.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="$(SeizaThumbnailProviderDll)">
+      <Link>SeizaThumbnailProvider.dll</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
       <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
     </Content>

@@ -55,11 +55,13 @@ if ($resolvedRevision -notmatch '^[0-9a-f]{40}$') {
 
 $cargoAction = if ($Test) { "test" } else { "build" }
 $cargoCommand = "cargo $cargoAction --manifest-path `"$($nativePackage.manifest_path)`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked"
+$thumbnailCommand = "cargo $cargoAction --package seiza-thumbnail-provider --target-dir `"$targetDirectory`" --locked"
 if ($Configuration -eq "Release") {
     $cargoCommand += " --release"
+    $thumbnailCommand += " --release"
 }
 
-$buildCommand = "call `"$developerCommand`" -no_logo -arch=x64 -host_arch=x64 && $cargoCommand"
+$buildCommand = "call `"$developerCommand`" -no_logo -arch=x64 -host_arch=x64 && $cargoCommand && $thumbnailCommand"
 
 Push-Location $workspaceRoot
 try {

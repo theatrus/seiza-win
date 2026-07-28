@@ -57,6 +57,8 @@ The earlier preview highlights still apply:
 
 - GPU-backed FITS and XISF viewing with a cached thumbnail browser and
   image-anchored pan, wheel zoom, and pinch zoom.
+- Native Explorer content thumbnails for FITS and XISF files, rendered by an
+  isolated Rust shell extension without starting the WinUI app.
 - Seven stretch models, ordered adjustment stages, RGB strategies, background
   extraction, live histograms, and Richardson-Lucy deconvolution.
 - Local plate solving with WCS grids, deep-sky contours, named and field stars,
@@ -70,6 +72,8 @@ The earlier preview highlights still apply:
 
 - Open FITS, XISF, PNG, JPEG, and TIFF images, folders, or dropped files; browse
   naturally sorted image sets in a cached thumbnail rail without blocking the UI.
+- See autostretched FITS and XISF content thumbnails directly in Windows File
+  Explorer after installing Seiza.
 - Register and stack selected FITS or XISF frames from an opened folder, with
   optional per-filter outputs, calibration masters, normalization, pixel
   rejection, reference selection, progress, and cancellation.
@@ -98,6 +102,16 @@ The earlier preview highlights still apply:
 - Check the signed Sparkle feed automatically or on demand, then download,
   verify, and open an in-place MSI update without visiting the Releases page.
 
+### Explorer content thumbnails
+
+The MSI registers Seiza's native thumbnail provider for FITS and XISF files.
+Explorer renders autostretched previews without launching the app, including
+mono, RGB, and Bayer data, and keeps the results in its normal thumbnail cache.
+
+| FITS capture sequence | XISF processing folder |
+| --- | --- |
+| ![Autostretched FITS content thumbnails in Windows File Explorer](docs/images/explorer-fits-thumbnails.png) | ![Mono and color XISF content thumbnails in Windows File Explorer](docs/images/explorer-xisf-thumbnails.png) |
+
 | Astronomy processing | Catalog management |
 | --- | --- |
 | ![Modeless astronomy-image processing controls with background correction and deconvolution](docs/images/astronomy-processing.jpg) | ![Catalog status, location, and installation controls](docs/images/catalog-settings.png) |
@@ -112,7 +126,8 @@ Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
-Default Apps.
+Default Apps. It also installs the native Explorer thumbnail provider for those
+astronomy formats.
 
 The MSI is fully self-contained. It includes .NET 10, the Windows App SDK/WinUI
 runtime, Win2D, and the Cargo-locked Seiza Rust core, so installation and first
@@ -158,7 +173,9 @@ Win2D owns interactive image and vector-overlay presentation. The published
 `seiza-cabi` Rust crate and its crates.io dependencies own decoding, FITS/XISF
 processing, statistics, catalogs, WCS, and solving. `Cargo.lock` selects exact
 versions, and the About dialog reports the C ABI version and packaged source
-commit.
+commit. A separate native Rust COM DLL renders FITS/XISF thumbnails inside
+Windows' isolated shell-extension host; it does not load WinUI, .NET, catalogs,
+or solving code.
 
 See [Architecture](docs/ARCHITECTURE.md) for component boundaries and
 performance rules.

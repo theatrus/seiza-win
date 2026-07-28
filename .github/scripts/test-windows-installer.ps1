@@ -21,6 +21,17 @@ $shortcut = Join-Path $programMenuDirectory "Seiza.lnk"
 $registeredApplications = "Registry::HKEY_LOCAL_MACHINE\Software\RegisteredApplications"
 $fitsClass = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\Seiza.FitsFile"
 $xisfClass = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\Seiza.XisfFile"
+$thumbnailProviderId = "{E8D56C6C-4E30-4C89-889A-D022180B710A}"
+$thumbnailHandlerId = "{E357FCCD-A995-4576-B01F-234630154E96}"
+$thumbnailClass = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\CLSID\$thumbnailProviderId"
+$thumbnailHandlers = @(
+    ".fit",
+    ".fits",
+    ".fts",
+    ".xisf"
+) | ForEach-Object {
+    "Registry::HKEY_LOCAL_MACHINE\Software\Classes\SystemFileAssociations\$_\shellex\$thumbnailHandlerId"
+}
 $installArguments = @(
     "/i",
     "`"$Msi`"",
@@ -45,6 +56,7 @@ try {
     $requiredFiles = @(
         $installedApp,
         (Join-Path $installDirectory "seiza_cabi.dll"),
+        (Join-Path $installDirectory "SeizaThumbnailProvider.dll"),
         (Join-Path $installDirectory "coreclr.dll"),
         (Join-Path $installDirectory "hostfxr.dll"),
         (Join-Path $installDirectory "Microsoft.WindowsAppRuntime.dll"),
@@ -75,6 +87,19 @@ try {
     if (-not (Test-Path -LiteralPath $xisfClass)) {
         throw "XISF file class was not installed"
     }
+    if (-not (Test-Path -LiteralPath $thumbnailClass)) {
+        throw "Explorer thumbnail provider COM class was not installed"
+    }
+    $registeredThumbnailDll = (Get-Item -LiteralPath (Join-Path $thumbnailClass "InprocServer32")).GetValue("")
+    if ($registeredThumbnailDll -ne (Join-Path $installDirectory "SeizaThumbnailProvider.dll")) {
+        throw "Explorer thumbnail provider points to '$registeredThumbnailDll'"
+    }
+    foreach ($thumbnailHandler in $thumbnailHandlers) {
+        $registeredHandler = (Get-Item -LiteralPath $thumbnailHandler).GetValue("")
+        if ($registeredHandler -ne $thumbnailProviderId) {
+            throw "Thumbnail handler '$thumbnailHandler' points to '$registeredHandler'"
+        }
+    }
 
     $appProcess = Start-Process -FilePath $installedApp -PassThru
     Start-Sleep -Seconds 3
@@ -104,6 +129,14 @@ finally {
         }
         if (Test-Path -LiteralPath $xisfClass) {
             throw "MSI uninstall left the XISF file class behind"
+        }
+        if (Test-Path -LiteralPath $thumbnailClass) {
+            throw "MSI uninstall left the thumbnail provider COM class behind"
+        }
+        foreach ($thumbnailHandler in $thumbnailHandlers) {
+            if (Test-Path -LiteralPath $thumbnailHandler) {
+                throw "MSI uninstall left '$thumbnailHandler' behind"
+            }
         }
     }
 }
