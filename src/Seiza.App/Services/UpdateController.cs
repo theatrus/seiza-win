@@ -40,7 +40,9 @@ internal sealed class UpdateController : IDisposable
         {
             UIFactory = null,
             RelaunchAfterUpdate = false,
-            CheckServerFileName = true,
+            // GitHub release downloads redirect to an extensionless asset URL.
+            // Keep the MSI filename from the signed appcast instead.
+            CheckServerFileName = false,
         };
 
         _updater.DownloadStarted += Updater_DownloadStarted;
@@ -202,6 +204,17 @@ internal sealed class UpdateController : IDisposable
 
     private async Task DownloadAndInstallAsync(FrameworkElement owner, AppCastItem update)
     {
+        try
+        {
+            _updater.TmpDownloadFileNameWithExtension =
+                UpdateInstallerNaming.FromDownloadLink(update.DownloadLink);
+        }
+        catch (InvalidDataException exception)
+        {
+            await ShowMessageAsync(owner, "Update download failed", exception.Message);
+            return;
+        }
+
         _downloadItem = update;
         _downloadedPath = null;
         _downloadError = null;
