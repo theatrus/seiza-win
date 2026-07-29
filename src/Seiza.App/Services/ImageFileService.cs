@@ -26,7 +26,7 @@ internal static class ImageFileService
         [".fits", ".fit", ".fts", ".xisf"],
         StringComparer.OrdinalIgnoreCase);
 
-    public static async Task<string?> PickImageAsync()
+    public static async Task<IReadOnlyList<string>> PickImagesAsync(nint ownerWindow)
     {
         FileOpenPicker picker = new()
         {
@@ -39,12 +39,12 @@ internal static class ImageFileService
             picker.FileTypeFilter.Add(extension);
         }
 
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);
-        StorageFile? file = await picker.PickSingleFileAsync();
-        return file?.Path;
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, ownerWindow);
+        IReadOnlyList<StorageFile> files = await picker.PickMultipleFilesAsync();
+        return files.Select(file => file.Path).ToArray();
     }
 
-    public static async Task<string?> PickFolderAsync()
+    public static async Task<string?> PickFolderAsync(nint ownerWindow)
     {
         FolderPicker picker = new()
         {
@@ -53,7 +53,7 @@ internal static class ImageFileService
         };
         picker.FileTypeFilter.Add("*");
 
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, ownerWindow);
         StorageFolder? folder = await picker.PickSingleFolderAsync();
         return folder?.Path;
     }
@@ -83,8 +83,10 @@ internal static class ImageFileService
     public static bool IsSupportedImage(string path) =>
         SupportedExtensionSet.Contains(Path.GetExtension(path));
 
-    public static bool IsStackableImage(string path) =>
+    public static bool IsAstronomyImage(string path) =>
         StackableExtensionSet.Contains(Path.GetExtension(path));
+
+    public static bool IsStackableImage(string path) => IsAstronomyImage(path);
 
     public static bool IsSupportedExtension(string? extension) =>
         !string.IsNullOrWhiteSpace(extension) && SupportedExtensionSet.Contains(extension);

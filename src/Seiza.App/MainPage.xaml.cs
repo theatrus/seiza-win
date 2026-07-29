@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Numerics;
+using System.Runtime.InteropServices;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
@@ -51,10 +52,21 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _didCheckForUpdates;
     private FitsStretchWindow? _stretchWindow;
     private ImageStackWindow? _stackWindow;
+    private MainWindow? _ownerWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
 
     public ObservableCollection<ImageBrowserItemViewModel> BrowserItems { get; } = [];
+
+    internal bool HasImage => _currentPath is not null;
+
+    internal string? CurrentPath => _currentPath;
+
+    internal void AttachWindow(MainWindow window) => _ownerWindow = window;
+
+    private nint OwnerWindowHandle => _ownerWindow is null
+        ? throw new InvalidOperationException("The page is not attached to a window.")
+        : WinRT.Interop.WindowNative.GetWindowHandle(_ownerWindow);
 
     public MainPage()
     {
@@ -68,7 +80,7 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void MainPage_Loaded(object sender, RoutedEventArgs e)
     {
-        if (_didCheckForUpdates)
+        if (_didCheckForUpdates || !App.TryBeginAutomaticUpdateCheck())
         {
             return;
         }
@@ -81,19 +93,19 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void OpenImage_Click(object sender, RoutedEventArgs e)
     {
-        string? path = await ImageFileService.PickImageAsync();
-        if (path is not null)
+        IReadOnlyList<string> paths = await ImageFileService.PickImagesAsync(OwnerWindowHandle);
+        if (paths.Count > 0)
         {
-            await OpenImageAndDiscoverSiblingsAsync(path);
+            await App.OpenDocumentPathsAsync(paths, _ownerWindow);
         }
     }
 
     private async void OpenFolder_Click(object sender, RoutedEventArgs e)
     {
-        string? path = await ImageFileService.PickFolderAsync();
+        string? path = await ImageFileService.PickFolderAsync(OwnerWindowHandle);
         if (path is not null)
         {
-            await OpenFolderAsync(path);
+            await App.OpenFolderInWindowAsync(path, _ownerWindow);
         }
     }
 
@@ -450,7 +462,10 @@ public sealed partial class MainPage : Page, IDisposable
         try
         {
             ViewModel.ErrorMessage = null;
-            await WcsExportService.PickAndSaveAsync(_currentPath, _solveResult.Wcs);
+            await WcsExportService.PickAndSaveAsync(
+                OwnerWindowHandle,
+                _currentPath,
+                _solveResult.Wcs);
         }
         catch (Exception exception)
         {
@@ -552,9 +567,6 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void ExportImage_Click(object sender, RoutedEventArgs e) =>
         await ExportAsync(false);
-
-    private async void ExportOverlays_Click(object sender, RoutedEventArgs e) =>
-        await ExportAsync(true);
 
     private async void CopyImage_Click(object sender, RoutedEventArgs e)
     {
@@ -661,9 +673,22 @@ public sealed partial class MainPage : Page, IDisposable
             return;
         }
 
-        ImageExportDestination? destination = await ImageExportService.PickDestinationAsync(
-            _currentPath,
+        bool overlaysAvailable = _overlayRenderer is not null &&
+            _overlayOptions.HasVisibleOverlays;
+        ImageExportRequest? request = await ImageExportService.PickOptionsAsync(
+            XamlRoot,
+            ImageFileService.IsAstronomyImage(_currentPath),
+            overlaysAvailable,
             includeOverlays);
+        if (request is null)
+        {
+            return;
+        }
+
+        ImageExportDestination? destination = await ImageExportService.PickDestinationAsync(
+            OwnerWindowHandle,
+            _currentPath,
+            request);
         if (destination is null)
         {
             return;
@@ -673,9 +698,25 @@ public sealed partial class MainPage : Page, IDisposable
         ViewModel.ErrorMessage = null;
         try
         {
-            if (!includeOverlays)
+            if (request.BitDepth == ImageExportBitDepth.Sixteen)
             {
-                await ImageExportService.SaveAsync(_bitmap, destination);
+                RenderedImage16Data rendered = await ImageRenderService.Render16Async(
+                    _currentPath,
+                    CurrentProcessing());
+                if (request.IncludeVisibleOverlays)
+                {
+                    byte[] overlay = RenderFullResolutionOverlay();
+                    Rgba16Compositor.CompositePremultipliedBgra8(
+                        MemoryMarshal.Cast<byte, ushort>(rendered.RgbaBytes.AsSpan()),
+                        overlay);
+                }
+                await ImageExportService.Save16Async(rendered, destination);
+                return;
+            }
+
+            if (!request.IncludeVisibleOverlays)
+            {
+                await ImageExportService.Save8Async(_bitmap, destination);
                 return;
             }
 
@@ -695,7 +736,7 @@ public sealed partial class MainPage : Page, IDisposable
                     1,
                     Vector2.Zero);
             }
-            await ImageExportService.SaveAsync(renderTarget, destination);
+            await ImageExportService.Save8Async(renderTarget, destination);
         }
         catch (Exception exception)
         {
@@ -707,6 +748,33 @@ public sealed partial class MainPage : Page, IDisposable
         }
     }
 
+    private byte[] RenderFullResolutionOverlay()
+    {
+        if (_overlayRenderer is null || !_overlayOptions.HasVisibleOverlays)
+        {
+            throw new InvalidOperationException("No visible overlays are available to export.");
+        }
+
+        using CanvasRenderTarget overlay = new(
+            ImageCanvas,
+            _sourceWidth,
+            _sourceHeight,
+            96,
+            DirectXPixelFormat.B8G8R8A8UIntNormalized,
+            CanvasAlphaMode.Premultiplied);
+        using (CanvasDrawingSession drawingSession = overlay.CreateDrawingSession())
+        {
+            drawingSession.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
+            _overlayRenderer.Draw(
+                drawingSession,
+                _overlayOptions,
+                1,
+                1,
+                Vector2.Zero);
+        }
+        return overlay.GetPixelBytes();
+    }
+
     private async void About_Click(object sender, RoutedEventArgs e)
     {
         var dialog = new AboutDialog
@@ -714,6 +782,24 @@ public sealed partial class MainPage : Page, IDisposable
             XamlRoot = XamlRoot,
         };
         await dialog.ShowAsync();
+    }
+
+    private void NewWindow_Click(object sender, RoutedEventArgs e) => CreateNewWindow();
+
+    private void NewWindow_Invoked(
+        KeyboardAccelerator sender,
+        KeyboardAcceleratorInvokedEventArgs args)
+    {
+        CreateNewWindow();
+        args.Handled = true;
+    }
+
+    private void CreateNewWindow()
+    {
+        if (_ownerWindow is not null)
+        {
+            App.CreateDocumentWindow();
+        }
     }
 
     private async Task OpenImageAndDiscoverSiblingsAsync(string path)
@@ -736,7 +822,7 @@ public sealed partial class MainPage : Page, IDisposable
         await LoadImageAsync(path);
     }
 
-    private async Task OpenFolderAsync(string folderPath)
+    internal async Task OpenFolderAsync(string folderPath)
     {
         try
         {
@@ -852,10 +938,7 @@ public sealed partial class MainPage : Page, IDisposable
             }
             InspectorControl.ShowMetadata(image.Metadata, processing);
             ViewModel.CompleteLoading(path, image.Metadata);
-            if (App.Window is MainWindow window)
-            {
-                window.SetDocumentTitle(Path.GetFileName(path));
-            }
+            _ownerWindow?.SetDocumentTitle(Path.GetFileName(path));
 
             FitImageToWindow();
             _ = PrefetchThumbnailsAroundSelectionAsync();
@@ -1311,11 +1394,6 @@ public sealed partial class MainPage : Page, IDisposable
             !ViewModel.IsLoading &&
             !ViewModel.IsExporting;
         CopyImageItem.IsEnabled = _bitmap is not null && !ViewModel.IsLoading;
-        ExportImageItem.IsEnabled = !ViewModel.IsExporting;
-        ExportOverlaysItem.IsEnabled =
-            ViewModel.HasSolution &&
-            _overlayOptions.HasVisibleOverlays &&
-            !ViewModel.IsExporting;
         bool supportsAstronomyProcessing = SupportsAstronomyProcessing(_currentMetadata);
         CopyAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         PasteAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;

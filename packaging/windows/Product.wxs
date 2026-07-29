@@ -83,6 +83,29 @@
       <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.xisf\shellex\{E357FCCD-A995-4576-B01F-234630154E96}" Type="string" Value="{E8D56C6C-4E30-4C89-889A-D022180B710A}" />
     </Component>
 
+    <!-- Preview Pane runs this second COM class in the x64 prevhost.exe
+         surrogate. Stream initialization keeps low-integrity Explorer hosting
+         isolated from the source path and from the WinUI/.NET application. -->
+    <Component Directory="APPLICATIONFOLDER" Id="SeizaPreviewProviderRegistration" Guid="B79E4FD5-8C42-4C0F-964E-68CBF4568D42">
+      <RegistryValue
+          Root="HKLM"
+          Key="Software\Classes\CLSID\{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}"
+          Type="string"
+          Value="Seiza FITS and XISF Preview Handler"
+          KeyPath="yes" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}" Name="AppID" Type="string" Value="{6D2B5079-2F0B-48DD-AB7F-97CEC514D30B}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}\InprocServer32" Type="string" Value="[APPLICATIONFOLDER]SeizaThumbnailProvider.dll" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\CLSID\{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}\InprocServer32" Name="ThreadingModel" Type="string" Value="Apartment" />
+      <RegistryValue Root="HKLM" Key="Software\Microsoft\Windows\CurrentVersion\PreviewHandlers" Name="{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}" Type="string" Value="Seiza FITS and XISF Preview Handler" />
+
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.FitsFile\shellex\{8895B1C6-B41F-4C1C-A562-0D564250836F}" Type="string" Value="{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\Seiza.XisfFile\shellex\{8895B1C6-B41F-4C1C-A562-0D564250836F}" Type="string" Value="{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.fit\shellex\{8895B1C6-B41F-4C1C-A562-0D564250836F}" Type="string" Value="{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.fits\shellex\{8895B1C6-B41F-4C1C-A562-0D564250836F}" Type="string" Value="{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.fts\shellex\{8895B1C6-B41F-4C1C-A562-0D564250836F}" Type="string" Value="{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}" />
+      <RegistryValue Root="HKLM" Key="Software\Classes\SystemFileAssociations\.xisf\shellex\{8895B1C6-B41F-4C1C-A562-0D564250836F}" Type="string" Value="{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}" />
+    </Component>
+
     <Feature
         Id="MainFeature"
         Title="Seiza for Windows"
@@ -95,6 +118,7 @@
       <ComponentRef Id="SeizaStartMenuShortcut" />
       <ComponentRef Id="SeizaFileAssociations" />
       <ComponentRef Id="SeizaThumbnailProviderRegistration" />
+      <ComponentRef Id="SeizaPreviewProviderRegistration" />
     </Feature>
 
     <Binary

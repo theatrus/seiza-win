@@ -12,6 +12,7 @@ internal static class WcsExportService
     private const int FitsBlockLength = 2880;
 
     public static async Task<StorageFile?> PickAndSaveAsync(
+        nint ownerWindow,
         string sourcePath,
         WcsResult wcs)
     {
@@ -23,7 +24,7 @@ internal static class WcsExportService
             SuggestedFileName = Path.GetFileNameWithoutExtension(sourcePath),
         };
         picker.FileTypeChoices.Add("FITS WCS solution", [".wcs"]);
-        WinRT.Interop.InitializeWithWindow.Initialize(picker, App.WindowHandle);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, ownerWindow);
 
         StorageFile? file = await picker.PickSaveFileAsync();
         if (file is null)

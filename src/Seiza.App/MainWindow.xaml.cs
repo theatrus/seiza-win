@@ -23,6 +23,10 @@ public sealed partial class MainWindow : Window
 
         // Navigate the root frame to the main page on startup.
         RootFrame.Navigate(typeof(MainPage));
+        if (RootFrame.Content is MainPage page)
+        {
+            page.AttachWindow(this);
+        }
     }
 
     public void SetDocumentTitle(string fileName)
@@ -35,4 +39,14 @@ public sealed partial class MainWindow : Window
     public Task OpenPathAsync(string path) => RootFrame.Content is MainPage page
         ? page.OpenPathAsync(path)
         : Task.CompletedTask;
+
+    public Task OpenFolderAsync(string path) => RootFrame.Content is MainPage page
+        ? page.OpenFolderAsync(path)
+        : Task.CompletedTask;
+
+    internal bool HasDocument => RootFrame.Content is MainPage { HasImage: true };
+
+    internal string? CurrentPath => RootFrame.Content is MainPage page
+        ? page.CurrentPath
+        : null;
 }

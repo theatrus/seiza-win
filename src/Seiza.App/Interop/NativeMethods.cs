@@ -81,6 +81,34 @@ internal static partial class NativeMethods
 
     [LibraryImport(
         LibraryName,
+        EntryPoint = "seiza_rendered_image16_open_with_stretch_config",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint OpenRenderedImage16WithStretchConfiguration(
+        string path,
+        string configurationJson,
+        uint maxDimension,
+        out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_rendered_image16_width")]
+    internal static partial uint GetRenderedImage16Width(nint image);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_rendered_image16_height")]
+    internal static partial uint GetRenderedImage16Height(nint image);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_rendered_image16_rgba")]
+    internal static partial nint GetRenderedImage16Rgba(nint image);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_rendered_image16_rgba_length")]
+    internal static partial nuint GetRenderedImage16RgbaLength(nint image);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_rendered_image16_metadata_json")]
+    internal static partial nint GetRenderedImage16MetadataJson(nint image);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_rendered_image16_free")]
+    internal static partial void FreeRenderedImage16(nint image);
+
+    [LibraryImport(
+        LibraryName,
         EntryPoint = "seiza_live_stacker_open_fits",
         StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint OpenLiveStacker(
