@@ -38,7 +38,7 @@ test exist.
 | Mixed-format folder collection and natural ordering | Available | **Complete** | — |
 | Previous/next and arrow-key navigation | Available | **Complete** | — |
 | Replace the active viewer contents when opening another item | Available | **Complete** | — |
-| Multiple document windows and file activation routing | Available | **Planned** | One process, one window per document collection, activation redirected into the running app. |
+| Multiple document windows and file activation routing | Available | **Complete** | One process owns independent document sessions; Open, Ctrl+N, and redirected FITS/XISF file activations reuse an empty window, focus an already-open document, or create a new window. |
 | Thumbnail drawer | Available | **Complete** | Runtime-tested virtualized WinUI rail on a mixed 26-image XISF/TIFF folder, with direct selection and accessible file names. |
 | Memory/disk thumbnail cache and adjacent prefetch | Available | **Complete** | Bounded memory LRU plus `%LOCALAPPDATA%` PNG cache keys source path, size, timestamp, thumbnail version, and dimension; visible rows and adjacent items share in-flight work. |
 | Cached preview while full resolution loads | Available | **Planned** | Never blank an already available preview during a full render. |
@@ -64,7 +64,7 @@ test exist.
 | Export stretched image without overlays | Available | **Complete** | Runtime-tested at the full 6,248 x 4,176 source resolution. |
 | Export with visible overlays | Available | **Complete** | Uses the same Win2D renderer and layer state as the live viewport. |
 | PNG, JPEG, and TIFF export | Available | **Complete** | Native Save As picker selects the encoder from the chosen extension. |
-| 16-bit PNG/TIFF export | Available | **Core ready** | Expose the upstream RGBA16 render/export path without reducing processed samples to the 8-bit viewport. |
+| 16-bit PNG/TIFF export | Available | **Complete** | FITS/XISF exports request full-resolution RGBA16 directly from `seiza-cabi`, preserve it through optional overlay compositing, and encode with WIC without passing through the 8-bit viewport. JPEG and imported raster sources remain 8-bit. |
 | Copy/paste image | Available | **Complete** | Runtime-tested full 6,167 x 4,094 XISF render through the Windows bitmap clipboard, including Windows BMP/DIB normalization back to a PNG source. |
 | Copy/paste processing adjustments | Available | **Partial** | The versioned schema round-trips the ordered stretch stack, color strategy, background extraction, and deconvolution with validation and undo; final interactive clipboard QA remains. |
 | Directory image stacking | Available | **Complete** | Native WinUI frame/reference selection, filename-filter grouping, normalization, delta-sigma rejection, calibration masters, registration limits, progress/cancel, 32-bit FITS output, and automatic result opening match macOS. Runtime-tested through `seiza-cabi 0.12.2` by registering two 6,248 x 4,176 telescope FITS frames and reopening the 104,371,200-byte output. |
@@ -141,7 +141,7 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | --- | --- | --- | --- |
 | Product app icon | macOS app icon | **Complete** | The same Seiza artwork is supplied at Windows executable, taskbar, title-bar, Start, Store, tile, lock-screen, splash, and About sizes. |
 | Astronomy file registration and document icon | Finder association/icon available | **Complete** | All-users MSI registers `.fits`, `.fit`, `.fts`, and `.xisf` with Windows Default Apps and the Seiza executable icon. |
-| Stretched system preview | Quick Look extension available | **Planned** | Explorer Preview Pane handler in a separately hosted native component. |
+| Stretched system preview | Quick Look extension available | **Complete** | The all-users MSI registers a bounded, stream-based native Rust `IPreviewHandler` for FITS/XISF. Windows hosts it in low-integrity x64 `prevhost.exe`; it autostretches on `DoPreview` and releases the source stream and child HWND on `Unload`. |
 | Content thumbnails on file icons | Finder content thumbnails | **Complete** | The all-users MSI registers a stream-based native Rust `IThumbnailProvider` for FITS and XISF. It runs in Windows' isolated shell host, autostretches mono/RGB/Bayer pixels, preserves aspect ratio without upscaling, and is runtime-tested on telescope files in Explorer. |
 | Signed distributable | Signed/notarized universal DMG | **Partial** | Self-contained x64 MSI is complete and runtime-tested; production code signing and ARM64 remain. |
 | Release automation | macOS release workflows | **Complete** | Version tags build and smoke-test the MSI, sign the Sparkle appcast and enclosure in the protected `signing` environment, produce checksums, and publish the GitHub release. |
@@ -175,6 +175,7 @@ These remain tracked beyond the current macOS parity surface:
    sampling, histograms, history, and full-resolution commit are implemented.
    The remaining stretch-method fixture matrix is tracked as visual QA.
 5. **In progress: Windows integration** — app identity, astronomy-file registration,
-   Explorer FITS/XISF thumbnails, the all-users self-contained WiX MSI, and
-   installer CI and tag-driven releases are complete; multi-window activation,
-   Preview Pane integration, and Authenticode signing remain.
+   Explorer FITS/XISF thumbnails and Preview Pane rendering, multi-window
+   activation, true 16-bit PNG/TIFF export, the all-users self-contained WiX
+   MSI, and installer CI and tag-driven releases are complete; Authenticode
+   signing remains.

@@ -25,12 +25,19 @@ Windows Explorer / dllhost.exe
                               |-- bounded IStream input
                               |-- seiza-fits / seiza-xisf decode
                               `-- autostretched top-down BGRA HBITMAP
+
+Windows Explorer / prevhost.exe
+    `-- IPreviewHandler ---- SeizaThumbnailProvider.dll (Rust)
+                            |-- bounded IStream input
+                            |-- isolated, low-integrity preview host
+                            `-- child HWND with autostretched BGRA HBITMAP
 ```
 
-The Explorer thumbnail provider is a separately hosted Rust COM DLL, independent
-of WinUI, .NET, catalog loading, and plate solving. Windows loads it through an
-isolated `dllhost.exe`; the MSI intentionally does not disable process isolation.
-A future Preview Pane handler should follow the same boundary.
+The Explorer thumbnail and Preview Pane providers are separate COM classes in
+one native Rust DLL, independent of WinUI, .NET, catalog loading, and plate
+solving. Windows loads thumbnails through an isolated `dllhost.exe` and previews
+through the x64 low-integrity `prevhost.exe`; the MSI intentionally does not
+disable process isolation.
 
 ## Locked decisions
 
@@ -41,7 +48,11 @@ A future Preview Pane handler should follow the same boundary.
    WCS, solving, and catalog data.
 5. No Rust layout, allocator-owned string, or panic crosses the C ABI.
 6. Pixel buffers cross through opaque handles; versioned JSON carries metadata and solve records.
-7. The process hosts multiple document windows and redirects new file activations into the existing process.
+7. The process hosts multiple document windows and redirects new file activations
+   into the existing process. A custom entry point registers Windows App SDK
+   `AppInstance` before XAML initialization and carries native file activations;
+   a current-user named pipe keyed by the registered process ID carries ordinary
+   quoted `%1` paths from the unpackaged MSI association.
 8. Distribution is an all-users, self-contained WiX 4 MSI with Windows Default
    Apps registration for FITS and XISF files. The MSI carries .NET and Windows App SDK
    runtimes; production releases must be code-signed.
@@ -55,6 +66,15 @@ A future Preview Pane handler should follow the same boundary.
     `IInitializeWithStream` in a native Rust DLL. The handler accepts bounded
     stream input, never loads app/runtime/catalog state, and remains in Windows'
     default out-of-process shell-extension host.
+12. Explorer Preview Pane images use a second COM class implementing
+    `IPreviewHandler`, `IInitializeWithStream`, `IObjectWithSite`, and
+    `IOleWindow`. It defers decoding until `DoPreview`, renders into a child
+    window owned by `prevhost.exe`, forwards accelerators to the host, and
+    releases the stream, bitmap, and window during `Unload`.
+13. Full-resolution PNG/TIFF export requests RGBA16 directly from `seiza-cabi`.
+    The managed buffer remains 16-bit through optional overlay compositing and
+    is passed directly to the Windows Imaging Component encoder without a
+    second full-frame conversion copy.
 
 ## Performance rules
 
@@ -67,6 +87,9 @@ A future Preview Pane handler should follow the same boundary.
 - Preserve Explorer thumbnail aspect ratio, never upscale source pixels, cap
   requested output dimensions, and rely on Explorer's thumbnail cache rather
   than adding process-global catalog or app caches to the shell extension.
+- Apply the same bounded-input and decode preflight rules to Preview Pane
+  rendering, cap either shell surface at 4,096 pixels, and release all stream,
+  bitmap, and window state from `Unload`.
 - Preflight FITS/XISF dimensions, sample storage, compression, and RGB/Bayer
   expansion before decoding. Reject any request whose conservative peak
   working-set estimate exceeds 1.5 GiB; process isolation is not a substitute
@@ -95,8 +118,12 @@ The detailed status and acceptance criteria live in
 8. **Complete:** render native FITS/XISF content thumbnails through a bounded,
    stream-based Rust COM provider registered by the MSI and isolated in
    `dllhost.exe`.
-9. **Next:** add cached previews during full-resolution loads, multi-window
-   activation, Explorer Preview Pane integration, and Authenticode signing.
+9. **Complete:** route launches and file activations into one app process with
+   independent document windows, export true RGBA16 PNG/TIFF files, and render
+   FITS/XISF images in Explorer's Preview Pane through an isolated native COM
+   handler.
+10. **Next:** add cached previews during full-resolution loads and Authenticode
+    signing.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.

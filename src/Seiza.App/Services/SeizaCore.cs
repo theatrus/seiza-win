@@ -70,6 +70,50 @@ internal static unsafe class SeizaCore
         return new RenderedImageData(bgra, width, height, metadata);
     }
 
+    public static RenderedImage16Data Render16(
+        string path,
+        FitsImageProcessingConfiguration? processing = null)
+    {
+        nint error = 0;
+        nint rawHandle = NativeMethods.OpenRenderedImage16WithStretchConfiguration(
+            path,
+            (processing ?? FitsImageProcessingConfiguration.Default).ToJson(),
+            0,
+            out error);
+        if (rawHandle == 0)
+        {
+            throw ReadError(error);
+        }
+
+        using SafeRenderedImage16Handle image = new(rawHandle);
+        nint handle = image.DangerousGetHandle();
+        int width = checked((int)NativeMethods.GetRenderedImage16Width(handle));
+        int height = checked((int)NativeMethods.GetRenderedImage16Height(handle));
+        int expectedLength = checked(width * height * 4);
+        int elementLength = checked((int)NativeMethods.GetRenderedImage16RgbaLength(handle));
+        nint pixelPointer = NativeMethods.GetRenderedImage16Rgba(handle);
+        nint metadataPointer = NativeMethods.GetRenderedImage16MetadataJson(handle);
+
+        if (width <= 0 || height <= 0 || elementLength != expectedLength ||
+            pixelPointer == 0 || metadataPointer == 0)
+        {
+            throw new SeizaCoreException("The Seiza native core returned an invalid 16-bit image.");
+        }
+
+        int byteLength = checked(elementLength * sizeof(ushort));
+        byte[] rgbaBytes = GC.AllocateUninitializedArray<byte>(byteLength);
+        Marshal.Copy(pixelPointer, rgbaBytes, 0, byteLength);
+
+        string metadataJson = Marshal.PtrToStringUTF8(metadataPointer)
+            ?? throw new SeizaCoreException("The Seiza native core returned invalid metadata.");
+        ImageMetadata metadata = JsonSerializer.Deserialize(
+            metadataJson,
+            SeizaJsonSerializerContext.Default.ImageMetadata)
+            ?? throw new SeizaCoreException("The Seiza native core returned invalid metadata.");
+
+        return new RenderedImage16Data(rgbaBytes, width, height, metadata);
+    }
+
     private static bool IsAstronomyImage(string path) =>
         Path.GetExtension(path).ToLowerInvariant() is ".fits" or ".fit" or ".fts" or ".xisf";
 

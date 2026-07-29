@@ -26,4 +26,24 @@ internal static class ImageRenderService
             RenderGate.Release();
         }
     }
+
+    public static async Task<RenderedImage16Data> Render16Async(
+        string path,
+        FitsImageProcessingConfiguration? processing = null,
+        CancellationToken cancellationToken = default)
+    {
+        await RenderGate.WaitAsync(cancellationToken);
+        try
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            RenderedImage16Data rendered = await Task.Run(() =>
+                SeizaCore.Render16(path, processing));
+            cancellationToken.ThrowIfCancellationRequested();
+            return rendered;
+        }
+        finally
+        {
+            RenderGate.Release();
+        }
+    }
 }

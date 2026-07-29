@@ -32,6 +32,19 @@ $thumbnailHandlers = @(
 ) | ForEach-Object {
     "Registry::HKEY_LOCAL_MACHINE\Software\Classes\SystemFileAssociations\$_\shellex\$thumbnailHandlerId"
 }
+$previewProviderId = "{47B9C88E-38F5-4DE8-9A33-25E3989A7C51}"
+$previewHandlerId = "{8895B1C6-B41F-4C1C-A562-0D564250836F}"
+$previewHostAppId = "{6D2B5079-2F0B-48DD-AB7F-97CEC514D30B}"
+$previewClass = "Registry::HKEY_LOCAL_MACHINE\Software\Classes\CLSID\$previewProviderId"
+$previewHandlersList = "Registry::HKEY_LOCAL_MACHINE\Software\Microsoft\Windows\CurrentVersion\PreviewHandlers"
+$previewHandlers = @(
+    ".fit",
+    ".fits",
+    ".fts",
+    ".xisf"
+) | ForEach-Object {
+    "Registry::HKEY_LOCAL_MACHINE\Software\Classes\SystemFileAssociations\$_\shellex\$previewHandlerId"
+}
 $installArguments = @(
     "/i",
     "`"$Msi`"",
@@ -100,6 +113,27 @@ try {
             throw "Thumbnail handler '$thumbnailHandler' points to '$registeredHandler'"
         }
     }
+    if (-not (Test-Path -LiteralPath $previewClass)) {
+        throw "Explorer Preview Pane provider COM class was not installed"
+    }
+    $registeredPreviewDll = (Get-Item -LiteralPath (Join-Path $previewClass "InprocServer32")).GetValue("")
+    if ($registeredPreviewDll -ne (Join-Path $installDirectory "SeizaThumbnailProvider.dll")) {
+        throw "Explorer Preview Pane provider points to '$registeredPreviewDll'"
+    }
+    $registeredPreviewAppId = (Get-Item -LiteralPath $previewClass).GetValue("AppID")
+    if ($registeredPreviewAppId -ne $previewHostAppId) {
+        throw "Explorer Preview Pane provider uses AppID '$registeredPreviewAppId'"
+    }
+    $listedPreviewProvider = (Get-Item -LiteralPath $previewHandlersList).GetValue($previewProviderId)
+    if ($listedPreviewProvider -ne "Seiza FITS and XISF Preview Handler") {
+        throw "Explorer Preview Pane provider is missing from the global handler list"
+    }
+    foreach ($previewHandler in $previewHandlers) {
+        $registeredHandler = (Get-Item -LiteralPath $previewHandler).GetValue("")
+        if ($registeredHandler -ne $previewProviderId) {
+            throw "Preview handler '$previewHandler' points to '$registeredHandler'"
+        }
+    }
 
     $appProcess = Start-Process -FilePath $installedApp -PassThru
     Start-Sleep -Seconds 3
@@ -136,6 +170,18 @@ finally {
         foreach ($thumbnailHandler in $thumbnailHandlers) {
             if (Test-Path -LiteralPath $thumbnailHandler) {
                 throw "MSI uninstall left '$thumbnailHandler' behind"
+            }
+        }
+        if (Test-Path -LiteralPath $previewClass) {
+            throw "MSI uninstall left the Preview Pane provider COM class behind"
+        }
+        $listedPreviewProvider = (Get-Item -LiteralPath $previewHandlersList).GetValue($previewProviderId)
+        if ($null -ne $listedPreviewProvider) {
+            throw "MSI uninstall left the Preview Pane provider in the global handler list"
+        }
+        foreach ($previewHandler in $previewHandlers) {
+            if (Test-Path -LiteralPath $previewHandler) {
+                throw "MSI uninstall left '$previewHandler' behind"
             }
         }
     }

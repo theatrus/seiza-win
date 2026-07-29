@@ -10,6 +10,10 @@
     xmlns:viewModels="using:Seiza.App.ViewModels"
     mc:Ignorable="d">
 
+    <Page.KeyboardAccelerators>
+        <KeyboardAccelerator Invoked="NewWindow_Invoked" Key="N" Modifiers="Control" />
+    </Page.KeyboardAccelerators>
+
     <Grid>
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
@@ -21,6 +25,14 @@
             x:Name="Toolbar"
             DefaultLabelPosition="Right"
             IsDynamicOverflowEnabled="True">
+            <CommandBar.SecondaryCommands>
+                <AppBarButton Click="NewWindow_Click" Label="New window" />
+                <AppBarSeparator />
+                <AppBarButton Click="CheckForUpdates_Click" Label="Check for updates…" />
+                <AppBarSeparator />
+                <AppBarButton Click="About_Click" Label="About Seiza" />
+            </CommandBar.SecondaryCommands>
+
             <AppBarButton
                 Click="OpenImage_Click"
                 Label="Open image"
@@ -251,18 +263,13 @@
             </AppBarButton>
             <AppBarButton
                 x:Name="ExportButton"
+                Click="ExportImage_Click"
                 IsEnabled="False"
                 Label="Export"
-                ToolTipService.ToolTip="Export the stretched image">
+                ToolTipService.ToolTip="Export the stretched image, with optional overlays">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xEDE1;" />
                 </AppBarButton.Icon>
-                <AppBarButton.Flyout>
-                    <MenuFlyout>
-                        <MenuFlyoutItem x:Name="ExportImageItem" Click="ExportImage_Click" Text="Export image..." />
-                        <MenuFlyoutItem x:Name="ExportOverlaysItem" Click="ExportOverlays_Click" IsEnabled="False" Text="Export with visible overlays..." />
-                    </MenuFlyout>
-                </AppBarButton.Flyout>
             </AppBarButton>
 
             <AppBarSeparator />
@@ -289,22 +296,6 @@
                 </AppBarButton.Icon>
             </AppBarButton>
 
-            <AppBarSeparator />
-
-            <AppBarButton
-                Label="More"
-                ToolTipService.ToolTip="Updates and app information">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE712;" />
-                </AppBarButton.Icon>
-                <AppBarButton.Flyout>
-                    <MenuFlyout>
-                        <MenuFlyoutItem Click="CheckForUpdates_Click" Text="Check for updates…" />
-                        <MenuFlyoutSeparator />
-                        <MenuFlyoutItem Click="About_Click" Text="About Seiza" />
-                    </MenuFlyout>
-                </AppBarButton.Flyout>
-            </AppBarButton>
         </CommandBar>
 
         <SplitView

@@ -22,17 +22,40 @@ pub fn render_thumbnail(bytes: &[u8], max_dimension: u32) -> Result<RenderedThum
         FitsImage::from_bytes(bytes).map_err(|error| error.to_string())?
     };
 
-    render_image(&image, max_dimension)
+    render_image(&image, max_dimension, max_dimension)
 }
 
-fn render_image(image: &FitsImage, max_dimension: u32) -> Result<RenderedThumbnail, String> {
+pub(crate) fn render_preview(
+    bytes: &[u8],
+    max_width: u32,
+    max_height: u32,
+) -> Result<RenderedThumbnail, String> {
+    if max_width == 0 || max_height == 0 {
+        return Err("preview dimensions must be greater than zero".into());
+    }
+    validate_image_budget(bytes)?;
+
+    let image = if bytes.starts_with(b"XISF0100") {
+        seiza_xisf::from_bytes(bytes).map_err(|error| error.to_string())?
+    } else {
+        FitsImage::from_bytes(bytes).map_err(|error| error.to_string())?
+    };
+
+    render_image(&image, max_width, max_height)
+}
+
+fn render_image(
+    image: &FitsImage,
+    max_width: u32,
+    max_height: u32,
+) -> Result<RenderedThumbnail, String> {
     let width = u32::try_from(image.width).map_err(|_| "image width is too large")?;
     let height = u32::try_from(image.height).map_err(|_| "image height is too large")?;
     if width == 0 || height == 0 {
         return Err("image has no pixels".into());
     }
 
-    let (output_width, output_height) = thumbnail_dimensions(width, height, max_dimension);
+    let (output_width, output_height) = fitted_dimensions(width, height, max_width, max_height);
     let params = StretchParams::default();
 
     if let Some(rgb) = image.debayer().or_else(|| image.rgb_planes()) {
@@ -96,13 +119,13 @@ fn render_image(image: &FitsImage, max_dimension: u32) -> Result<RenderedThumbna
     }
 }
 
-fn thumbnail_dimensions(width: u32, height: u32, max_dimension: u32) -> (u32, u32) {
-    let largest = width.max(height);
-    if largest <= max_dimension {
+fn fitted_dimensions(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
+    if width <= max_width && height <= max_height {
         return (width, height);
     }
 
-    let scale = f64::from(max_dimension) / f64::from(largest);
+    let scale =
+        (f64::from(max_width) / f64::from(width)).min(f64::from(max_height) / f64::from(height));
     (
         (f64::from(width) * scale).round().max(1.0) as u32,
         (f64::from(height) * scale).round().max(1.0) as u32,
@@ -135,14 +158,16 @@ fn sample_bgra(
 
 #[cfg(test)]
 mod tests {
-    use super::{render_thumbnail, thumbnail_dimensions};
+    use super::{fitted_dimensions, render_preview, render_thumbnail};
     use crate::{test_fits, test_xisf};
 
     #[test]
     fn dimensions_preserve_aspect_ratio_without_upscaling() {
-        assert_eq!(thumbnail_dimensions(4000, 2000, 256), (256, 128));
-        assert_eq!(thumbnail_dimensions(2000, 4000, 256), (128, 256));
-        assert_eq!(thumbnail_dimensions(64, 32, 256), (64, 32));
+        assert_eq!(fitted_dimensions(4000, 2000, 256, 256), (256, 128));
+        assert_eq!(fitted_dimensions(2000, 4000, 256, 256), (128, 256));
+        assert_eq!(fitted_dimensions(64, 32, 256, 256), (64, 32));
+        assert_eq!(fitted_dimensions(4000, 2000, 160, 120), (160, 80));
+        assert_eq!(fitted_dimensions(2000, 4000, 160, 120), (60, 120));
     }
 
     #[test]
@@ -167,5 +192,11 @@ mod tests {
         let thumbnail = render_thumbnail(&test_xisf(3, 6), 3).expect("render XISF");
         assert_eq!((thumbnail.width, thumbnail.height), (2, 3));
         assert_eq!(thumbnail.bgra.len(), 24);
+    }
+
+    #[test]
+    fn preview_fits_rectangular_bounds() {
+        let preview = render_preview(&test_fits(400, 200), 160, 120).expect("render preview");
+        assert_eq!((preview.width, preview.height), (160, 80));
     }
 }
