@@ -193,7 +193,9 @@ public sealed partial class MainPage : Page, IDisposable
 
         _selectedIndex = ImageBrowserList.SelectedIndex;
         UpdateNavigationState();
-        await LoadImageAsync(_imagePaths[_selectedIndex]);
+        await LoadImageAsync(
+            _imagePaths[_selectedIndex],
+            processingOverride: _processingHistory.Current);
     }
 
     private async void ImageBrowserList_ContainerContentChanging(
@@ -213,7 +215,9 @@ public sealed partial class MainPage : Page, IDisposable
         {
             _selectedIndex--;
             UpdateNavigationState();
-            await LoadImageAsync(_imagePaths[_selectedIndex]);
+            await LoadImageAsync(
+                _imagePaths[_selectedIndex],
+                processingOverride: _processingHistory.Current);
         }
     }
 
@@ -223,7 +227,9 @@ public sealed partial class MainPage : Page, IDisposable
         {
             _selectedIndex++;
             UpdateNavigationState();
-            await LoadImageAsync(_imagePaths[_selectedIndex]);
+            await LoadImageAsync(
+                _imagePaths[_selectedIndex],
+                processingOverride: _processingHistory.Current);
         }
     }
 
@@ -259,7 +265,7 @@ public sealed partial class MainPage : Page, IDisposable
         var window = new FitsStretchWindow(
             Path.GetFileName(path),
             currentProcessing.StretchStack,
-            currentProcessing.ExtractsBackground,
+            currentProcessing.BackgroundConfiguration,
             currentProcessing.Deconvolution,
             SupportsColorStretch(_currentMetadata));
         _stretchWindow = window;
@@ -279,7 +285,8 @@ public sealed partial class MainPage : Page, IDisposable
             }
 
             FitsStretchStack requestedStack = window.ResultStack;
-            bool requestedBackground = window.ResultExtractsBackground;
+            FitsBackgroundConfiguration? requestedBackground =
+                window.ResultBackgroundConfiguration;
             FitsDeconvolutionConfiguration? requestedDeconvolution =
                 window.ResultDeconvolution;
             var processing = new FitsImageProcessingConfiguration(

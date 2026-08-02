@@ -24,9 +24,21 @@ public sealed partial class FitsStretchWindow : Window
             .Select(strategy => new ColorStrategyChoice(strategy, strategy.Title()))
             .ToArray();
 
+    private static readonly BackgroundModeChoice[] BackgroundModes =
+        Enum.GetValues<FitsBackgroundCorrectionMode>()
+            .Select(mode => new BackgroundModeChoice(mode, mode.Title()))
+            .ToArray();
+
+    private static readonly BackgroundModelChoice[] BackgroundModels =
+        Enum.GetValues<FitsBackgroundModelType>()
+            .Select(model => new BackgroundModelChoice(model, model.Title()))
+            .ToArray();
+
     private readonly List<FitsStretchConfiguration> _stages;
     private readonly TaskCompletionSource<bool> _completion = new(
         TaskCreationOptions.RunContinuationsAsynchronously);
+    private FitsBackgroundConfiguration? _background;
+    private FitsBackgroundConfiguration _retainedBackground;
     private FitsDeconvolutionConfiguration? _deconvolution;
     private CancellationTokenSource? _previewCancellation;
     private int _selectedStageIndex;
@@ -37,12 +49,14 @@ public sealed partial class FitsStretchWindow : Window
     internal FitsStretchWindow(
         string documentName,
         FitsStretchStack stack,
-        bool extractsBackground,
+        FitsBackgroundConfiguration? background,
         FitsDeconvolutionConfiguration? deconvolution,
         bool supportsColor)
     {
         InitializeComponent();
         _stages = stack.Stages.Select(stage => stage.Clone()).ToList();
+        _background = background?.Clone();
+        _retainedBackground = _background?.Clone() ?? new FitsBackgroundConfiguration();
         _deconvolution = deconvolution?.Clone();
         _selectedStageIndex = _stages.Count - 1;
         Title = $"Image Processing — {documentName}";
@@ -62,7 +76,7 @@ public sealed partial class FitsStretchWindow : Window
         MethodPicker.ItemsSource = StretchTypes;
         ColorStrategyPicker.ItemsSource = ColorStrategies;
         _isUpdating = true;
-        BackgroundToggle.IsOn = extractsBackground;
+        BackgroundToggle.IsOn = _background is not null;
         DeconvolutionToggle.IsOn = _deconvolution is not null;
         _isUpdating = false;
         ColorPanel.Visibility = supportsColor ? Visibility.Visible : Visibility.Collapsed;
@@ -77,7 +91,7 @@ public sealed partial class FitsStretchWindow : Window
 
     internal FitsStretchStack ResultStack => new(_stages);
 
-    internal bool ResultExtractsBackground => BackgroundToggle.IsOn;
+    internal FitsBackgroundConfiguration? ResultBackgroundConfiguration => _background?.Clone();
 
     internal FitsDeconvolutionConfiguration? ResultDeconvolution => _deconvolution?.Clone();
 
@@ -123,6 +137,7 @@ public sealed partial class FitsStretchWindow : Window
                 item => item.Strategy == Configuration.ColorStrategy);
             ColorHelpText.Text = Configuration.ColorStrategy.Help();
             BuildParameterControls();
+            BuildBackgroundControls();
             BuildDeconvolutionControls();
             UpdateValidation();
         }
@@ -217,6 +232,258 @@ public sealed partial class FitsStretchWindow : Window
             default:
                 throw new ArgumentOutOfRangeException();
         }
+    }
+
+    private void BuildBackgroundControls()
+    {
+        BackgroundParameterPanel.Children.Clear();
+        BackgroundParameterPanel.Visibility = _background is null
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        if (_background is null)
+        {
+            return;
+        }
+
+        AddBackgroundModePicker();
+        AddSecondaryText(_background.Mode.Help());
+        AddParameter(
+            BackgroundParameterPanel,
+            "Amount",
+            _background.Strength,
+            0,
+            1,
+            0.05,
+            value => _background.Strength = value);
+        AddBackgroundModelPicker();
+        AddSecondaryText(_background.ModelType.Help());
+
+        switch (_background.ModelType)
+        {
+            case FitsBackgroundModelType.Automatic:
+                AddParameter(
+                    BackgroundParameterPanel,
+                    "Maximum degree",
+                    _background.AutomaticMaxDegree,
+                    0,
+                    4,
+                    1,
+                    value => _background.AutomaticMaxDegree = (int)Math.Round(value));
+                AddUnboundedNumberParameter(
+                    BackgroundParameterPanel,
+                    "Ridge",
+                    _background.Ridge,
+                    0,
+                    1.0e-8,
+                    value => _background.Ridge = value);
+                AddParameter(
+                    BackgroundParameterPanel,
+                    "Required improvement",
+                    _background.MinimumImprovement,
+                    0,
+                    0.75,
+                    0.01,
+                    value => _background.MinimumImprovement = value);
+
+                var allowRadialBasis = new ToggleSwitch
+                {
+                    Header = "Consider radial-basis model",
+                    IsOn = _background.AllowRadialBasisInAutomatic,
+                };
+                allowRadialBasis.Toggled += (_, _) =>
+                {
+                    if (_isUpdating || _background is null)
+                    {
+                        return;
+                    }
+                    _background.AllowRadialBasisInAutomatic = allowRadialBasis.IsOn;
+                    BuildBackgroundControls();
+                    DraftChanged();
+                };
+                BackgroundParameterPanel.Children.Add(allowRadialBasis);
+                if (_background.AllowRadialBasisInAutomatic)
+                {
+                    AddRadialBasisControls();
+                    AddBackgroundModelWarning();
+                }
+                break;
+            case FitsBackgroundModelType.Polynomial:
+                AddParameter(
+                    BackgroundParameterPanel,
+                    "Degree",
+                    _background.PolynomialDegree,
+                    0,
+                    4,
+                    1,
+                    value => _background.PolynomialDegree = (int)Math.Round(value));
+                AddUnboundedNumberParameter(
+                    BackgroundParameterPanel,
+                    "Ridge",
+                    _background.Ridge,
+                    0,
+                    1.0e-8,
+                    value => _background.Ridge = value);
+                break;
+            case FitsBackgroundModelType.RadialBasis:
+                AddRadialBasisControls();
+                AddBackgroundModelWarning();
+                break;
+            default:
+                throw new ArgumentOutOfRangeException();
+        }
+    }
+
+    private void AddBackgroundModePicker()
+    {
+        if (_background is null)
+        {
+            return;
+        }
+
+        var picker = new ComboBox
+        {
+            ItemsSource = BackgroundModes,
+            DisplayMemberPath = nameof(BackgroundModeChoice.Title),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            SelectedIndex = Array.FindIndex(
+                BackgroundModes,
+                choice => choice.Mode == _background.Mode),
+        };
+        AutomationProperties.SetName(picker, "Background correction mode");
+        picker.SelectionChanged += (_, _) =>
+        {
+            if (_isUpdating || _background is null ||
+                picker.SelectedItem is not BackgroundModeChoice choice)
+            {
+                return;
+            }
+            _background.Mode = choice.Mode;
+            BuildBackgroundControls();
+            DraftChanged();
+        };
+        BackgroundParameterPanel.Children.Add(CreateLabeledControl("Correction", picker));
+    }
+
+    private void AddBackgroundModelPicker()
+    {
+        if (_background is null)
+        {
+            return;
+        }
+
+        var picker = new ComboBox
+        {
+            ItemsSource = BackgroundModels,
+            DisplayMemberPath = nameof(BackgroundModelChoice.Title),
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            SelectedIndex = Array.FindIndex(
+                BackgroundModels,
+                choice => choice.Model == _background.ModelType),
+        };
+        AutomationProperties.SetName(picker, "Background model");
+        picker.SelectionChanged += (_, _) =>
+        {
+            if (_isUpdating || _background is null ||
+                picker.SelectedItem is not BackgroundModelChoice choice)
+            {
+                return;
+            }
+            _background.ModelType = choice.Model;
+            BuildBackgroundControls();
+            DraftChanged();
+        };
+        BackgroundParameterPanel.Children.Add(CreateLabeledControl("Background model", picker));
+    }
+
+    private void AddRadialBasisControls()
+    {
+        if (_background is null)
+        {
+            return;
+        }
+
+        AddParameter(
+            BackgroundParameterPanel,
+            "Smoothing",
+            _background.RbfSmoothing,
+            0,
+            1,
+            0.005,
+            value => _background.RbfSmoothing = value);
+        AddParameter(
+            BackgroundParameterPanel,
+            "Control points",
+            _background.MaxControlPoints,
+            16,
+            512,
+            16,
+            value => _background.MaxControlPoints = (int)Math.Round(value));
+    }
+
+    private void AddBackgroundModelWarning() =>
+        BackgroundParameterPanel.Children.Add(new InfoBar
+        {
+            IsOpen = true,
+            IsClosable = false,
+            Severity = InfoBarSeverity.Warning,
+            Message = "A flexible model can remove real nebula or galaxy detail. " +
+                "Inspect the preview before saving.",
+        });
+
+    private void AddSecondaryText(string text) =>
+        BackgroundParameterPanel.Children.Add(new TextBlock
+        {
+            Text = text,
+            Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                "TextFillColorSecondaryBrush"],
+            TextWrapping = TextWrapping.Wrap,
+        });
+
+    private static Grid CreateLabeledControl(string title, Control control)
+    {
+        var grid = new Grid { ColumnSpacing = 10 };
+        grid.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(140) });
+        grid.ColumnDefinitions.Add(new ColumnDefinition
+        {
+            Width = new GridLength(1, GridUnitType.Star),
+        });
+        grid.Children.Add(new TextBlock
+        {
+            Text = title,
+            VerticalAlignment = VerticalAlignment.Center,
+        });
+        Grid.SetColumn(control, 1);
+        grid.Children.Add(control);
+        return grid;
+    }
+
+    private void AddUnboundedNumberParameter(
+        StackPanel target,
+        string title,
+        double value,
+        double minimum,
+        double step,
+        Action<double> setter)
+    {
+        var number = new NumberBox
+        {
+            Minimum = minimum,
+            SmallChange = step,
+            LargeChange = step * 10,
+            SpinButtonPlacementMode = NumberBoxSpinButtonPlacementMode.Compact,
+            Value = value,
+        };
+        AutomationProperties.SetName(number, $"{title} value");
+        number.ValueChanged += (_, args) =>
+        {
+            if (_isUpdating || !double.IsFinite(args.NewValue) || args.NewValue < minimum)
+            {
+                return;
+            }
+            setter(args.NewValue);
+            DraftChanged();
+        };
+        target.Children.Add(CreateLabeledControl(title, number));
     }
 
     private void BuildDeconvolutionControls()
@@ -446,10 +713,25 @@ public sealed partial class FitsStretchWindow : Window
 
     private void BackgroundToggle_Toggled(object sender, RoutedEventArgs e)
     {
-        if (!_isUpdating)
+        if (_isUpdating)
         {
-            DraftChanged();
+            return;
         }
+
+        if (BackgroundToggle.IsOn)
+        {
+            _background = _retainedBackground.Clone();
+        }
+        else
+        {
+            if (_background is not null)
+            {
+                _retainedBackground = _background.Clone();
+            }
+            _background = null;
+        }
+        BuildBackgroundControls();
+        DraftChanged();
     }
 
     private void DeconvolutionToggle_Toggled(object sender, RoutedEventArgs e)
@@ -531,6 +813,7 @@ public sealed partial class FitsStretchWindow : Window
         string? message = _stages
             .Select(stage => stage.ValidationMessage)
             .FirstOrDefault(candidate => candidate is not null) ??
+            _background?.ValidationMessage ??
             _deconvolution?.ValidationMessage;
         SaveButton.IsEnabled = message is null;
         ValidationInfoBar.Message = message ?? string.Empty;
@@ -560,7 +843,7 @@ public sealed partial class FitsStretchWindow : Window
             SetPreviewStatus(true, "Updating live preview…");
             var processing = new FitsImageProcessingConfiguration(
                 new FitsStretchStack(_stages),
-                BackgroundToggle.IsOn,
+                _background,
                 _deconvolution,
                 interactivePreview: true);
             await PreviewRequested(new FitsStretchPreviewRequest(processing, cancellationToken));
@@ -621,4 +904,8 @@ public sealed partial class FitsStretchWindow : Window
     private sealed record StretchTypeChoice(FitsStretchType Type, string Title);
 
     private sealed record ColorStrategyChoice(FitsStretchColorStrategy Strategy, string Title);
+
+    private sealed record BackgroundModeChoice(FitsBackgroundCorrectionMode Mode, string Title);
+
+    private sealed record BackgroundModelChoice(FitsBackgroundModelType Model, string Title);
 }

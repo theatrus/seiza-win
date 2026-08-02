@@ -7,13 +7,14 @@ merely because its Rust implementation exists.
 
 ## Baseline
 
-- macOS reference: `main` at
-  [`7f6d566`](https://github.com/theatrus/seiza-mac/commit/7f6d566)
-- Seiza core reference: crates.io `seiza-cabi 0.12.2` from
-  [`8df7a81`](https://github.com/theatrus/seiza/commit/8df7a81d5daa2236f651317bd5be7d76b58efc78)
+- macOS reference: PR
+  [`#31`](https://github.com/theatrus/seiza-mac/pull/31) at
+  [`3cdc7e2`](https://github.com/theatrus/seiza-mac/commit/3cdc7e2d48857ee52f22877fb6d8822560662b1b)
+- Seiza core reference: crates.io `seiza-cabi 0.14.0` from
+  [`12b43dd`](https://github.com/theatrus/seiza/commit/12b43ddc6aa3e306399986041e231f63eafb1a57)
 - Windows reference: `main` at
-  [`7ec56f5`](https://github.com/theatrus/seiza-win/commit/7ec56f58a645a97d621a98092b4a0d2906fc80fd)
-- Last audited: 2026-07-26
+  [`41e77eb`](https://github.com/theatrus/seiza-win/commit/41e77eb211a186799beac800cc76b0059b90c544)
+- Last audited: 2026-08-02
 
 Update this baseline and the affected rows whenever the macOS app gains a
 feature or changes an interaction. A Windows feature is **Complete** only after
@@ -48,7 +49,7 @@ test exist.
 | Seven astronomy-image stretch methods | Available | **Partial** | Auto MTF and GHS are runtime-tested through the Windows editor; complete a visual fixture matrix for Percentile Asinh, Linear, Asinh, explicit MTF, and No Stretch. |
 | Ordered stretch stages | Available | **Complete** | Modeless editor adds, selects, removes, and reorders stages; a GHS plus identity stack is runtime-tested through the upstream C ABI. |
 | Color strategies | Available | **Complete** | Linked Channels, Per Channel, and Preserve Luminance Color replace the old three-item RGB menu and share the macOS JSON contract. |
-| Background-gradient removal | Available | **Complete** | Runtime-tested as an interactive preview on a 261 MB planar-RGB FITS frame with explicit progress. |
+| Background correction models | Available | **Complete** | Seiza 0.14 subtract/divide correction exposes amount plus automatic, polynomial, and radial-basis models with safety warnings, validation, live preview, history, clipboard round-trip, folder-navigation persistence, legacy-recipe compatibility, and fitted-model/sample diagnostics. |
 | Light Richardson-Lucy deconvolution | Available | **Complete** | Shared Rust runs background correction, deconvolution, then display stretch; the native controls, bounded live preview, full-resolution commit, validation, and inspector provenance are runtime-tested on a 261 MB planar-RGB FITS frame. |
 | Debounced live stretch preview | Available | **Complete** | Latest valid draft renders at a bounded 2,048-pixel dimension without replacing the committed full-resolution bitmap. |
 | Save/Cancel and stretch undo/redo | Available | **Complete** | Runtime-tested full-resolution commit, cancel restoration, and Ctrl+Z/Ctrl+Shift+Z history. |
@@ -66,8 +67,8 @@ test exist.
 | PNG, JPEG, and TIFF export | Available | **Complete** | Native Save As picker selects the encoder from the chosen extension. |
 | 16-bit PNG/TIFF export | Available | **Complete** | FITS/XISF exports request full-resolution RGBA16 directly from `seiza-cabi`, preserve it through optional overlay compositing, and encode with WIC without passing through the 8-bit viewport. JPEG and imported raster sources remain 8-bit. |
 | Copy/paste image | Available | **Complete** | Runtime-tested full 6,167 x 4,094 XISF render through the Windows bitmap clipboard, including Windows BMP/DIB normalization back to a PNG source. |
-| Copy/paste processing adjustments | Available | **Partial** | The versioned schema round-trips the ordered stretch stack, color strategy, background extraction, and deconvolution with validation and undo; final interactive clipboard QA remains. |
-| Directory image stacking | Available | **Complete** | Native WinUI frame/reference selection, filename-filter grouping, normalization, delta-sigma rejection, calibration masters, registration limits, progress/cancel, 32-bit FITS output, and automatic result opening match macOS. Runtime-tested through `seiza-cabi 0.12.2` by registering two 6,248 x 4,176 telescope FITS frames and reopening the 104,371,200-byte output. |
+| Copy/paste processing adjustments | Available | **Partial** | The versioned schema round-trips the ordered stretch stack, color strategy, complete Seiza 0.14 background configuration, and deconvolution with validation and undo; final interactive clipboard QA remains. |
+| Directory image stacking | Available | **Complete** | Native WinUI frame/reference selection, filename-filter grouping, normalization, delta-sigma rejection, calibration masters, registration limits, progress/cancel, 32-bit FITS output, and automatic result opening match macOS. Runtime-tested through `seiza-cabi` by registering two 6,248 x 4,176 telescope FITS frames and reopening the 104,371,200-byte output. |
 
 ## Catalog settings and managed data
 
@@ -171,8 +172,9 @@ These remain tracked beyond the current macOS parity surface:
 3. **Complete: Overlay/export vertical slice** — common coordinate transform,
    layer menu, grid/center, catalog layers, and clean/composited export.
 4. **Complete: Current astronomy processing interaction set** — modeless ordered
-   stages, live preview, background removal, light deconvolution, GHS image
-   sampling, histograms, history, and full-resolution commit are implemented.
+   stages, live preview, selectable background correction models, light
+   deconvolution, GHS image sampling, histograms, history, and full-resolution
+   commit are implemented.
    The remaining stretch-method fixture matrix is tracked as visual QA.
 5. **In progress: Windows integration** — app identity, astronomy-file registration,
    Explorer FITS/XISF thumbnails and Preview Pane rendering, multi-window

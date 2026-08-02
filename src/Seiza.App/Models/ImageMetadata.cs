@@ -12,7 +12,32 @@ public sealed record ImageMetadata(
     ImageStatistics Statistics,
     IReadOnlyDictionary<string, JsonElement> Headers,
     ImageHistogram? InputHistogram = null,
-    ImageHistogram? DisplayHistogram = null);
+    ImageHistogram? DisplayHistogram = null,
+    ImageBackgroundProcessing? BackgroundProcessing = null);
+
+public sealed record ImageBackgroundProcessing(
+    string Mode,
+    double Strength,
+    string Model,
+    ImageBackgroundDiagnostics Diagnostics)
+{
+    public string ModelTitle => Model switch
+    {
+        "polynomial" => "Polynomial",
+        "radial_basis" => "Radial Basis",
+        _ => Model,
+    };
+}
+
+public sealed record ImageBackgroundDiagnostics(
+    [property: System.Text.Json.Serialization.JsonPropertyName("candidate_samples")]
+    int CandidateSamples,
+    [property: System.Text.Json.Serialization.JsonPropertyName("accepted_samples")]
+    int AcceptedSamples,
+    [property: System.Text.Json.Serialization.JsonPropertyName("rejected_noise")]
+    int RejectedNoise,
+    [property: System.Text.Json.Serialization.JsonPropertyName("rejected_residual")]
+    int RejectedResidual);
 
 public sealed record ImageStatistics(
     int Minimum,
