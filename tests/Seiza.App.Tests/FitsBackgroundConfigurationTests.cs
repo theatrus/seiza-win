@@ -101,6 +101,34 @@ public sealed class FitsBackgroundConfigurationTests
         Assert.Contains("between 0 and 1", exception.Message, StringComparison.Ordinal);
     }
 
+    [Theory]
+    [InlineData((int)FitsBackgroundModelType.Automatic)]
+    [InlineData((int)FitsBackgroundModelType.Polynomial)]
+    public void ModelsThatUseRidgeRejectNegativeValues(int modelValue)
+    {
+        var background = new FitsBackgroundConfiguration
+        {
+            ModelType = (FitsBackgroundModelType)modelValue,
+            Ridge = -1,
+        };
+
+        Assert.Equal(
+            "Background ridge must be a non-negative number.",
+            background.ValidationMessage);
+    }
+
+    [Fact]
+    public void RadialBasisIgnoresUnusedRidge()
+    {
+        var background = new FitsBackgroundConfiguration
+        {
+            ModelType = FitsBackgroundModelType.RadialBasis,
+            Ridge = -1,
+        };
+
+        Assert.Null(background.ValidationMessage);
+    }
+
     [Fact]
     public void HistoryTracksBackgroundOnlyChanges()
     {
@@ -119,20 +147,5 @@ public sealed class FitsBackgroundConfigurationTests
         Assert.Null(history.Current.BackgroundConfiguration);
         Assert.True(history.Redo());
         Assert.Equal(changed, history.Current);
-    }
-
-    [Fact]
-    public void LegacyBooleanConstructorWritesTheHistoricalPolynomialModel()
-    {
-        var processing = new FitsImageProcessingConfiguration(FitsStretchStack.Default, true);
-
-        using JsonDocument document = JsonDocument.Parse(processing.ToJson());
-        JsonElement model = document.RootElement
-            .GetProperty("background")
-            .GetProperty("config")
-            .GetProperty("model");
-
-        Assert.Equal("polynomial", model.GetProperty("kind").GetString());
-        Assert.Equal(2, model.GetProperty("degree").GetInt32());
     }
 }

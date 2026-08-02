@@ -268,7 +268,8 @@ public sealed partial class FitsStretchWindow : Window
                     0,
                     4,
                     1,
-                    value => _background.AutomaticMaxDegree = (int)Math.Round(value));
+                    value => _background.AutomaticMaxDegree = (int)value,
+                    normalize: RoundToInteger);
                 AddUnboundedNumberParameter(
                     BackgroundParameterPanel,
                     "Ridge",
@@ -315,7 +316,8 @@ public sealed partial class FitsStretchWindow : Window
                     0,
                     4,
                     1,
-                    value => _background.PolynomialDegree = (int)Math.Round(value));
+                    value => _background.PolynomialDegree = (int)value,
+                    normalize: RoundToInteger);
                 AddUnboundedNumberParameter(
                     BackgroundParameterPanel,
                     "Ridge",
@@ -417,7 +419,8 @@ public sealed partial class FitsStretchWindow : Window
             16,
             512,
             16,
-            value => _background.MaxControlPoints = (int)Math.Round(value));
+            value => _background.MaxControlPoints = (int)value,
+            normalize: RoundToInteger);
     }
 
     private void AddBackgroundModelWarning() =>
@@ -512,7 +515,8 @@ public sealed partial class FitsStretchWindow : Window
             1,
             50,
             1,
-            value => _deconvolution.Iterations = (int)Math.Round(value));
+            value => _deconvolution.Iterations = (int)value,
+            normalize: RoundToInteger);
         AddParameter(
             DeconvolutionParameterPanel,
             "Amount",
@@ -563,7 +567,8 @@ public sealed partial class FitsStretchWindow : Window
         double minimum,
         double maximum,
         double step,
-        Action<double> setter)
+        Action<double> setter,
+        Func<double, double>? normalize = null)
     {
         var grid = new Grid
         {
@@ -608,10 +613,12 @@ public sealed partial class FitsStretchWindow : Window
             {
                 return;
             }
+            double next = Normalize(args.NewValue);
             syncing = true;
-            number.Value = args.NewValue;
+            slider.Value = next;
+            number.Value = next;
             syncing = false;
-            setter(args.NewValue);
+            setter(next);
             DraftChanged();
         };
         number.ValueChanged += (_, args) =>
@@ -620,9 +627,10 @@ public sealed partial class FitsStretchWindow : Window
             {
                 return;
             }
-            double next = Math.Clamp(args.NewValue, minimum, maximum);
+            double next = Normalize(args.NewValue);
             syncing = true;
             slider.Value = next;
+            number.Value = next;
             syncing = false;
             setter(next);
             DraftChanged();
@@ -632,7 +640,15 @@ public sealed partial class FitsStretchWindow : Window
         grid.Children.Add(slider);
         grid.Children.Add(number);
         target.Children.Add(grid);
+
+        double Normalize(double candidate) => Math.Clamp(
+            normalize?.Invoke(candidate) ?? candidate,
+            minimum,
+            maximum);
     }
+
+    private static double RoundToInteger(double value) =>
+        Math.Round(value, MidpointRounding.AwayFromZero);
 
     private void StagePicker_SelectionChanged(object sender, SelectionChangedEventArgs e)
     {
