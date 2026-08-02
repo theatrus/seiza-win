@@ -8,9 +8,10 @@ its assets manually.
 ## Version policy
 
 Seiza for Windows uses semantic versions and immutable `vMAJOR.MINOR.PATCH`
-tags. Windows and macOS keep the same **major** version so a major product
-generation has one meaning across platforms. Minor and patch versions may
-advance independently for platform-specific features and fixes.
+tags. Before 1.0, Windows and macOS keep the same `0.MINOR` product generation;
+patch versions may advance independently for platform-specific fixes. At 1.0
+and later, the apps keep the same major version while minor and patch versions
+may advance independently unless a cross-platform release calls for alignment.
 
 Choose the version before opening the release-preparation pull request. A
 published tag or release is never moved, reused, or silently replaced.

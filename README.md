@@ -4,23 +4,22 @@ Seiza is a fast, native Windows astronomy image viewer and plate-solving app.
 It combines a modern WinUI 3 interface and GPU-backed viewport with the same
 Rust image, catalog, and solving core used by Seiza on macOS.
 
-[Download Seiza 0.5.3 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.5.3/seiza-0.5.3-windows-x86_64.msi)
+[Download Seiza 0.6.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/seiza-0.6.0-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza 0.5.3 release highlights
+## Seiza 0.6.0 release highlights
 
-- Choose automatic, polynomial, or radial-basis background models for FITS and
-  XISF processing, with additive subtraction or multiplicative division.
-- Tune background strength and model-specific fitting parameters while the
-  full-resolution preview updates through the Seiza 0.14 processing core.
-- Let automatic selection compare polynomial fits and optionally consider a
-  flexible radial-basis model, with a minimum-improvement threshold that helps
-  protect real nebula and galaxy structure.
-- Preserve the complete background recipe through undo/redo, adjustment
-  copy/paste, and folder navigation, and inspect fitted-model and sample counts
-  in image metadata.
+- Upgrade the native processing core to Seiza 0.15.1 for more reliable
+  catalog-protected background extraction.
+- Normalize repeated closing and adjacent vertices in protected catalog
+  contours so a degenerate edge cannot exclude every background sample.
+- Reject zero-area or non-finite protection geometry safely while continuing
+  to preserve valid extended nebula and galaxy regions during gradient fitting.
+- Retain the complete automatic, polynomial, and radial-basis background
+  workflow introduced in 0.5.3, including subtract/divide modes, adjustable
+  strength, full recipe persistence, and fitted-sample metadata.
 
 ### Native Explorer previews and thumbnails
 
@@ -144,8 +143,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.5.3 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.5.3/seiza-0.5.3-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.5.3/SHA256SUMS.txt)
+Download the [Seiza 0.6.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/seiza-0.6.0-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -182,7 +181,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.5.3
+  -p:SeizaVersion=0.6.0
 ```
 
 The installer is written to `dist`. See the
