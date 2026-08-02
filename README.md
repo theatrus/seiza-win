@@ -4,22 +4,23 @@ Seiza is a fast, native Windows astronomy image viewer and plate-solving app.
 It combines a modern WinUI 3 interface and GPU-backed viewport with the same
 Rust image, catalog, and solving core used by Seiza on macOS.
 
-[Download Seiza 0.5.2 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.5.2/seiza-0.5.2-windows-x86_64.msi)
+[Download Seiza 0.5.3 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.5.3/seiza-0.5.3-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza 0.5.2 release highlights
+## Seiza 0.5.3 release highlights
 
-- Select a FITS or XISF file in File Explorer to inspect an autostretched image
-  in the Preview Pane without opening Seiza.
-- Open images in independent document windows while one Seiza process handles
-  multi-file Open, shell activation, and already-open document focusing.
-- Export FITS and XISF data as true 16-bit-per-channel PNG or TIFF, clean or
-  composited with the currently visible overlays.
-- In-app updates now preserve the signed appcast's MSI filename across GitHub
-  release redirects, allowing Windows Installer to start reliably after the
-  download is verified.
+- Choose automatic, polynomial, or radial-basis background models for FITS and
+  XISF processing, with additive subtraction or multiplicative division.
+- Tune background strength and model-specific fitting parameters while the
+  full-resolution preview updates through the Seiza 0.14 processing core.
+- Let automatic selection compare polynomial fits and optionally consider a
+  flexible radial-basis model, with a minimum-improvement threshold that helps
+  protect real nebula and galaxy structure.
+- Preserve the complete background recipe through undo/redo, adjustment
+  copy/paste, and folder navigation, and inspect fitted-model and sample counts
+  in image metadata.
 
 ### Native Explorer previews and thumbnails
 
@@ -143,8 +144,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.5.2 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.5.2/seiza-0.5.2-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.5.2/SHA256SUMS.txt)
+Download the [Seiza 0.5.3 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.5.3/seiza-0.5.3-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.5.3/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -181,7 +182,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.5.2
+  -p:SeizaVersion=0.5.3
 ```
 
 The installer is written to `dist`. See the

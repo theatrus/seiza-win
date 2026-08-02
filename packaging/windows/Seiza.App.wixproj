@@ -5,7 +5,7 @@
     <RepoRoot Condition="'$(RepoRoot)' == ''">$(MSBuildThisFileDirectory)..\..\</RepoRoot>
     <AppProject>$(RepoRoot)src\Seiza.App\Seiza.App.csproj</AppProject>
     <PublishDirectory>$(RepoRoot)artifacts\publish\win-x64\</PublishDirectory>
-    <SeizaVersion Condition="'$(SeizaVersion)' == ''">0.5.2</SeizaVersion>
+    <SeizaVersion Condition="'$(SeizaVersion)' == ''">0.5.3</SeizaVersion>
     <OutputName>seiza-$(SeizaVersion)-windows-x86_64</OutputName>
     <OutputPath>$(RepoRoot)dist\</OutputPath>
     <IntermediateOutputPath>$(RepoRoot)artifacts\wix\</IntermediateOutputPath>
