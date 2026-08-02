@@ -1152,6 +1152,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "quick-xml"
+version = "0.41.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
+dependencies = [
+ "memchr",
+]
+
+[[package]]
 name = "quinn"
 version = "0.11.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1588,7 +1597,7 @@ dependencies = [
 name = "seiza-thumbnail-provider"
 version = "0.1.0"
 dependencies = [
- "quick-xml",
+ "quick-xml 0.41.0",
  "seiza-fits",
  "seiza-xisf",
  "windows",
@@ -1603,7 +1612,7 @@ checksum = "99c58629034c4197cf415a86ad91fc044dbf9f1ea892ec5617d611e530af990c"
 dependencies = [
  "flate2",
  "lz4_flex",
- "quick-xml",
+ "quick-xml 0.38.4",
  "seiza-fits",
  "sha1",
  "sha2",
