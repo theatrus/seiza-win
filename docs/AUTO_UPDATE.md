@@ -43,9 +43,11 @@ dotnet tool restore
 
 For a release:
 
-1. Choose the next Windows semantic version. Windows and macOS keep the same
-   semantic-version major, while minor and patch versions may advance
-   independently for platform-specific features and fixes.
+1. Choose the next Windows semantic version. Before 1.0, Windows and macOS keep
+   the same `0.MINOR` product generation while patch versions may advance
+   independently. At 1.0 and later, keep the same major version while minor
+   and patch versions may advance independently unless a coordinated release
+   calls for alignment.
 2. Set the app version in `src/Seiza.App/Seiza.App.csproj`.
 3. Add `docs/releases/vMAJOR.MINOR.PATCH.md`.
 4. Merge the release commit and tag it `vMAJOR.MINOR.PATCH`.

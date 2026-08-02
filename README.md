@@ -4,12 +4,12 @@ Seiza is a fast, native Windows astronomy image viewer and plate-solving app.
 It combines a modern WinUI 3 interface and GPU-backed viewport with the same
 Rust image, catalog, and solving core used by Seiza on macOS.
 
-[Download Seiza 0.5.4 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.5.4/seiza-0.5.4-windows-x86_64.msi)
+[Download Seiza 0.6.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/seiza-0.6.0-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza 0.5.4 release highlights
+## Seiza 0.6.0 release highlights
 
 - Upgrade the native processing core to Seiza 0.15.1 for more reliable
   catalog-protected background extraction.
@@ -143,8 +143,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.5.4 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.5.4/seiza-0.5.4-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.5.4/SHA256SUMS.txt)
+Download the [Seiza 0.6.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/seiza-0.6.0-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -181,7 +181,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.5.4
+  -p:SeizaVersion=0.6.0
 ```
 
 The installer is written to `dist`. See the
