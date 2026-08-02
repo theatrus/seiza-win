@@ -313,34 +313,35 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
 {
     public FitsImageProcessingConfiguration(
         FitsStretchStack stretchStack,
-        bool extractsBackground,
+        FitsBackgroundConfiguration? backgroundConfiguration,
         FitsDeconvolutionConfiguration? deconvolution = null,
         bool interactivePreview = false)
     {
         StretchStack = stretchStack.Clone();
-        ExtractsBackground = extractsBackground;
+        BackgroundConfiguration = backgroundConfiguration?.Clone();
         Deconvolution = deconvolution?.Clone();
         InteractivePreview = interactivePreview;
     }
 
     public FitsStretchStack StretchStack { get; }
-    public bool ExtractsBackground { get; }
+    public FitsBackgroundConfiguration? BackgroundConfiguration { get; }
     public FitsDeconvolutionConfiguration? Deconvolution { get; }
     public bool InteractivePreview { get; }
 
     public static FitsImageProcessingConfiguration Default { get; } = new(
         FitsStretchStack.Default,
-        false);
+        backgroundConfiguration: null);
 
     public FitsImageProcessingConfiguration Clone(bool? interactivePreview = null) => new(
         StretchStack,
-        ExtractsBackground,
+        BackgroundConfiguration,
         Deconvolution,
         interactivePreview ?? InteractivePreview);
 
     public string ToJson()
     {
         string? validationMessage = StretchStack.ValidationMessage ??
+            BackgroundConfiguration?.ValidationMessage ??
             Deconvolution?.ValidationMessage;
         if (validationMessage is not null)
         {
@@ -359,12 +360,10 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
             }
             writer.WriteEndArray();
 
-            if (ExtractsBackground)
+            if (BackgroundConfiguration is not null)
             {
                 writer.WritePropertyName("background");
-                writer.WriteStartObject();
-                writer.WriteString("mode", "subtract");
-                writer.WriteEndObject();
+                BackgroundConfiguration.WriteJson(writer);
             }
             if (Deconvolution is not null)
             {
@@ -435,7 +434,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
 
     public bool Equals(FitsImageProcessingConfiguration? other) => other is not null &&
         StretchStack.Equals(other.StretchStack) &&
-        ExtractsBackground == other.ExtractsBackground &&
+        Equals(BackgroundConfiguration, other.BackgroundConfiguration) &&
         Equals(Deconvolution, other.Deconvolution) &&
         InteractivePreview == other.InteractivePreview;
 
@@ -443,7 +442,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
 
     public override int GetHashCode() => HashCode.Combine(
         StretchStack,
-        ExtractsBackground,
+        BackgroundConfiguration,
         Deconvolution,
         InteractivePreview);
 
@@ -498,16 +497,10 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
             throw new FormatException("At least one stretch stage is required.");
         }
 
-        bool extractsBackground = false;
+        FitsBackgroundConfiguration? backgroundConfiguration = null;
         if (root.TryGetProperty("background", out JsonElement background))
         {
-            extractsBackground = background.ValueKind == JsonValueKind.Object &&
-                background.TryGetProperty("mode", out JsonElement mode) &&
-                mode.GetString() == "subtract";
-            if (!extractsBackground)
-            {
-                throw new FormatException("The background-processing mode is not supported.");
-            }
+            backgroundConfiguration = FitsBackgroundConfiguration.FromJsonElement(background);
         }
 
         FitsDeconvolutionConfiguration? deconvolution = null;
@@ -529,9 +522,10 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
 
         var result = new FitsImageProcessingConfiguration(
             new FitsStretchStack(stages),
-            extractsBackground,
+            backgroundConfiguration,
             deconvolution);
         string? validationMessage = result.StretchStack.ValidationMessage ??
+            result.BackgroundConfiguration?.ValidationMessage ??
             result.Deconvolution?.ValidationMessage;
         if (validationMessage is not null)
         {

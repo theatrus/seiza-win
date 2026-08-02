@@ -58,7 +58,15 @@ public sealed partial class ImageInspector : UserControl
             }
             ImageDetails.Add(new(
                 "Background",
-                processing.ExtractsBackground ? "Gradient removed" : "Original"));
+                processing.BackgroundConfiguration?.Summary ?? "Original"));
+            if (metadata.BackgroundProcessing is { } background)
+            {
+                ImageDetails.Add(new("Fitted model", background.ModelTitle));
+                ImageDetails.Add(new(
+                    "Background samples",
+                    $"{background.Diagnostics.AcceptedSamples:N0} of " +
+                    $"{background.Diagnostics.CandidateSamples:N0}"));
+            }
             if (processing.Deconvolution is { } deconvolution)
             {
                 ImageDetails.Add(new("Deconvolution", "Light Richardson–Lucy"));

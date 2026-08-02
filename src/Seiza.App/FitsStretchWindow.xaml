@@ -97,15 +97,16 @@
                 <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Linear processing" />
                 <ToggleSwitch
                     x:Name="BackgroundToggle"
-                    Header="Remove background gradient"
+                    Header="Correct background gradient"
                     OffContent="Keep original background"
-                    OnContent="Subtract smooth background"
+                    OnContent="Background correction on"
                     Toggled="BackgroundToggle_Toggled" />
                 <TextBlock
                     Margin="0,-6,0,0"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                    Text="Fit and subtract a smooth background from linear astronomy samples before the first stretch stage."
+                    Text="Fit and correct a smooth background in linear astronomy samples before deconvolution and stretching."
                     TextWrapping="Wrap" />
+                <StackPanel x:Name="BackgroundParameterPanel" Spacing="10" />
 
                 <ToggleSwitch
                     x:Name="DeconvolutionToggle"

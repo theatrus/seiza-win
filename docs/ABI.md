@@ -13,7 +13,7 @@ Rules:
 - Owned UTF-8 strings have an explicit Rust free function.
 - Every exported operation catches panics and returns a host-readable error.
 - High-volume pixels use a contiguous BGRA8 buffer suitable for direct Win2D upload; evolving records use JSON.
-- FITS and XISF processing use the shared `seiza_rendered_image_open_with_stretch_config` JSON contract so ordered stretch stages, color strategy, background subtraction, light deconvolution, and interactive-preview intent stay platform-neutral.
+- FITS and XISF processing use the shared `seiza_rendered_image_open_with_stretch_config` JSON contract so ordered stretch stages, color strategy, background correction, light deconvolution, and interactive-preview intent stay platform-neutral.
 - Catalog status is returned as owned JSON; catalog setup runs synchronously on a worker thread and reports borrowed progress JSON through a callback.
 - Rust owns manifest resolution, download caching, full SHA-256 verification, and atomic catalog installation.
 - A live stacker handle owns registration, calibrated accumulation,
@@ -35,6 +35,11 @@ Interactive edits are debounced in the WinUI shell and rendered at a maximum
 resolution; no per-pixel processing or stretch math is duplicated in C#.
 The native pipeline order is fixed: background correction, optional light
 Richardson-Lucy deconvolution, then the ordered display-stretch stack. The
+`background` JSON object carries subtract/divide mode, strength, and an
+automatic, fixed-degree polynomial, or radial-basis model. Automatic selection
+uses held-out samples and excludes the flexible radial-basis candidate unless
+the user opts in. Recipes written before Seiza 0.14 remain compatible and map
+to the historical degree-2 polynomial model. The
 `deconvolution` JSON object carries `psf_fwhm_pixels`, `iterations`, `amount`,
 `noise_fraction`, and `max_correction`.
 

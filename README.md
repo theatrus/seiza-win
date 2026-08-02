@@ -80,8 +80,9 @@ Other preview highlights still apply:
 
 - GPU-backed FITS and XISF viewing with a cached thumbnail browser and
   image-anchored pan, wheel zoom, and pinch zoom.
-- Seven stretch models, ordered adjustment stages, RGB strategies, background
-  extraction, live histograms, and Richardson-Lucy deconvolution.
+- Seven stretch models, ordered adjustment stages, RGB strategies, automatic
+  and manual background correction, live histograms, and Richardson-Lucy
+  deconvolution.
 - Local plate solving with WCS grids, deep-sky contours, named and field stars,
   transients, solar-system objects, and motion vectors.
 - Full-resolution clean or overlay-composited export, FITS WCS sidecars, and
@@ -108,8 +109,12 @@ Other preview highlights still apply:
 - Stretch FITS and XISF data with Auto MTF, GHS, Percentile Asinh, Linear, Asinh,
   explicit MTF, or no stretch; stack and reorder stages with live previews,
   undo, and redo.
-- Process linear astronomy data with background-gradient removal, three color
-  strategies, and conservative Richardson-Lucy deconvolution.
+- Correct additive gradients or multiplicative illumination with adjustable
+  strength and automatic, polynomial, or radial-basis background models; the
+  flexible radial-basis option includes an extended-detail warning and is
+  opt-in during automatic selection.
+- Process linear astronomy data with three color strategies and conservative
+  Richardson-Lucy deconvolution.
 - Inspect image statistics, input/display RGB histograms, searchable source
   headers, processing provenance, and plate-solution quality.
 - Blind-solve locally using downloaded catalogs, then draw a WCS grid, field

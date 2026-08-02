@@ -1426,9 +1426,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "seiza"
-version = "0.12.2"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "525faedc07014b8dd1fc7de1407016bb59a96395ec67b23b7d1eb05219017ce5"
+checksum = "796848f820f8b3a4d30bc6b3df976757f1371eb1cdc8f3ba74f82b32ae62463d"
 dependencies = [
  "directories",
  "image",
@@ -1437,6 +1437,7 @@ dependencies = [
  "postcard",
  "rayon",
  "rustc-hash",
+ "seiza-calibration",
  "seiza-download",
  "seiza-stats",
  "serde",
@@ -1448,9 +1449,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-background"
-version = "0.1.0"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c0415eddd60c1bdfc01778c3563cb669fac86809587bee35f12aee9d4d316977"
+checksum = "ce27c654312993dceef01e654de2fdce5d3adeddbac19ea0c45c0b94a91b271b"
 dependencies = [
  "rayon",
  "seiza-stats",
@@ -1460,9 +1461,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.12.2"
+version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3922fa931b0da120f42bb03b2b6335a21e583142a4eaa0e9c5f3fd61a78125ac"
+checksum = "6a8e0ab7b3a649c5991078ccd6343132db8c8a6c127880a24dc153d08756511a"
 dependencies = [
  "cbindgen",
  "image",
@@ -1483,6 +1484,18 @@ name = "seiza-cabi-pin"
 version = "0.0.0"
 dependencies = [
  "seiza-cabi",
+]
+
+[[package]]
+name = "seiza-calibration"
+version = "0.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7a3efb42a2d6f61b63a95de257e1b8b30495b6347c466ed9bd5982df333d30d9"
+dependencies = [
+ "seiza-imgproc",
+ "seiza-stats",
+ "serde",
+ "thiserror",
 ]
 
 [[package]]
@@ -1527,19 +1540,30 @@ dependencies = [
 ]
 
 [[package]]
-name = "seiza-stacking"
-version = "0.1.1"
+name = "seiza-imgproc"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "dedf535255d022efbc85d92c72e378023ee257b80079e0e6ddbecf6ba6b6582a"
+checksum = "7838c64e51a8b068a684c25cea2d5333b38d5945c236f89d836408596dea6f1e"
+
+[[package]]
+name = "seiza-stacking"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "42ef51340d179fa30ee7291bc3132579c3ef0b3d79891fa0745b1d7cc641047e"
 dependencies = [
  "rayon",
  "seiza",
+ "seiza-calibration",
  "seiza-fits",
+ "seiza-imgproc",
  "seiza-stats",
  "seiza-stretch",
  "seiza-xisf",
  "serde",
+ "serde_json",
+ "tempfile",
  "thiserror",
+ "zstd",
 ]
 
 [[package]]

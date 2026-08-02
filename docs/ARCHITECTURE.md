@@ -95,7 +95,11 @@ disable process isolation.
   working-set estimate exceeds 1.5 GiB; process isolation is not a substitute
   for bounding attacker-controlled allocations.
 - Render interactive processing drafts through the shared JSON C ABI at a bounded 2,048-pixel dimension, cancel stale UI results, and retain the committed full-resolution bitmap until Save succeeds.
-- Keep the shared pixel pipeline ordered as background correction, optional light deconvolution, then display stretch; the Windows shell only edits and serializes configuration.
+- Keep the shared pixel pipeline ordered as background correction, optional
+  light deconvolution, then display stretch; the Windows shell only edits and
+  serializes configuration. Seiza 0.14 owns background sampling, automatic
+  held-out model selection, polynomial and radial-basis fitting, correction,
+  and diagnostics.
 - Keep image registration, normalization, rejection, calibration, and stack
   accumulation in Rust. The Windows shell may group filenames and schedule
   batches, but it only crosses the C ABI once per input frame and cancels at
@@ -110,7 +114,9 @@ The detailed status and acceptance criteria live in
 2. **Complete:** catalog status/setup in the Windows ABI plus native Settings for location, readiness, presets, durable progress, verification, and repair.
 3. **Complete:** bind the solve response, add the explicit Solve workflow, and present solution quality.
 4. **Complete:** draw the solved overlay scene in Win2D with layer and catalog controls.
-5. **Complete:** match the current macOS astronomy processing interactions with the stackable editor, GHS image sampling, input/display histograms, and live light deconvolution.
+5. **Complete:** match the current macOS astronomy processing interactions with
+   the stackable editor, GHS image sampling, automatic/polynomial/radial-basis
+   background controls, input/display histograms, and live light deconvolution.
 6. **Complete:** register and stack directory FITS/XISF light frames with
    filter grouping, calibration, progress, cancellation, and 32-bit FITS output.
 7. **Complete:** build an all-users, self-contained WiX MSI, include both
