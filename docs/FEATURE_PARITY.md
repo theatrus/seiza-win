@@ -10,10 +10,10 @@ merely because its Rust implementation exists.
 - macOS reference: PR
   [`#31`](https://github.com/theatrus/seiza-mac/pull/31) at
   [`3cdc7e2`](https://github.com/theatrus/seiza-mac/commit/3cdc7e2d48857ee52f22877fb6d8822560662b1b)
-- Seiza core reference: crates.io `seiza-cabi 0.14.0` from
-  [`12b43dd`](https://github.com/theatrus/seiza/commit/12b43ddc6aa3e306399986041e231f63eafb1a57)
+- Seiza core reference: crates.io `seiza-cabi 0.15.1` from
+  [`06075d5`](https://github.com/theatrus/seiza/commit/06075d52fc0a60d637d3f9715b717c8b5b96215e)
 - Windows reference: `main` at
-  [`41e77eb`](https://github.com/theatrus/seiza-win/commit/41e77eb211a186799beac800cc76b0059b90c544)
+  [`cb0b173`](https://github.com/theatrus/seiza-win/commit/cb0b173cadaca3dfbbf6b54a4e299709f87803dd)
 - Last audited: 2026-08-02
 
 Update this baseline and the affected rows whenever the macOS app gains a
