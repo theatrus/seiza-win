@@ -1,11 +1,16 @@
 # Seiza for Windows
 
 Seiza is a fast, native Windows astronomy image viewer and plate-solving app.
-It combines a modern WinUI 3 interface and GPU-backed viewport with the same
-Rust image, catalog, and solving core used by Seiza on macOS.
+It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
+[Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
+core.
 
 [Download Seiza 0.6.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/seiza-0.6.0-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
+
+**Seiza projects:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
+[Seiza for Mac](https://github.com/theatrus/seiza-mac) ·
+[Seiza for Windows](https://github.com/theatrus/seiza-win)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
