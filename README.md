@@ -8,9 +8,8 @@ core.
 [Download Seiza 0.6.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/seiza-0.6.0-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
-**Seiza projects:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
-[Seiza for Mac](https://github.com/theatrus/seiza-mac) ·
-[Seiza for Windows](https://github.com/theatrus/seiza-win)
+**Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
+[Seiza for Mac](https://github.com/theatrus/seiza-mac)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
