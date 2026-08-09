@@ -41,6 +41,13 @@ jobs:
       - name: Build WinUI app (Release)
         run: dotnet build Seiza.slnx -c Release --no-restore
 
+      # Deliberately unsigned. Pull requests from forks cannot mint an OIDC token
+      # for this repository, and the federated credential is bound to the
+      # `release` environment, so CI could not authenticate even on `main`
+      # without a second credential. Signing here would also spend five of the
+      # 5,000 monthly signatures on every push and every pull request update,
+      # which is the budget releases depend on. Authenticode is applied by
+      # release.yml alone.
       - name: Build all-users MSI
         run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.6.0
 

@@ -4,19 +4,45 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    # Temporary, for validating the signing work on PR #28 before it merges.
+    # The build job publishes nothing on a branch push and the publish job is
+    # skipped outright, so this only exercises build -> sign -> verify.
+    # workflow_dispatch cannot be used instead: it only becomes available once
+    # the workflow is on the default branch, which is what we are trying to
+    # avoid doing before it is proven. REMOVE THIS BRANCH ENTRY BEFORE MERGE.
+    branches:
+      - 'ci/windows-authenticode-signing'
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: release-${{ github.ref }}
 
 jobs:
-  windows:
-    if: github.repository == 'theatrus/seiza-win' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
-    environment: signing
+  build:
+    name: Build and sign the Windows installer
+    if: >-
+      github.repository == 'theatrus/seiza-win' && github.event_name == 'push' &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       github.ref_name == 'ci/windows-authenticode-signing')
+    # The Entra federated credential is bound to the subject
+    # `repo:theatrus/seiza-win:environment:release`, so this job must run in the
+    # `release` environment or the OIDC token will not match and azure/login
+    # fails. A job belongs to exactly one environment, and SPARKLE_ED_PRIVATE_KEY
+    # lives in `signing`, which is why the appcast and the release upload now sit
+    # in a second job below.
+    environment: release
+    permissions:
+      contents: read
+      # Required for the OIDC exchange with Entra that authenticates
+      # Authenticode signing. No Azure signing secret is stored in this repo.
+      id-token: write
     runs-on: windows-latest
     timeout-minutes: 90
+    outputs:
+      version: ${{ steps.release-metadata.outputs.version }}
+      notes: ${{ steps.release-metadata.outputs.notes }}
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
       DOTNET_NOLOGO: true
@@ -33,26 +59,46 @@ jobs:
           components: rustfmt
 
       - name: Validate release tag and notes
+        id: release-metadata
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+)$') {
-            throw "Release tag must have the form vMAJOR.MINOR.PATCH"
-          }
-          $version = $Matches[1]
           [xml] $project = Get-Content src\Seiza.App\Seiza.App.csproj
           $projectVersion = $project.SelectSingleNode('/Project/PropertyGroup/Version').InnerText
-          if ($version -ne $projectVersion) {
-            throw "Tag version $version does not match app version $projectVersion"
+          if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+)$') {
+            $version = $Matches[1]
+            if ($version -ne $projectVersion) {
+              throw "Tag version $version does not match app version $projectVersion"
+            }
           }
-          $notes = "docs\releases\$($env:GITHUB_REF_NAME).md"
+          elseif ($env:GITHUB_REF_NAME -eq 'ci/windows-authenticode-signing') {
+            # Validation run on the signing branch: there is no tag to check
+            # against, so take the version from the project. Everything after
+            # this point is identical to a real release, which is the whole
+            # point of running it. REMOVE WITH THE BRANCH TRIGGER BEFORE MERGE.
+            $version = $projectVersion
+            Write-Output "validation run: using app version $version"
+          }
+          else {
+            throw "Release tag must have the form vMAJOR.MINOR.PATCH"
+          }
+          $notes = "docs\releases\v$version.md"
           if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) {
-            throw "Release notes are required at $notes"
+            if ($env:GITHUB_REF_NAME -eq 'ci/windows-authenticode-signing') {
+              Write-Output "validation run: no release notes at $notes; continuing"
+              $notes = ""
+            } else {
+              throw "Release notes are required at $notes"
+            }
           }
           if (-not (Select-String -Quiet -LiteralPath src\Seiza.App\Services\UpdateController.cs -SimpleMatch $env:SPARKLE_PUBLIC_KEY)) {
             throw "The release key does not match the public key compiled into the app"
           }
           "SEIZA_VERSION=$version" >> $env:GITHUB_ENV
           "RELEASE_NOTES=$notes" >> $env:GITHUB_ENV
+          # The publishing job runs in a different environment and so cannot read
+          # this job's GITHUB_ENV.
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "notes=$notes" >> $env:GITHUB_OUTPUT
 
       - name: Check Rust formatting
         run: cargo fmt --all --check
@@ -60,19 +106,283 @@ jobs:
       - name: Test Rust core
         run: .\scripts\build-rust.ps1 -Test
 
-      - name: Restore application and release tools
+      - name: Restore application
+        run: dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
+
+      # Phase one of a two-phase build. The wixproj publishes the app itself when
+      # it builds the MSI, which leaves no moment at which the application files
+      # exist but are not yet packaged. Running the publish on its own opens that
+      # moment, so the binaries can be signed before the installer seals them in.
+      - name: Publish the application
+        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=${{ env.SEIZA_VERSION }} -t:PublishSeizaApp
+
+      - name: Resolve the application binaries to sign
+        if: vars.AZURE_CLIENT_ID != ''
+        shell: pwsh
         run: |
-          dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
-          dotnet tool restore
+          # Named one by one, never a folder-and-recurse sweep. This is a
+          # self-contained publish: some two hundred files, nearly all of them
+          # Microsoft's .NET runtime and Windows App SDK, which Microsoft has
+          # already signed. Signing those would replace their publisher identity
+          # with ours and would spend the Basic tier's 5,000 signatures a month
+          # on files nobody asked us to vouch for. Only first-party code is
+          # listed, and each name is checked so a rename cannot quietly shrink
+          # the set.
+          $publish = Join-Path $env:GITHUB_WORKSPACE "artifacts\publish\win-x64"
+          $names = @(
+            "Seiza.App.exe",              # the native host Windows actually launches
+            "Seiza.App.dll",              # the managed application itself
+            "seiza_cabi.dll",             # first-party Rust core
+            "SeizaThumbnailProvider.dll"  # first-party Rust shell extension
+          )
+          $paths = foreach ($name in $names) {
+            $path = Join-Path $publish $name
+            if (-not (Test-Path -LiteralPath $path -PathType Leaf)) {
+              throw "Expected to sign $path but the publish did not produce it"
+            }
+            (Resolve-Path -LiteralPath $path).Path
+          }
+          $paths | ForEach-Object { Write-Output "will sign: $_" }
+          Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8NoBOM -Value (
+            @("SIGN_FILES<<SIGN_FILES_EOF") + $paths + @("SIGN_FILES_EOF"))
 
+      # Authenticode signing runs through Azure Artifact Signing, formerly
+      # Trusted Signing. The key stays in Microsoft's HSM and we only ever hold a
+      # short-lived OIDC-exchanged token, so there is no signing secret here.
+      #
+      # This login sits immediately before the signing step, and is repeated
+      # before the second one, rather than being done once at the top of the
+      # job. The GitHub OIDC token azure/login exchanges is a client assertion
+      # valid for only five minutes, and publishing a self-contained app takes
+      # far longer than that. Logging in early leaves the az CLI holding a dead
+      # assertion and signing fails with AADSTS700024, "Client assertion is not
+      # within its valid time range" -- which reads like a wrong tenant or a
+      # missing role but is purely about elapsed time. A credential that lives
+      # five minutes has to be acquired next to where it is used.
+      #
+      # Every signing step is gated on the variable being present so a fork,
+      # which has neither the variables nor access to the federated credential,
+      # still produces an installer rather than failing outright.
+      - name: Authenticate to Azure (for binary signing)
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Microsoft's own action, not the community trusted-signing-cli. That tool
+      # hard-requires --azure-client-secret and has no OIDC path at all, so using
+      # it would mean keeping a signing secret in this repository. This action
+      # authenticates through DefaultAzureCredential and rides the azure/login
+      # session above.
+      - name: Sign the application binaries
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/trusted-signing-action@v0
+        with:
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.SIGNING_PROFILE }}
+          files: ${{ env.SIGN_FILES }}
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # Phase two. WiX harvests the published directory as it stands, so the
+      # signatures applied above travel into the installer untouched.
       - name: Build all-users MSI
-        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=${{ env.SEIZA_VERSION }}
+        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=${{ env.SEIZA_VERSION }} -p:SeizaSkipPublish=true
 
+      # Fresh assertion again: harvesting and cab-compressing a self-contained
+      # payload sits between this and the previous login.
+      - name: Authenticate to Azure (for installer signing)
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      # Only the installer here. The four binaries were signed before packaging;
+      # signing them again would spend quota twice and append a second signature
+      # to a file that already carries a good one.
+      - name: Sign the MSI
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/trusted-signing-action@v0
+        with:
+          endpoint: ${{ vars.SIGNING_ENDPOINT }}
+          trusted-signing-account-name: ${{ vars.SIGNING_ACCOUNT }}
+          certificate-profile-name: ${{ vars.SIGNING_PROFILE }}
+          files: ${{ github.workspace }}\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi
+          file-digest: SHA256
+          timestamp-rfc3161: http://timestamp.acs.microsoft.com
+          timestamp-digest: SHA256
+
+      # Five artifacts must verify, not one. The MSI is what a user downloads;
+      # the four binaries are what gets installed and run afterwards. Checking
+      # the MSI alone would pass happily while shipping unsigned executables
+      # inside a signed wrapper.
+      - name: Verify Windows signatures
+        if: vars.AZURE_CLIENT_ID != ''
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem -LiteralPath "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -like "*\x64\*" } |
+            Sort-Object -Property FullName |
+            Select-Object -Last 1
+          if (-not $signtool) { throw "signtool.exe was not found on the runner" }
+          Write-Output "using: $($signtool.FullName)"
+
+          $binaries = $env:SIGN_FILES -split '\r?\n' |
+            ForEach-Object { $_.Trim() } |
+            Where-Object { $_ }
+          $msi = (Resolve-Path -LiteralPath ".\dist\seiza-$($env:SEIZA_VERSION)-windows-x86_64.msi").Path
+
+          foreach ($artifact in @($binaries) + @($msi)) {
+            Write-Output "--- $artifact"
+            $report = & $signtool.FullName verify /pa /v $artifact
+            $report | Write-Output
+            if ($LASTEXITCODE -ne 0) {
+              throw "$artifact does not carry a signature that chains to a trusted root"
+            }
+            if (-not ($report | Select-String -SimpleMatch "StackFoundry LLC" -Quiet)) {
+              throw "$artifact is signed by someone other than StackFoundry LLC"
+            }
+          }
+          # Now the copies sealed inside the MSI -- the ones that actually get
+          # installed and run.
+          #
+          # Verifying the loose binaries proves they were signed; verifying the
+          # MSI proves the installer was signed. Neither proves the installer
+          # contains those signed bytes. On psf-guard that gap hid a real
+          # defect: signing before packaging looked correct, but the bundler
+          # rewrote the executable afterwards, so a validly signed installer
+          # shipped a program whose signature no longer matched its content
+          # (0x80096010). WiX is not expected to rewrite anything -- but that
+          # is precisely the assumption that failed there, so check rather than
+          # assume.
+          #
+          # msiexec /a rather than 7z: an administrative install restores the
+          # real file names, while 7z yields the MSI's internal mangled names
+          # and nothing can be found by name.
+          $msiExtract = Join-Path $env:RUNNER_TEMP "msi-payload-check"
+          Remove-Item -Recurse -Force $msiExtract -ErrorAction SilentlyContinue
+          New-Item -ItemType Directory -Force $msiExtract | Out-Null
+          $proc = Start-Process msiexec -Wait -PassThru -ArgumentList @(
+            '/a', "`"$msi`"", '/qn', "TARGETDIR=`"$msiExtract`""
+          )
+          if ($proc.ExitCode -ne 0) {
+            throw "msiexec administrative extract failed with $($proc.ExitCode)"
+          }
+
+          $checked = 0
+          foreach ($binary in $binaries) {
+            $name = Split-Path -Leaf $binary
+            $inner = Get-ChildItem -Path $msiExtract -Recurse -Filter $name |
+              Select-Object -First 1
+            if (-not $inner) {
+              Write-Output "--- (inside MSI) ${name}: not present in the payload; skipping"
+              continue
+            }
+            $checked++
+            $signedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash
+            $innerHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $inner.FullName).Hash
+            Write-Output "--- (inside MSI) $name"
+            Write-Output "    signed : $signedHash"
+            Write-Output "    inside : $innerHash"
+            if ($signedHash -ne $innerHash) {
+              Write-Output "    -> DIFFERS from the signed file (packaging rewrote it)"
+            }
+            $report = & $signtool.FullName verify /pa /v $inner.FullName
+            $report | Write-Output
+            if ($LASTEXITCODE -ne 0) {
+              throw "the $name inside the MSI is not validly signed"
+            }
+            if (-not ($report | Select-String -SimpleMatch "StackFoundry LLC" -Quiet)) {
+              throw "the $name inside the MSI is signed by someone other than StackFoundry LLC"
+            }
+          }
+          if ($checked -eq 0) {
+            throw "no first-party binary was found inside the MSI payload -- the check proved nothing, which is not the same as passing"
+          }
+
+          Write-Output "OK: the installer, the loose binaries, and $checked copies inside the MSI are all signed as StackFoundry LLC"
+
+      # Both tests run against the signed MSI rather than an earlier copy, so
+      # what CI exercises is byte for byte what ships.
       - name: Verify installer Finish launch action
         run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
 
       - name: Smoke-test Windows installer
         run: .\.github\scripts\test-windows-installer.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
+
+      - name: Hand the signed installer to the publishing job
+        uses: actions/upload-artifact@v7
+        with:
+          name: seiza-${{ env.SEIZA_VERSION }}-windows-msi
+          path: dist/seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi
+          if-no-files-found: error
+          retention-days: 5
+
+  publish:
+    name: Sign the appcast and publish the release
+    needs: build
+    # Tags only. A branch validation run must never publish a release or touch
+    # the appcast, which is what existing installs poll for updates.
+    if: startsWith(github.ref, 'refs/tags/v')
+    # SPARKLE_ED_PRIVATE_KEY lives in the `signing` environment, and Authenticode
+    # needs `release`. One job cannot have both, so the release is split here.
+    # The order this imposes is the right one anyway: the Sparkle signature has
+    # to cover the Authenticode-signed installer, because that is the file
+    # clients download. Signing the MSI after the appcast was generated would
+    # leave every existing install refusing the update.
+    environment: signing
+    permissions:
+      contents: write
+    runs-on: windows-latest
+    timeout-minutes: 30
+    env:
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_NOLOGO: true
+      SEIZA_VERSION: ${{ needs.build.outputs.version }}
+      RELEASE_NOTES: ${{ needs.build.outputs.notes }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-dotnet@v6
+        with:
+          dotnet-version: 10.0.x
+
+      - name: Download the signed installer
+        uses: actions/download-artifact@v7
+        with:
+          name: seiza-${{ needs.build.outputs.version }}-windows-msi
+          path: dist
+
+      # Cheap insurance against the failure that would otherwise be silent: an
+      # appcast whose signature covers pre-Authenticode bytes looks perfectly
+      # healthy in CI and breaks every installed client.
+      - name: Confirm the installer is signed before signing the appcast
+        if: vars.AZURE_CLIENT_ID != ''
+        shell: pwsh
+        run: |
+          $signtool = Get-ChildItem -LiteralPath "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -like "*\x64\*" } |
+            Sort-Object -Property FullName |
+            Select-Object -Last 1
+          if (-not $signtool) { throw "signtool.exe was not found on the runner" }
+          $msi = (Resolve-Path -LiteralPath ".\dist\seiza-$($env:SEIZA_VERSION)-windows-x86_64.msi").Path
+          $report = & $signtool.FullName verify /pa /v $msi
+          $report | Write-Output
+          if ($LASTEXITCODE -ne 0) {
+            throw "The downloaded installer is not Authenticode signed"
+          }
+          if (-not ($report | Select-String -SimpleMatch "StackFoundry LLC" -Quiet)) {
+            throw "The downloaded installer is signed by someone other than StackFoundry LLC"
+          }
+
+      - name: Restore release tools
+        run: dotnet tool restore
 
       - name: Generate signed Sparkle appcast
         shell: pwsh

@@ -36,11 +36,27 @@
     </HarvestDirectory>
   </ItemGroup>
 
-  <Target Name="PublishSeizaApp" BeforeTargets="GetHarvestDirectoryContent">
+  <!-- Ordinarily this runs as part of building the MSI, so one command produces
+       the installer. Release builds need a gap between publishing and
+       harvesting in which to Authenticode-sign the application: call this
+       target on its own, sign the published files, then build the MSI again
+       with SeizaSkipPublish=true. Without the skip, publishing would run a
+       second time and overwrite the signed files, because the SDK's copy
+       compares size and timestamp and a signature changes both. -->
+  <Target Name="PublishSeizaApp" BeforeTargets="GetHarvestDirectoryContent" Condition="'$(SeizaSkipPublish)' != 'true'">
     <MSBuild
         Projects="$(AppProject)"
         Targets="Publish"
         Properties="Configuration=Release;Platform=x64;RuntimeIdentifier=win-x64;Version=$(SeizaVersion);SelfContained=true;WindowsPackageType=None;WindowsAppSDKSelfContained=true;PublishSingleFile=false;PublishReadyToRun=true;PublishTrimmed=false;DebugSymbols=false;DebugType=None;PublishDir=$(PublishDirectory)" />
     <Copy SourceFiles="@(InstallerDocumentation)" DestinationFolder="$(PublishDirectory)" />
+  </Target>
+
+  <!-- Skipping the publish when nothing has been published would harvest an
+       empty directory and produce an installer that carries no application at
+       all, which is the kind of failure that survives a green build. -->
+  <Target Name="RequireSeizaPublishOutput" BeforeTargets="GetHarvestDirectoryContent" Condition="'$(SeizaSkipPublish)' == 'true'">
+    <Error
+        Condition="!Exists('$(PublishDirectory)Seiza.App.exe')"
+        Text="SeizaSkipPublish is set but $(PublishDirectory)Seiza.App.exe does not exist. Run the PublishSeizaApp target first." />
   </Target>
 </Project>

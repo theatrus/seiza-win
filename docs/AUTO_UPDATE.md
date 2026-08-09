@@ -82,7 +82,10 @@ and a local appcast URL. Verify all of these paths:
 - tampered appcast, detached signature, and MSI rejection;
 - verified MSI launch, application exit, UAC, and WiX major upgrade.
 
-Production MSI Authenticode signing is independent of Sparkle signing and
-remains required to remove the unknown-publisher warning. Sparkle signatures
-determine what Seiza trusts; Authenticode determines what Windows and
-SmartScreen trust.
+MSI Authenticode signing is independent of Sparkle signing and is what removes
+the unknown-publisher warning. Sparkle signatures determine what Seiza trusts;
+Authenticode determines what Windows and SmartScreen trust. Releases now carry
+both: `release.yml` signs the MSI as StackFoundry LLC before it generates the
+appcast, so the Ed25519 enclosure signature covers the signed installer. Reverse
+that order and the feed would advertise a hash no downloaded file could ever
+match. See [`RELEASING.md`](RELEASING.md) for the two signing environments.
