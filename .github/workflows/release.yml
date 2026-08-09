@@ -83,21 +83,6 @@ jobs:
       - name: Restore application
         run: dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
 
-      # Authenticode signing runs through Azure Artifact Signing, formerly
-      # Trusted Signing. The key stays in Microsoft's HSM and we only ever hold a
-      # short-lived OIDC-exchanged token.
-      #
-      # Every signing step is gated on the variable being present so a fork,
-      # which has neither the variables nor access to the federated credential,
-      # still produces an installer rather than failing outright.
-      - name: Authenticate to Azure for code signing
-        if: vars.AZURE_CLIENT_ID != ''
-        uses: azure/login@v2
-        with:
-          client-id: ${{ vars.AZURE_CLIENT_ID }}
-          tenant-id: ${{ vars.AZURE_TENANT_ID }}
-          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
-
       # Phase one of a two-phase build. The wixproj publishes the app itself when
       # it builds the MSI, which leaves no moment at which the application files
       # exist but are not yet packaged. Running the publish on its own opens that
@@ -135,6 +120,31 @@ jobs:
           Add-Content -LiteralPath $env:GITHUB_ENV -Encoding utf8NoBOM -Value (
             @("SIGN_FILES<<SIGN_FILES_EOF") + $paths + @("SIGN_FILES_EOF"))
 
+      # Authenticode signing runs through Azure Artifact Signing, formerly
+      # Trusted Signing. The key stays in Microsoft's HSM and we only ever hold a
+      # short-lived OIDC-exchanged token, so there is no signing secret here.
+      #
+      # This login sits immediately before the signing step, and is repeated
+      # before the second one, rather than being done once at the top of the
+      # job. The GitHub OIDC token azure/login exchanges is a client assertion
+      # valid for only five minutes, and publishing a self-contained app takes
+      # far longer than that. Logging in early leaves the az CLI holding a dead
+      # assertion and signing fails with AADSTS700024, "Client assertion is not
+      # within its valid time range" -- which reads like a wrong tenant or a
+      # missing role but is purely about elapsed time. A credential that lives
+      # five minutes has to be acquired next to where it is used.
+      #
+      # Every signing step is gated on the variable being present so a fork,
+      # which has neither the variables nor access to the federated credential,
+      # still produces an installer rather than failing outright.
+      - name: Authenticate to Azure (for binary signing)
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
       # Microsoft's own action, not the community trusted-signing-cli. That tool
       # hard-requires --azure-client-secret and has no OIDC path at all, so using
       # it would mean keeping a signing secret in this repository. This action
@@ -156,6 +166,16 @@ jobs:
       # signatures applied above travel into the installer untouched.
       - name: Build all-users MSI
         run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=${{ env.SEIZA_VERSION }} -p:SeizaSkipPublish=true
+
+      # Fresh assertion again: harvesting and cab-compressing a self-contained
+      # payload sits between this and the previous login.
+      - name: Authenticate to Azure (for installer signing)
+        if: vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
       # Only the installer here. The four binaries were signed before packaging;
       # signing them again would spend quota twice and append a second signature
