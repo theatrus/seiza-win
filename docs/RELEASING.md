@@ -19,18 +19,38 @@ published tag or release is never moved, reused, or silently replaced.
 ## Release system
 
 Pushing a release tag runs [`.github/workflows/release.yml`](../.github/workflows/release.yml).
-The workflow validates the tag and release notes, tests Rust, builds the
-self-contained all-users x64 WiX MSI, checks the installer's Finish action,
-performs an elevated install/launch/uninstall smoke test, signs the Sparkle
-appcast and records the MSI enclosure signature, produces checksums, and
-creates the GitHub release.
+It runs as two jobs. The first validates the tag and release notes, tests Rust,
+publishes the application, Authenticode-signs the first-party binaries, builds
+the self-contained all-users x64 WiX MSI, signs that too, verifies every
+signature, checks the installer's Finish action, and performs an elevated
+install/launch/uninstall smoke test. The second signs the Sparkle appcast,
+records the MSI enclosure signature, produces checksums, and creates the GitHub
+release.
 
-The `signing` GitHub environment must contain `SPARKLE_ED_PRIVATE_KEY`. It must
-match the public key compiled into
-[`UpdateController.cs`](../src/Seiza.App/Services/UpdateController.cs). Never
-print, copy into logs, or commit the private key. Sparkle signing establishes
-update trust; future MSI Authenticode signing will separately establish
-Windows publisher identity.
+The split exists because the two kinds of signing need different GitHub
+environments and a job can only be in one:
+
+- `release` holds nothing secret. It exists so the OIDC token carries the
+  subject `repo:theatrus/seiza-win:environment:release`, which is what the
+  Entra federated credential for Azure Artifact Signing is bound to. The
+  Authenticode key itself never leaves Microsoft's HSM and there is no signing
+  secret in this repository; the repository variables `AZURE_CLIENT_ID`,
+  `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`, `SIGNING_ENDPOINT`,
+  `SIGNING_ACCOUNT`, and `SIGNING_PROFILE` name the account and profile to use.
+- `signing` holds `SPARKLE_ED_PRIVATE_KEY`, which must match the public key
+  compiled into
+  [`UpdateController.cs`](../src/Seiza.App/Services/UpdateController.cs). Never
+  print, copy into logs, or commit it.
+
+The order matters and the workflow enforces it. Authenticode is applied to the
+binaries before WiX packages them, so the installed program carries publisher
+identity and not merely the installer; and to the MSI before the appcast is
+generated, so the Sparkle signature covers the bytes clients actually download.
+An appcast signed over a pre-Authenticode MSI would look healthy in CI and
+would make every installed copy refuse the update.
+
+Sparkle signing establishes update trust. Authenticode establishes what Windows
+and SmartScreen trust. Neither substitutes for the other.
 
 Before starting, install the same local prerequisites listed in the main
 README: Visual Studio's **WinUI application development** workload, .NET 10,
@@ -40,10 +60,13 @@ confirm repository access without exposing any secret values:
 ```powershell
 gh auth status
 gh secret list --env signing
+gh variable list
 ```
 
-The second command must list `SPARKLE_ED_PRIVATE_KEY`. Only the tag workflow
-needs the private key; local release builds must not download or handle it.
+The second command must list `SPARKLE_ED_PRIVATE_KEY`. The third must list the
+six `AZURE_*` and `SIGNING_*` variables. Only the tag workflow needs the
+private key; local release builds must not download or handle it, and they
+produce unsigned installers.
 
 ## Prepare the release pull request
 
@@ -171,6 +194,9 @@ Then verify all of the following:
 
 - the GitHub release title and body use the intended Windows version and notes;
 - every expected asset exists and `SHA256SUMS.txt` matches downloaded files;
+- the downloaded MSI's Digital Signatures tab names StackFoundry LLC, and so
+  do `Seiza.App.exe`, `Seiza.App.dll`, `seiza_cabi.dll`, and
+  `SeizaThumbnailProvider.dll` once installed;
 - `appcast.xml` names the new version, points at the versioned MSI asset, and
   contains its Ed25519 signature;
 - `appcast.xml.signature` is present at the `latest/download` URL;
@@ -208,6 +234,7 @@ ordinary documentation pull request; do not rebuild or retag the release.
 - [ ] Rust, app, installer-build, and Finish-action tests pass locally.
 - [ ] Pull request review and CI are complete.
 - [ ] The merged `main` commit is the commit being tagged.
-- [ ] The tag workflow succeeds in the protected `signing` environment.
+- [ ] The tag workflow succeeds in both the `release` and `signing` environments.
+- [ ] The published MSI shows StackFoundry LLC as its publisher.
 - [ ] Release assets, checksums, appcast, update path, About, and Explorer
       integration are verified.
