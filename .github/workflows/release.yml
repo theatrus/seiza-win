@@ -4,6 +4,14 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    # Temporary, for validating the signing work on PR #28 before it merges.
+    # The build job publishes nothing on a branch push and the publish job is
+    # skipped outright, so this only exercises build -> sign -> verify.
+    # workflow_dispatch cannot be used instead: it only becomes available once
+    # the workflow is on the default branch, which is what we are trying to
+    # avoid doing before it is proven. REMOVE THIS BRANCH ENTRY BEFORE MERGE.
+    branches:
+      - 'ci/windows-authenticode-signing'
 
 permissions:
   contents: read
@@ -14,7 +22,10 @@ concurrency:
 jobs:
   build:
     name: Build and sign the Windows installer
-    if: github.repository == 'theatrus/seiza-win' && github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    if: >-
+      github.repository == 'theatrus/seiza-win' && github.event_name == 'push' &&
+      (startsWith(github.ref, 'refs/tags/v') ||
+       github.ref_name == 'ci/windows-authenticode-signing')
     # The Entra federated credential is bound to the subject
     # `repo:theatrus/seiza-win:environment:release`, so this job must run in the
     # `release` environment or the OIDC token will not match and azure/login
@@ -51,18 +62,33 @@ jobs:
         id: release-metadata
         shell: pwsh
         run: |
-          if ($env:GITHUB_REF_NAME -notmatch '^v(\d+\.\d+\.\d+)$') {
-            throw "Release tag must have the form vMAJOR.MINOR.PATCH"
-          }
-          $version = $Matches[1]
           [xml] $project = Get-Content src\Seiza.App\Seiza.App.csproj
           $projectVersion = $project.SelectSingleNode('/Project/PropertyGroup/Version').InnerText
-          if ($version -ne $projectVersion) {
-            throw "Tag version $version does not match app version $projectVersion"
+          if ($env:GITHUB_REF_NAME -match '^v(\d+\.\d+\.\d+)$') {
+            $version = $Matches[1]
+            if ($version -ne $projectVersion) {
+              throw "Tag version $version does not match app version $projectVersion"
+            }
           }
-          $notes = "docs\releases\$($env:GITHUB_REF_NAME).md"
+          elseif ($env:GITHUB_REF_NAME -eq 'ci/windows-authenticode-signing') {
+            # Validation run on the signing branch: there is no tag to check
+            # against, so take the version from the project. Everything after
+            # this point is identical to a real release, which is the whole
+            # point of running it. REMOVE WITH THE BRANCH TRIGGER BEFORE MERGE.
+            $version = $projectVersion
+            Write-Output "validation run: using app version $version"
+          }
+          else {
+            throw "Release tag must have the form vMAJOR.MINOR.PATCH"
+          }
+          $notes = "docs\releases\v$version.md"
           if (-not (Test-Path -LiteralPath $notes -PathType Leaf)) {
-            throw "Release notes are required at $notes"
+            if ($env:GITHUB_REF_NAME -eq 'ci/windows-authenticode-signing') {
+              Write-Output "validation run: no release notes at $notes; continuing"
+              $notes = ""
+            } else {
+              throw "Release notes are required at $notes"
+            }
           }
           if (-not (Select-String -Quiet -LiteralPath src\Seiza.App\Services\UpdateController.cs -SimpleMatch $env:SPARKLE_PUBLIC_KEY)) {
             throw "The release key does not match the public key compiled into the app"
@@ -301,6 +327,9 @@ jobs:
   publish:
     name: Sign the appcast and publish the release
     needs: build
+    # Tags only. A branch validation run must never publish a release or touch
+    # the appcast, which is what existing installs poll for updates.
+    if: startsWith(github.ref, 'refs/tags/v')
     # SPARKLE_ED_PRIVATE_KEY lives in the `signing` environment, and Authenticode
     # needs `release`. One job cannot have both, so the release is split here.
     # The order this imposes is the right one anyway: the Sparkle signature has
