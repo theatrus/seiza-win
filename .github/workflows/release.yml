@@ -386,9 +386,23 @@ jobs:
         shell: pwsh
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_ED_PRIVATE_KEY }}
+          # netsparkle-generate-appcast wants BOTH halves of the key pair in
+          # the environment. Given only the private half it does not complain
+          # -- it silently falls back to looking for key files under
+          # %LOCALAPPDATA%\netsparkle, finds none, prints "Skipped generating
+          # signature" and writes an unsigned appcast. The v0.6.1 tag failed
+          # here for exactly that reason.
+          #
+          # The public key is not a secret: it is compiled into the app and
+          # appears verbatim in the build job above, which checks that
+          # UpdateController.cs still contains it.
+          SPARKLE_PUBLIC_KEY: Jk4K7QO9ohQbi455S888/lnSiqXB6a5sB4wEuEZjaQ0=
         run: |
           if ([string]::IsNullOrWhiteSpace($env:SPARKLE_PRIVATE_KEY)) {
             throw "SPARKLE_ED_PRIVATE_KEY is not configured in the signing environment"
+          }
+          if ([string]::IsNullOrWhiteSpace($env:SPARKLE_PUBLIC_KEY)) {
+            throw "SPARKLE_PUBLIC_KEY is not set; NetSparkle needs both halves"
           }
           $msi = Resolve-Path ".\dist\seiza-$($env:SEIZA_VERSION)-windows-x86_64.msi"
           $releaseBase = "https://github.com/$($env:GITHUB_REPOSITORY)/releases/download/$($env:GITHUB_REF_NAME)"
