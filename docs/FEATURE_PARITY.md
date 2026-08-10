@@ -10,7 +10,7 @@ merely because its Rust implementation exists.
 - macOS reference: PR
   [`#31`](https://github.com/theatrus/seiza-mac/pull/31) at
   [`3cdc7e2`](https://github.com/theatrus/seiza-mac/commit/3cdc7e2d48857ee52f22877fb6d8822560662b1b)
-- Seiza core reference: crates.io `seiza-cabi 0.15.1` from
+- Seiza core reference: crates.io `seiza-cabi 0.15.5` from
   [`06075d5`](https://github.com/theatrus/seiza/commit/06075d52fc0a60d637d3f9715b717c8b5b96215e)
 - Windows reference: `main` at
   [`cb0b173`](https://github.com/theatrus/seiza-win/commit/cb0b173cadaca3dfbbf6b54a4e299709f87803dd)
