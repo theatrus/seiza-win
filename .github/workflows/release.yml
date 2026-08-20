@@ -163,7 +163,7 @@ jobs:
       # still produces an installer rather than failing outright.
       - name: Authenticate to Azure (for binary signing)
         if: vars.AZURE_CLIENT_ID != ''
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -176,7 +176,7 @@ jobs:
       # session above.
       - name: Sign the application binaries
         if: vars.AZURE_CLIENT_ID != ''
-        uses: azure/trusted-signing-action@v0
+        uses: azure/trusted-signing-action@v2
         with:
           endpoint: ${{ vars.SIGNING_ENDPOINT }}
           trusted-signing-account-name: ${{ vars.SIGNING_ACCOUNT }}
@@ -195,7 +195,7 @@ jobs:
       # payload sits between this and the previous login.
       - name: Authenticate to Azure (for installer signing)
         if: vars.AZURE_CLIENT_ID != ''
-        uses: azure/login@v2
+        uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
@@ -206,7 +206,7 @@ jobs:
       # to a file that already carries a good one.
       - name: Sign the MSI
         if: vars.AZURE_CLIENT_ID != ''
-        uses: azure/trusted-signing-action@v0
+        uses: azure/trusted-signing-action@v2
         with:
           endpoint: ${{ vars.SIGNING_ENDPOINT }}
           trusted-signing-account-name: ${{ vars.SIGNING_ACCOUNT }}
@@ -352,7 +352,7 @@ jobs:
           dotnet-version: 10.0.x
 
       - name: Download the signed installer
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: seiza-${{ needs.build.outputs.version }}-windows-msi
           path: dist
