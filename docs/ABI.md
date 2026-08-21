@@ -29,8 +29,8 @@ Rules:
   additionally carries `requestedFrames` and `skippedInputs`; Windows verifies
   that accepted and skipped paths are a disjoint, exact partition, that every
   skip has a reason, and that enough accepted frames remain. An ambiguous
-  partial report from the currently bundled schema-1 Seiza 0.18.2 is discarded
-  rather than guessed or cached.
+  legacy partial report is discarded rather than guessed or cached. Bundled
+  Seiza 0.18.3 emits the complete schema-2 partition.
 - Calibration preparation calls the native signature matchers for sensor
   settings, flat optics, and dark exposure/temperature using Seiza's exported
   default tolerances. Live pushes rely on the stacker's authoritative native
