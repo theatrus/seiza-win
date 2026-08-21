@@ -5,7 +5,7 @@ It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
 core.
 
-[Download Seiza 0.6.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/seiza-0.6.0-windows-x86_64.msi)
+[Download Seiza 0.6.1 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.6.1/seiza-0.6.1-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -13,19 +13,16 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza 0.6.0 release highlights
+## Development highlights
 
-- Upgrade the native processing core to Seiza 0.15.1 for more reliable
-  catalog-protected background extraction.
-- Normalize repeated closing and adjacent vertices in protected catalog
-  contours so a degenerate edge cannot exclude every background sample.
-- Reject zero-area or non-finite protection geometry safely while continuing
-  to preserve valid extended nebula and galaxy regions during gradient fitting.
-- Retain the complete automatic, polynomial, and radial-basis background
-  workflow introduced in 0.5.3, including subtract/divide modes, adjustable
-  strength, full recipe persistence, and fitted-sample metadata.
+This work will ship in the next Windows release. The stable download above
+remains Seiza 0.6.1.
 
-### Native Explorer previews and thumbnails
+- Upgrade the native processing core to Seiza 0.18.1 for resumable live-stack
+  checkpoints, calibration planning and master construction, native SNR
+  measurements, and bounded preview and export support.
+
+## Native Explorer previews and thumbnails
 
 The all-users MSI registers Seiza's native thumbnail and Preview Pane providers
 for `.fit`, `.fits`, `.fts`, and `.xisf`. Explorer hosts them in isolated shell
@@ -44,10 +41,15 @@ without a Windows restart.
   light frames into an unstretched 32-bit floating-point FITS image.
 - Stacks can be split automatically by filename filter, with an independent
   reference frame for each filter group. Global or local normalization,
-  delta-sigma rejection, registration limits, and bias/dark/flat calibration
-  masters match the macOS workflow.
+  delta-sigma rejection, registration limits, and calibration match the macOS
+  workflow. Choose existing masters or point Seiza at raw bias, dark,
+  dark-flat, and flat frames; the shared core matches camera metadata and
+  proves one safe calibration set against every target light in each group
+  before building the dependency chain.
 - Stacking runs off the UI thread with per-frame progress, accepted/rejected
   counts, cancellation between frames, and automatic opening of the result.
+  Measurements at progressively deeper checkpoints show SNR and achieved
+  noise reduction without copying the accumulator.
 
 Open a folder containing FITS or XISF light frames, then choose **Stack** from
 the toolbar. Select the exposures to include and a reference frame, then tune
@@ -67,6 +69,31 @@ also validates every output in a multi-filter batch before stacking begins and
 identifies any files that were already saved if a later stack is cancelled.
 
 ![A completed full-resolution FITS stack reopened automatically in Seiza for Windows](docs/images/directory-image-stacking-result.png)
+
+## Live folder stacking
+
+Choose **Live Stack** to watch a capture folder while an imaging session is in
+progress. Seiza waits until each FITS or XISF file has stopped changing, checks
+that it is a raw, compatible light frame, revalidates it against the active
+masters, and registers it into a filter-locked stack. File-system notifications
+keep the display responsive, while periodic full reconciliation catches files
+that arrived while the folder or watcher was unavailable.
+
+The live window provides a bounded autostretched preview, accepted/rejected
+counts, calibration epochs, checkpoint health, and an SNR chart with measured
+noise, background, and cumulative exposure when the headers provide it. You
+can save a non-destructive FITS snapshot at any time or finish the accumulator
+to publish the final 32-bit floating-point FITS stack.
+
+Live sessions checkpoint the exact registration, normalization, rejection,
+calibration, and source-ledger state. **Pause and save** makes the session
+resumable; startup validates the newest native context and manifest together
+and can fall back to the previous complete generation after an interrupted
+write. Existing or automatically built masters can be applied atomically as a
+new calibration epoch. Selecting no new calibration while resuming preserves
+the masters recorded in the checkpoint.
+
+![A four-frame live stack with a bounded comet preview, accepted-frame status, checkpoint health, and measured-versus-ideal SNR depth chart](docs/images/live-folder-stacking.jpg)
 
 ## Signed updater and installer
 
@@ -105,8 +132,12 @@ Other preview highlights still apply:
   file focuses its window, while additional file activations stay in the same
   Seiza process and open a new document window.
 - Register and stack selected FITS or XISF frames from an opened folder, with
-  optional per-filter outputs, calibration masters, normalization, pixel
-  rejection, reference selection, progress, and cancellation.
+  optional per-filter outputs, existing or automatically built calibration
+  masters, normalization, pixel rejection, reference selection, SNR analysis,
+  progress, and cancellation.
+- Watch a capture folder for stable FITS/XISF lights, inspect a bounded live
+  preview and depth curve, save snapshots, and pause or resume the exact stack
+  from crash-safe checkpoints.
 - Fit, pan, wheel-zoom, and pointer-anchored pinch-zoom a GPU-backed
   high-resolution viewport. Overlay geometry and labels stay registered to image
   pixels while line weights remain readable.
@@ -147,8 +178,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.6.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/seiza-0.6.0-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.6.0/SHA256SUMS.txt)
+Download the [Seiza 0.6.1 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.6.1/seiza-0.6.1-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.6.1/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -160,10 +191,10 @@ runtime, Win2D, and the Cargo-locked Seiza Rust core, so installation and first
 launch do not download or bootstrap a separate runtime. Windows will request
 administrator approval because this is an all-users installation.
 
-System requirements are Windows 11 24H2 or newer on an x64 computer.
-Authenticode signing is still on the roadmap, so Windows may show an
-unknown-publisher warning for this preview installer. The in-app updater uses
-independent Ed25519 signatures to verify its feed and MSI download.
+System requirements are Windows 11 24H2 or newer on an x64 computer. The MSI
+and bundled first-party binaries are Authenticode signed by StackFoundry LLC.
+The in-app updater also uses independent Ed25519 signatures to verify its feed
+and MSI download.
 
 ## Build and test
 
@@ -185,7 +216,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.6.0
+  -p:SeizaVersion=0.6.1
 ```
 
 The installer is written to `dist`. See the

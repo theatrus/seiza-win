@@ -7,14 +7,13 @@ merely because its Rust implementation exists.
 
 ## Baseline
 
-- macOS reference: PR
-  [`#31`](https://github.com/theatrus/seiza-mac/pull/31) at
-  [`3cdc7e2`](https://github.com/theatrus/seiza-mac/commit/3cdc7e2d48857ee52f22877fb6d8822560662b1b)
-- Seiza core reference: crates.io `seiza-cabi 0.15.5` from
-  [`06075d5`](https://github.com/theatrus/seiza/commit/06075d52fc0a60d637d3f9715b717c8b5b96215e)
-- Windows reference: `main` at
-  [`cb0b173`](https://github.com/theatrus/seiza-win/commit/cb0b173cadaca3dfbbf6b54a4e299709f87803dd)
-- Last audited: 2026-08-02
+- macOS reference: `main` at
+  [`d0b3e20`](https://github.com/theatrus/seiza-mac/commit/d0b3e2039e7676d1565d62b4e61ce713ca0da286)
+- Seiza core reference: crates.io `seiza-cabi 0.18.1` from
+  [`a6e367c`](https://github.com/theatrus/seiza/commit/a6e367c9d55513ad22083b484550b543605c80d4)
+- Windows reference: live-stack implementation at
+  [`f83dab0`](https://github.com/theatrus/seiza-win/commit/f83dab0b50f365db4570f7972f618f1a12565160)
+- Last audited: 2026-08-20
 
 Update this baseline and the affected rows whenever the macOS app gains a
 feature or changes an interaction. A Windows feature is **Complete** only after
@@ -68,7 +67,10 @@ test exist.
 | 16-bit PNG/TIFF export | Available | **Complete** | FITS/XISF exports request full-resolution RGBA16 directly from `seiza-cabi`, preserve it through optional overlay compositing, and encode with WIC without passing through the 8-bit viewport. JPEG and imported raster sources remain 8-bit. |
 | Copy/paste image | Available | **Complete** | Runtime-tested full 6,167 x 4,094 XISF render through the Windows bitmap clipboard, including Windows BMP/DIB normalization back to a PNG source. |
 | Copy/paste processing adjustments | Available | **Partial** | The versioned schema round-trips the ordered stretch stack, color strategy, complete Seiza 0.14 background configuration, and deconvolution with validation and undo; final interactive clipboard QA remains. |
-| Directory image stacking | Available | **Complete** | Native WinUI frame/reference selection, filename-filter grouping, normalization, delta-sigma rejection, calibration masters, registration limits, progress/cancel, 32-bit FITS output, and automatic result opening match macOS. Runtime-tested through `seiza-cabi` by registering two 6,248 x 4,176 telescope FITS frames and reopening the 104,371,200-byte output. |
+| Directory image stacking | Available | **Complete** | Native WinUI frame/reference selection, filename-filter grouping, normalization, delta-sigma rejection, registration limits, progress/cancel, 32-bit FITS output, and automatic result opening match macOS. Runtime-tested through `seiza-cabi` by registering two 6,248 x 4,176 telescope FITS frames and reopening the 104,371,200-byte output. |
+| Calibration-frame preparation | Available | **Partial** | Windows can header-probe raw bias, dark, dark-flat, and flat libraries; delegate matching/coherent selection to shared Rust; build masters in dependency order; reject unsafe flat calibration; and reuse a fingerprinted atomic cache. Unit/native coverage is complete; final UI runtime QA with a representative raw calibration library remains. |
+| Stack SNR analysis | Available | **Complete** | Directory and live stacks measure the native accumulator at doubling depths plus the final depth and present noise improvement against the square-root ideal. Runtime-tested with four distinct 6,248 x 4,176, 30-second telescope FITS lights: measured noise fell from 41.76 at one frame to 19.83 at four frames, a 2.11x improvement against the ideal 2.00x. |
+| Resumable live folder stacking | Available | **Complete** | A native WinUI window watches and reconciles stable FITS/XISF arrivals, locks one compatible filter/camera geometry, renders bounded previews, snapshots or finishes FITS output, and checkpoints exact native online state with current/previous generation recovery. Runtime-tested end to end through pause, app relaunch, exact resume, new-file ingestion, a 104,371,200-byte non-destructive snapshot, final export, and completion-tombstone retirement. |
 
 ## Catalog settings and managed data
 
@@ -144,7 +146,7 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | Astronomy file registration and document icon | Finder association/icon available | **Complete** | All-users MSI registers `.fits`, `.fit`, `.fts`, and `.xisf` with Windows Default Apps and the Seiza executable icon. |
 | Stretched system preview | Quick Look extension available | **Complete** | The all-users MSI registers a bounded, stream-based native Rust `IPreviewHandler` for FITS/XISF. Windows hosts it in low-integrity x64 `prevhost.exe`; it autostretches on `DoPreview` and releases the source stream and child HWND on `Unload`. |
 | Content thumbnails on file icons | Finder content thumbnails | **Complete** | The all-users MSI registers a stream-based native Rust `IThumbnailProvider` for FITS and XISF. It runs in Windows' isolated shell host, autostretches mono/RGB/Bayer pixels, preserves aspect ratio without upscaling, and is runtime-tested on telescope files in Explorer. |
-| Signed distributable | Signed/notarized universal DMG | **Partial** | Self-contained x64 MSI is complete and runtime-tested; production code signing and ARM64 remain. |
+| Signed distributable | Signed/notarized universal DMG | **Complete** | The self-contained x64 MSI and bundled first-party binaries are Authenticode signed through Azure Artifact Signing, while the updater independently verifies its appcast and enclosure with Ed25519. ARM64 remains a separate platform roadmap item. |
 | Release automation | macOS release workflows | **Complete** | Version tags build and smoke-test the MSI, sign the Sparkle appcast and enclosure in the protected `signing` environment, produce checksums, and publish the GitHub release. |
 | Native accessibility | SwiftUI/AppKit accessibility | **Partial** | Core controls are named; add automated coverage for inspector, Settings, and overlay controls. |
 | About and native-core provenance | About panel | **Complete** | Reports the Windows app version plus the exact Seiza crate version and 40-character source commit resolved by Cargo. |
@@ -161,7 +163,7 @@ These remain tracked beyond the current macOS parity surface:
 - sequence comparison, blink/difference views, and registration;
 - multi-extension FITS image-HDU navigation;
 - lazy FITS cube slices with neighboring-slice preloading;
-- updater, crash reporting, and a repeatable performance corpus.
+- crash reporting and a repeatable performance corpus.
 
 ## Delivery order
 
@@ -176,8 +178,8 @@ These remain tracked beyond the current macOS parity surface:
    deconvolution, GHS image sampling, histograms, history, and full-resolution
    commit are implemented.
    The remaining stretch-method fixture matrix is tracked as visual QA.
-5. **In progress: Windows integration** — app identity, astronomy-file registration,
+5. **Complete: Windows integration** — app identity, astronomy-file registration,
    Explorer FITS/XISF thumbnails and Preview Pane rendering, multi-window
    activation, true 16-bit PNG/TIFF export, the all-users self-contained WiX
-   MSI, and installer CI and tag-driven releases are complete; Authenticode
-   signing remains.
+   MSI, Authenticode signing, and installer CI and tag-driven releases are
+   complete.
