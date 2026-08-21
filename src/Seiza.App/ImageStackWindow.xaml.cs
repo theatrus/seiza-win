@@ -17,6 +17,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         TaskCreationOptions.RunContinuationsAsynchronously);
     private readonly ImageStackCalibration _calibration = new();
     private CancellationTokenSource? _stackCancellation;
+    private ContentDialog? _activeDialog;
     private IReadOnlyList<ImageStackGroup> _groups = [];
     private bool _allowClose;
     private bool _closed;
@@ -24,6 +25,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     private bool _initializing = true;
     private bool _loaded;
     private bool _running;
+    private string? _calibrationLibraryPath;
 
     internal ImageStackWindow(IReadOnlyList<string> paths)
     {
@@ -230,7 +232,17 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         RejectionOptionsPanel.Visibility = rejection == StackRejectionMode.DeltaSigma
             ? Visibility.Visible
             : Visibility.Collapsed;
-        DarkExposureBox.IsEnabled = DarkExposureToggle.IsOn && _calibration.DarkPath is not null;
+        bool automaticCalibration = SelectedTag(CalibrationSourcePicker) == "Automatic";
+        ManualCalibrationPanel.Visibility = automaticCalibration
+            ? Visibility.Collapsed
+            : Visibility.Visible;
+        AutomaticCalibrationPanel.Visibility = automaticCalibration
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        DarkExposureBox.IsEnabled =
+            !automaticCalibration &&
+            DarkExposureToggle.IsOn &&
+            _calibration.DarkPath is not null;
         _calibration.OverridesDarkExposure = DarkExposureToggle.IsOn;
         _calibration.DarkExposureSeconds = DarkExposureBox.Value;
 
@@ -257,7 +269,16 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         {
             return "Enter an output base name.";
         }
-        return options.ValidationMessage ?? _calibration.ValidationMessage(selected);
+        if (SelectedTag(CalibrationSourcePicker) == "Automatic" &&
+            (string.IsNullOrWhiteSpace(_calibrationLibraryPath) ||
+             !Directory.Exists(_calibrationLibraryPath)))
+        {
+            return "Choose a calibration library folder.";
+        }
+        return options.ValidationMessage ??
+            (SelectedTag(CalibrationSourcePicker) == "Automatic"
+                ? null
+                : _calibration.ValidationMessage(selected));
     }
 
     private ImageStackOptions CreateOptions() => new()
@@ -287,6 +308,35 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     private static int CheckedInt(double value) => double.IsFinite(value)
         ? checked((int)Math.Round(value))
         : 0;
+
+    private void CalibrationSource_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (!_initializing)
+        {
+            UpdateOptionsAndValidation();
+        }
+    }
+
+    private async void ChooseCalibrationLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new FolderPicker
+        {
+            SuggestedStartLocation = PickerLocationId.PicturesLibrary,
+            ViewMode = PickerViewMode.List,
+        };
+        picker.FileTypeFilter.Add("*");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WindowHandle);
+        StorageFolder? folder = await picker.PickSingleFolderAsync();
+        if (folder is null || _closed)
+        {
+            return;
+        }
+        _calibrationLibraryPath = folder.Path;
+        CalibrationLibraryTextBox.Text = folder.Path;
+        AutomaticCalibrationHintText.Text =
+            "Masters will be matched independently for each filter stack and cached for reuse.";
+        UpdateOptionsAndValidation();
+    }
 
     private async void ChooseBias_Click(object sender, RoutedEventArgs e) =>
         await ChooseCalibrationAsync(path => _calibration.BiasPath = path);
@@ -328,7 +378,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         }
         WinRT.Interop.InitializeWithWindow.Initialize(picker, WindowHandle);
         StorageFile? file = await picker.PickSingleFileAsync();
-        if (file is not null)
+        if (file is not null && !_closed)
         {
             setPath(file.Path);
             RefreshCalibration();
@@ -382,23 +432,6 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             return;
         }
 
-        var jobs = new List<ImageStackJob>(_groups.Count);
-        foreach (ImageStackGroup group in _groups)
-        {
-            string reference = _referencePaths.GetValueOrDefault(group.Id) ?? group.Inputs[0];
-            string[] orderedInputs = new[] { reference }
-                .Concat(group.Inputs.Where(path =>
-                    !string.Equals(path, reference, StringComparison.OrdinalIgnoreCase)))
-                .ToArray();
-            jobs.Add(new ImageStackJob(
-                group,
-                new ImageStackRequest(
-                    orderedInputs,
-                    outputs[group.Id],
-                    options,
-                    _calibration)));
-        }
-
         _running = true;
         _allowClose = false;
         _closeWhenIdle = false;
@@ -424,6 +457,39 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
         try
         {
+            using BatchCalibrationPreparation prepared = await PrepareCalibrationsAsync(
+                cancellation.Token);
+            if (prepared.Warnings.Count > 0 &&
+                !await ConfirmCalibrationWarningsAsync(prepared.Warnings))
+            {
+                cancellation.Token.ThrowIfCancellationRequested();
+                if (!_closeWhenIdle)
+                {
+                    RestoreAfterFailure(
+                        "Stacking was cancelled before any light frames were processed.",
+                        InfoBarSeverity.Informational);
+                }
+                return;
+            }
+
+            var jobs = new List<ImageStackJob>(_groups.Count);
+            foreach (ImageStackGroup group in _groups)
+            {
+                string reference = _referencePaths.GetValueOrDefault(group.Id) ?? group.Inputs[0];
+                string[] orderedInputs = new[] { reference }
+                    .Concat(group.Inputs.Where(path =>
+                        !string.Equals(path, reference, StringComparison.OrdinalIgnoreCase)))
+                    .ToArray();
+                jobs.Add(new ImageStackJob(
+                    group,
+                    new ImageStackRequest(
+                        orderedInputs,
+                        outputs[group.Id],
+                        options,
+                        prepared.ByGroup[group.Id])));
+            }
+
+            StackProgressBar.IsIndeterminate = false;
             ImageStackBatchResult result = await ImageStackService.StackBatchAsync(
                 jobs,
                 progress,
@@ -475,6 +541,138 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                 Close();
             }
         }
+    }
+
+    private async Task<BatchCalibrationPreparation> PrepareCalibrationsAsync(
+        CancellationToken cancellationToken)
+    {
+        if (SelectedTag(CalibrationSourcePicker) != "Automatic")
+        {
+            return new BatchCalibrationPreparation(
+                _groups.ToDictionary(
+                    group => group.Id,
+                    _ => _calibration.Copy(),
+                    StringComparer.Ordinal),
+                [],
+                []);
+        }
+
+        string libraryPath = Path.GetFullPath(_calibrationLibraryPath!);
+        string cacheDirectory = CalibrationCachePaths.ForLibrary(libraryPath);
+        var service = new CalibrationPreparationService();
+        var calibrations = new Dictionary<string, ImageStackCalibration>(StringComparer.Ordinal);
+        var warnings = new List<string>();
+        var results = new List<CalibrationPreparationResult>();
+        var protectedMasterPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        try
+        {
+            for (int index = 0; index < _groups.Count; index++)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                ImageStackGroup group = _groups[index];
+                string referencePath =
+                    _referencePaths.GetValueOrDefault(group.Id) ?? group.Inputs[0];
+                ProgressMessageText.Text = $"{group.Title}: inspecting target light headers…";
+                ProgressCountsText.Text =
+                    $"Preparing calibration {index + 1} of {_groups.Count}";
+                StackProgressBar.IsIndeterminate = true;
+                CalibrationFrameProbe[] targetLights = await ProbeTargetLightsAsync(
+                    group.Inputs,
+                    cancellationToken);
+                CalibrationFrameProbe reference = targetLights.First(probe =>
+                    string.Equals(
+                        Path.GetFullPath(probe.Path),
+                        Path.GetFullPath(referencePath),
+                        StringComparison.OrdinalIgnoreCase));
+                var progress = new Progress<CalibrationPreparationProgress>(update =>
+                {
+                    if (_closed)
+                    {
+                        return;
+                    }
+                    ProgressMessageText.Text = $"{group.Title}: {update.Message}";
+                    StackProgressBar.IsIndeterminate = update.Total <= 0;
+                    StackProgressBar.Value = update.Total <= 0
+                        ? 0
+                        : Math.Clamp((double)update.Completed / update.Total, 0, 1);
+                });
+                CalibrationPreparationResult result = await service.PrepareAsync(
+                    new CalibrationPreparationRequest
+                    {
+                        Reference = reference,
+                        TargetLights = targetLights,
+                        SourcePaths = [libraryPath],
+                        CacheDirectory = cacheDirectory,
+                        ProtectedMasterPaths = protectedMasterPaths.ToArray(),
+                    },
+                    progress,
+                    cancellationToken);
+                results.Add(result);
+                calibrations[group.Id] = result.Calibration.Copy();
+                warnings.AddRange(result.Warnings.Select(warning => $"{group.Title}: {warning}"));
+                foreach (string masterPath in result.Summaries
+                             .Select(summary => summary.MasterPath)
+                             .OfType<string>())
+                {
+                    protectedMasterPaths.Add(masterPath);
+                }
+            }
+        }
+        catch
+        {
+            foreach (CalibrationPreparationResult result in results)
+            {
+                result.Dispose();
+            }
+            throw;
+        }
+        return new BatchCalibrationPreparation(calibrations, warnings, results);
+    }
+
+    private static async Task<CalibrationFrameProbe[]> ProbeTargetLightsAsync(
+        IReadOnlyList<string> paths,
+        CancellationToken cancellationToken)
+    {
+        using var gate = new SemaphoreSlim(initialCount: 4, maxCount: 4);
+        Task<CalibrationFrameProbe>[] tasks = paths.Select(async path =>
+        {
+            await gate.WaitAsync(cancellationToken);
+            try
+            {
+                CalibrationFrameProbe probe = await CalibrationService.ProbeAsync(
+                    path,
+                    cancellationToken);
+                return probe with { Path = Path.GetFullPath(path) };
+            }
+            finally
+            {
+                gate.Release();
+            }
+        }).ToArray();
+        return await Task.WhenAll(tasks);
+    }
+
+    private async Task<bool> ConfirmCalibrationWarningsAsync(IReadOnlyList<string> warnings)
+    {
+        string content = CalibrationPreparationWarningText.Format(warnings);
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = "Calibration needs attention",
+            Content = new ScrollViewer
+            {
+                MaxHeight = 320,
+                Content = new TextBlock
+                {
+                    Text = content,
+                    TextWrapping = TextWrapping.Wrap,
+                },
+            },
+            PrimaryButtonText = "Continue stacking",
+            CloseButtonText = "Cancel",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        return await ShowDialogAsync(dialog) == ContentDialogResult.Primary;
     }
 
     private async Task<ImageStackOutputSelection?> PickOutputsAsync()
@@ -546,7 +744,23 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             CloseButtonText = "Cancel",
             DefaultButton = ContentDialogButton.Close,
         };
-        return await dialog.ShowAsync() == ContentDialogResult.Primary;
+        return await ShowDialogAsync(dialog) == ContentDialogResult.Primary;
+    }
+
+    private async Task<ContentDialogResult> ShowDialogAsync(ContentDialog dialog)
+    {
+        _activeDialog = dialog;
+        try
+        {
+            return await dialog.ShowAsync();
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeDialog, dialog))
+            {
+                _activeDialog = null;
+            }
+        }
     }
 
     private void RestoreAfterFailure(string message, InfoBarSeverity severity)
@@ -582,6 +796,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private void AppWindow_Closing(AppWindow sender, AppWindowClosingEventArgs args)
     {
+        _activeDialog?.Hide();
         if (!_running || _allowClose)
         {
             return;
@@ -598,6 +813,9 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     {
         _closed = true;
         AppWindow.Closing -= AppWindow_Closing;
+        Closed -= Window_Closed;
+        _activeDialog?.Hide();
+        _activeDialog = null;
         Dispose();
         _completion.TrySetResult(null);
     }
@@ -634,4 +852,24 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     private sealed record ImageStackOutputSelection(
         IReadOnlyDictionary<string, string> Outputs,
         IReadOnlyList<string> PlaceholderPaths);
+
+    private sealed record BatchCalibrationPreparation(
+        IReadOnlyDictionary<string, ImageStackCalibration> ByGroup,
+        IReadOnlyList<string> Warnings,
+        IReadOnlyList<CalibrationPreparationResult> Results) : IDisposable
+    {
+        private int _disposed;
+
+        public void Dispose()
+        {
+            if (Interlocked.Exchange(ref _disposed, 1) != 0)
+            {
+                return;
+            }
+            foreach (CalibrationPreparationResult result in Results)
+            {
+                result.Dispose();
+            }
+        }
+    }
 }

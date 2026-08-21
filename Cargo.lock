@@ -105,15 +105,6 @@ checksum = "b588b76d00fde79687d7646a9b5bdf3cc0f655e0bbd080335a95d7e96f3587da"
 
 [[package]]
 name = "block-buffer"
-version = "0.10.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3078c7629b62d3f0439517fa394996acacc5cbc91c5a20d8c658e77abd503a71"
-dependencies = [
- "generic-array",
-]
-
-[[package]]
-name = "block-buffer"
 version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d2f6c7dbe95a6ed67ad9f18e57daf93a2f034c524b99fd2b76d18fdfeb6660aa"
@@ -201,7 +192,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d524456ba66e72eb8b115ff89e01e497f8e6d11d78b70b1aa13c0fbd97540a81"
 dependencies = [
  "cfg-if",
- "cpufeatures 0.3.0",
+ "cpufeatures",
  "rand_core",
 ]
 
@@ -274,15 +265,6 @@ checksum = "a6ef517f0926dd24a1582492c791b6a4818a4d94e789a334894aa15b0d12f55c"
 
 [[package]]
 name = "cpufeatures"
-version = "0.2.17"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "59ed5838eebb26a2bb2e58f6d5b5316989ae9d08bab10e0e6d103e656d1b0280"
-dependencies = [
- "libc",
-]
-
-[[package]]
-name = "cpufeatures"
 version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8b2a41393f66f16b0823bb79094d54ac5fbd34ab292ddafb9a0456ac9f87d201"
@@ -338,16 +320,6 @@ checksum = "460fbee9c2c2f33933d720630a6a0bac33ba7053db5344fac858d4b8952d77d5"
 
 [[package]]
 name = "crypto-common"
-version = "0.1.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "78c8292055d1c1df0cce5d180393dc8cce0abec0a7102adb6c7b1eef6016d60a"
-dependencies = [
- "generic-array",
- "typenum",
-]
-
-[[package]]
-name = "crypto-common"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453"
@@ -357,23 +329,13 @@ dependencies = [
 
 [[package]]
 name = "digest"
-version = "0.10.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9ed9a281f7bc9b7576e61468ba615a66a5c8cfdff42420a70aa82701a3b1e292"
-dependencies = [
- "block-buffer 0.10.4",
- "crypto-common 0.1.7",
-]
-
-[[package]]
-name = "digest"
 version = "0.11.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f1dd6dbb5841937940781866fa1281a1ff7bd3bf827091440879f9994983d5c2"
 dependencies = [
- "block-buffer 0.12.1",
+ "block-buffer",
  "const-oid",
- "crypto-common 0.2.2",
+ "crypto-common",
 ]
 
 [[package]]
@@ -556,16 +518,6 @@ dependencies = [
  "memchr",
  "pin-project-lite",
  "slab",
-]
-
-[[package]]
-name = "generic-array"
-version = "0.14.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "85649ca51fd72272d7821adaf274ad91c288277713d9c18820d8499a7ff69e9a"
-dependencies = [
- "typenum",
- "version_check",
 ]
 
 [[package]]
@@ -966,15 +918,6 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "lz4_flex"
-version = "0.11.6"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "373f5eceeeab7925e0c1098212f2fbc4d416adec9d35051a6ab251e824c1854a"
-dependencies = [
- "twox-hash",
-]
-
-[[package]]
-name = "lz4_flex"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ecbdfe44b1bd960b68170b417450a628c43f7cf56bb3c5317e61cb230ee7f226"
@@ -1150,15 +1093,6 @@ name = "quick-error"
 version = "2.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a993555f31e5a609f617c12db6250dedcac1b0a85076912c436e6fc9b2c8e6a3"
-
-[[package]]
-name = "quick-xml"
-version = "0.38.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b66c2058c55a409d601666cffe35f04333cf1013010882cec174a7467cd4e21c"
-dependencies = [
- "memchr",
-]
 
 [[package]]
 name = "quick-xml"
@@ -1444,9 +1378,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "seiza"
-version = "0.15.5"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c8d9305616a23ef7679465f24dda0d64c7c03ab12c4445c7cf202c5f353999e4"
+checksum = "1c6639411436b7359655f7f3eb90e85b2269387ef765e69b1b48d256aa5a8762"
 dependencies = [
  "directories",
  "image",
@@ -1479,19 +1413,20 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.15.5"
+version = "0.18.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b68aa6f0cfa0dad1be9c8f7edebf8eb7a24f7fb5d2ba66233885b38866c60a01"
+checksum = "e4e7f94aeb3fc701383f2f82e2cd1482e204beea703e0f68434e1765ce1dec65"
 dependencies = [
  "cbindgen",
  "image",
  "seiza",
  "seiza-background",
+ "seiza-calibration",
  "seiza-deconvolution",
  "seiza-fits",
  "seiza-stacking",
  "seiza-stretch",
- "seiza-xisf 0.2.0",
+ "seiza-xisf",
  "serde",
  "serde_json",
  "tokio",
@@ -1506,9 +1441,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-calibration"
-version = "0.1.0"
+version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7a3efb42a2d6f61b63a95de257e1b8b30495b6347c466ed9bd5982df333d30d9"
+checksum = "a9d4e5d39295d42a6681272d18330a96137c8b14e35d4e74e2cd045f10babc21"
 dependencies = [
  "seiza-imgproc",
  "seiza-stats",
@@ -1559,15 +1494,15 @@ dependencies = [
 
 [[package]]
 name = "seiza-imgproc"
-version = "0.3.1"
+version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7838c64e51a8b068a684c25cea2d5333b38d5945c236f89d836408596dea6f1e"
+checksum = "43903045bca0b629b5bda14bfda11b26758bbb3fd51d24dedb253c0155020f1d"
 
 [[package]]
 name = "seiza-stacking"
-version = "0.6.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0a80c65960c26997729cdc36900664bf73eef363f72f47885ac6515b253c8234"
+checksum = "c00dd956b9701c7bd2d4167959a80b799b9fbc11a1db820c394c67bc2125b074"
 dependencies = [
  "rayon",
  "seiza",
@@ -1576,9 +1511,10 @@ dependencies = [
  "seiza-imgproc",
  "seiza-stats",
  "seiza-stretch",
- "seiza-xisf 0.2.0",
+ "seiza-xisf",
  "serde",
  "serde_json",
+ "sha2",
  "tempfile",
  "thiserror",
  "zstd",
@@ -1592,9 +1528,9 @@ checksum = "02427eea0eebef160eba79502519b73272924ccea855462292006af2320ef9e2"
 
 [[package]]
 name = "seiza-stretch"
-version = "0.2.0"
+version = "0.2.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "36e449c39ffe12c989a715479ce8e60990d0c9e8108d18d4f272a4631abbac27"
+checksum = "33bdfe46bd6c8433637ae4aed63b409b795549cab5be6ea5d00b9c046955f078"
 dependencies = [
  "rayon",
  "seiza-stats",
@@ -1606,28 +1542,11 @@ dependencies = [
 name = "seiza-thumbnail-provider"
 version = "0.1.0"
 dependencies = [
- "quick-xml 0.41.0",
+ "quick-xml",
  "seiza-fits",
- "seiza-xisf 0.1.0",
+ "seiza-xisf",
  "windows",
  "windows-core",
-]
-
-[[package]]
-name = "seiza-xisf"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "99c58629034c4197cf415a86ad91fc044dbf9f1ea892ec5617d611e530af990c"
-dependencies = [
- "flate2",
- "lz4_flex 0.11.6",
- "quick-xml 0.38.4",
- "seiza-fits",
- "sha1 0.10.7",
- "sha2",
- "tempfile",
- "thiserror",
- "zstd",
 ]
 
 [[package]]
@@ -1637,10 +1556,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8d972a8c14605b1ddd171c964f07522350c30efbe0a917f21f0e357844c6099c"
 dependencies = [
  "flate2",
- "lz4_flex 0.14.0",
- "quick-xml 0.41.0",
+ "lz4_flex",
+ "quick-xml",
  "seiza-fits",
- "sha1 0.11.0",
+ "sha1",
  "sha2",
  "tempfile",
  "thiserror",
@@ -1719,24 +1638,13 @@ dependencies = [
 
 [[package]]
 name = "sha1"
-version = "0.10.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a978451301f4db1d02937a4ab3ccce137717b81826e79b7d49ffe3244a13c3b8"
-dependencies = [
- "cfg-if",
- "cpufeatures 0.2.17",
- "digest 0.10.7",
-]
-
-[[package]]
-name = "sha1"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aacc4cc499359472b4abe1bf11d0b12e688af9a805fa5e3016f9a386dc2d0214"
 dependencies = [
  "cfg-if",
- "cpufeatures 0.3.0",
- "digest 0.11.3",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]
@@ -1746,8 +1654,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
 dependencies = [
  "cfg-if",
- "cpufeatures 0.3.0",
- "digest 0.11.3",
+ "cpufeatures",
+ "digest",
 ]
 
 [[package]]
@@ -2141,12 +2049,6 @@ name = "utf8parse"
 version = "0.2.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "06abde3611657adf66d383f00b093d7faecc7fa57071cce2578660c9f1010821"
-
-[[package]]
-name = "version_check"
-version = "0.9.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "want"

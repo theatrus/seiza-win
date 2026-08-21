@@ -1,0 +1,461 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<Window
+    x:Class="Seiza.App.LiveStackWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:canvas="using:Microsoft.Graphics.Canvas.UI.Xaml"
+    xmlns:local="using:Seiza.App"
+    Title="Live Stack">
+
+    <Window.SystemBackdrop>
+        <MicaBackdrop />
+    </Window.SystemBackdrop>
+
+    <Grid x:Name="ContentRoot">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <TitleBar
+            x:Name="LiveStackTitleBar"
+            Subtitle="Watch a capture folder, analyze SNR, and resume safely"
+            Title="Live Stack">
+            <TitleBar.IconSource>
+                <ImageIconSource ImageSource="Assets/AppIcon.ico" />
+            </TitleBar.IconSource>
+        </TitleBar>
+
+        <Grid Grid.Row="1">
+            <ScrollViewer
+                x:Name="ConfigurationScrollViewer"
+                HorizontalScrollBarVisibility="Disabled"
+                VerticalScrollBarVisibility="Auto">
+                <StackPanel
+                    x:Name="ConfigurationPanel"
+                    MaxWidth="820"
+                    Margin="28,22"
+                    HorizontalAlignment="Center"
+                    Spacing="18">
+                    <StackPanel Spacing="4">
+                        <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="Live folder stacking" />
+                        <TextBlock
+                            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                            Text="Seiza waits for complete FITS or XISF files, registers each compatible light, checkpoints the exact accumulator, and measures how image depth improves."
+                            TextWrapping="Wrap" />
+                    </StackPanel>
+
+                    <Border
+                        Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <StackPanel Spacing="12">
+                            <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Capture folder" />
+                            <Grid ColumnSpacing="10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBox
+                                    x:Name="WatchFolderTextBox"
+                                    AutomationProperties.Name="Capture folder"
+                                    IsReadOnly="True"
+                                    PlaceholderText="Choose the folder where new exposures appear"
+                                    TextChanged="Configuration_Changed" />
+                                <Button AutomationProperties.Name="Choose capture folder" Grid.Column="1" Click="ChooseWatchFolder_Click" Content="Choose…" />
+                            </Grid>
+                            <ToggleSwitch
+                                x:Name="IncludeSubdirectoriesToggle"
+                                Header="Include subfolders"
+                                IsOn="False"
+                                Toggled="Configuration_Changed" />
+                            <ToggleSwitch
+                                x:Name="ResumeToggle"
+                                Header="Resume the most recent compatible session"
+                                IsOn="True"
+                                OffContent="Start a new accumulator"
+                                OnContent="Restore when possible"
+                                Toggled="Configuration_Changed" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="The first compatible light locks image dimensions and filter for this window. Files for other filters are ignored; use a separate capture folder for each simultaneous filter stack."
+                                TextWrapping="Wrap" />
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <StackPanel Spacing="12">
+                            <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Stacking" />
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Normalization" VerticalAlignment="Center" />
+                                <ComboBox
+                                    x:Name="NormalizationPicker"
+                                    AutomationProperties.Name="Normalization"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    SelectionChanged="ConfigurationSelection_Changed">
+                                    <ComboBoxItem Content="None" Tag="None" />
+                                    <ComboBoxItem Content="Global" Tag="Global" IsSelected="True" />
+                                    <ComboBoxItem Content="Local" Tag="Local" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid x:Name="LocalTileRow" ColumnSpacing="12" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Local tile size" VerticalAlignment="Center" />
+                                <NumberBox
+                                    x:Name="LocalTileSizeBox"
+                                    Grid.Column="1"
+                                    Minimum="16"
+                                    Maximum="4096"
+                                    SmallChange="16"
+                                    Value="256"
+                                    ValueChanged="ConfigurationNumber_Changed" />
+                            </Grid>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Pixel rejection" VerticalAlignment="Center" />
+                                <ComboBox
+                                    x:Name="RejectionPicker"
+                                    AutomationProperties.Name="Pixel rejection"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    SelectionChanged="ConfigurationSelection_Changed">
+                                    <ComboBoxItem Content="None" Tag="None" />
+                                    <ComboBoxItem Content="Delta sigma" Tag="DeltaSigma" IsSelected="True" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid x:Name="RejectionOptionsPanel" ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <NumberBox x:Name="SigmaLowBox" Header="Low sigma" Minimum="0.1" Maximum="20" SmallChange="0.1" Value="3" ValueChanged="ConfigurationNumber_Changed" />
+                                <NumberBox x:Name="SigmaHighBox" Grid.Column="1" Header="High sigma" Minimum="0.1" Maximum="20" SmallChange="0.1" Value="3" ValueChanged="ConfigurationNumber_Changed" />
+                                <NumberBox x:Name="WarmupBox" Grid.Column="2" Header="Warmup frames" Minimum="2" Maximum="100" SmallChange="1" Value="5" ValueChanged="ConfigurationNumber_Changed" />
+                            </Grid>
+                            <Expander Header="Advanced registration limits">
+                                <StackPanel Margin="0,12,0,0" Spacing="10">
+                                    <NumberBox x:Name="RegistrationRmsBox" Header="Maximum registration RMS (pixels)" Minimum="0.01" Maximum="100" SmallChange="0.1" Value="2" ValueChanged="ConfigurationNumber_Changed" />
+                                    <NumberBox x:Name="DriftPixelsBox" Header="Maximum drift (pixels)" Minimum="1" Maximum="100000" SmallChange="1" Value="256" ValueChanged="ConfigurationNumber_Changed" />
+                                    <NumberBox x:Name="DriftFractionBox" Header="Maximum drift (image fraction)" Minimum="0" Maximum="1" SmallChange="0.01" Value="0.15" ValueChanged="ConfigurationNumber_Changed" />
+                                    <NumberBox x:Name="MinimumOverlapBox" Header="Minimum overlap (image fraction)" Minimum="0" Maximum="1" SmallChange="0.01" Value="0.6" ValueChanged="ConfigurationNumber_Changed" />
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                    </Border>
+
+                    <Border
+                        Padding="16"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        BorderThickness="1"
+                        CornerRadius="8">
+                        <StackPanel Spacing="12">
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Calibration" VerticalAlignment="Center" />
+                                <ComboBox
+                                    x:Name="CalibrationModePicker"
+                                    AutomationProperties.Name="Calibration mode"
+                                    Grid.Column="1"
+                                    HorizontalAlignment="Stretch"
+                                    SelectionChanged="CalibrationMode_Changed">
+                                    <ComboBoxItem Content="None" Tag="None" IsSelected="True" />
+                                    <ComboBoxItem Content="Existing masters" Tag="Masters" />
+                                    <ComboBoxItem Content="Build from calibration frames" Tag="Automatic" />
+                                </ComboBox>
+                            </Grid>
+
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="When resuming, None preserves the checkpoint's calibration. Existing or automatic masters are applied atomically as a new calibration epoch."
+                                TextWrapping="Wrap" />
+
+                            <StackPanel x:Name="ManualCalibrationPanel" Spacing="9" Visibility="Collapsed">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="92" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Master bias" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="BiasPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <Button AutomationProperties.Name="Choose master bias" Grid.Column="2" Click="ChooseBias_Click" Content="Choose…" />
+                                    <Button AutomationProperties.Name="Clear master bias" Grid.Column="3" Click="ClearBias_Click" Content="Clear" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="92" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Master dark" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="DarkPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <Button AutomationProperties.Name="Choose master dark" Grid.Column="2" Click="ChooseDark_Click" Content="Choose…" />
+                                    <Button AutomationProperties.Name="Clear master dark" Grid.Column="3" Click="ClearDark_Click" Content="Clear" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="92" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Master flat" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="FlatPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <Button AutomationProperties.Name="Choose master flat" Grid.Column="2" Click="ChooseFlat_Click" Content="Choose…" />
+                                    <Button AutomationProperties.Name="Clear master flat" Grid.Column="3" Click="ClearFlat_Click" Content="Clear" />
+                                </Grid>
+                                <ToggleSwitch x:Name="DarkExposureToggle" Header="Override master-dark exposure" Toggled="DarkExposureToggle_Toggled" />
+                                <NumberBox
+                                    x:Name="DarkExposureBox"
+                                    Header="Master-dark exposure (seconds)"
+                                    IsEnabled="False"
+                                    Minimum="0.001"
+                                    Maximum="86400"
+                                    SmallChange="1"
+                                    Value="300"
+                                    ValueChanged="ConfigurationNumber_Changed" />
+                            </StackPanel>
+
+                            <StackPanel x:Name="AutomaticCalibrationPanel" Spacing="10" Visibility="Collapsed">
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Choose a library containing raw bias, dark, dark-flat, and flat frames. Seiza matches metadata, builds reusable masters in dependency order, and will not apply an unsafe flat."
+                                    TextWrapping="Wrap" />
+                                <Grid ColumnSpacing="10">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="CalibrationFolderTextBox" AutomationProperties.Name="Calibration library folder" IsReadOnly="True" PlaceholderText="Calibration library folder" />
+                                    <Button AutomationProperties.Name="Choose calibration library folder" Grid.Column="1" Click="ChooseCalibrationFolder_Click" Content="Choose…" />
+                                </Grid>
+                                <ProgressBar x:Name="CalibrationProgressBar" IsIndeterminate="False" Maximum="1" Minimum="0" Visibility="Collapsed" />
+                                <TextBlock x:Name="CalibrationSummaryText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <InfoBar x:Name="ConfigurationInfoBar" IsClosable="False" IsOpen="False" Severity="Error" />
+                </StackPanel>
+            </ScrollViewer>
+
+            <Grid x:Name="RunningPanel" Margin="22,16,22,20" Visibility="Collapsed">
+                <VisualStateManager.VisualStateGroups>
+                    <VisualStateGroup>
+                        <VisualState x:Name="WideRunningLayout">
+                            <VisualState.StateTriggers>
+                                <AdaptiveTrigger MinWindowWidth="960" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Target="PreviewColumn.Width" Value="2*" />
+                                <Setter Target="DetailsColumn.Width" Value="420" />
+                                <Setter Target="PreviewRow.Height" Value="*" />
+                                <Setter Target="DetailsRow.Height" Value="0" />
+                                <Setter Target="PreviewBorder.Margin" Value="0,0,16,0" />
+                                <Setter Target="DetailsScroll.(Grid.Row)" Value="0" />
+                                <Setter Target="DetailsScroll.(Grid.Column)" Value="1" />
+                                <Setter Target="PreviewInfoBar.Margin" Value="0,12,16,0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                        <VisualState x:Name="NarrowRunningLayout">
+                            <VisualState.StateTriggers>
+                                <AdaptiveTrigger MinWindowWidth="0" />
+                            </VisualState.StateTriggers>
+                            <VisualState.Setters>
+                                <Setter Target="PreviewColumn.Width" Value="*" />
+                                <Setter Target="DetailsColumn.Width" Value="0" />
+                                <Setter Target="PreviewRow.Height" Value="*" />
+                                <Setter Target="DetailsRow.Height" Value="*" />
+                                <Setter Target="PreviewBorder.Margin" Value="0,0,0,14" />
+                                <Setter Target="DetailsScroll.(Grid.Row)" Value="1" />
+                                <Setter Target="DetailsScroll.(Grid.Column)" Value="0" />
+                                <Setter Target="PreviewInfoBar.Margin" Value="0,12,0,0" />
+                            </VisualState.Setters>
+                        </VisualState>
+                    </VisualStateGroup>
+                </VisualStateManager.VisualStateGroups>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition x:Name="PreviewColumn" Width="2*" />
+                    <ColumnDefinition x:Name="DetailsColumn" Width="420" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition x:Name="PreviewRow" Height="*" />
+                    <RowDefinition x:Name="DetailsRow" Height="0" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border
+                    x:Name="PreviewBorder"
+                    Margin="0,0,16,0"
+                    Background="#FF090A0C"
+                    BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                    BorderThickness="1"
+                    CornerRadius="8">
+                    <Grid>
+                        <canvas:CanvasControl
+                            x:Name="PreviewCanvas"
+                            AutomationProperties.Name="Live stack preview"
+                            ClearColor="#FF090A0C"
+                            Draw="PreviewCanvas_Draw" />
+                        <StackPanel
+                            x:Name="EmptyPreviewPanel"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            Spacing="8">
+                            <ProgressRing x:Name="WaitingProgressRing" Width="28" Height="28" IsActive="True" />
+                            <TextBlock Foreground="White" Text="Waiting for the first complete light frame…" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+
+                <ScrollViewer x:Name="DetailsScroll" Grid.Column="1" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+                    <StackPanel Spacing="14">
+                        <Border
+                            Padding="16"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <StackPanel Spacing="8">
+                                <TextBlock x:Name="RunStateText" Style="{ThemeResource SubtitleTextBlockStyle}" Text="Starting" />
+                                <TextBlock x:Name="RunStatusText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="CurrentFileText" TextTrimming="CharacterEllipsis" />
+                                <Grid ColumnSpacing="8" Margin="0,6,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel>
+                                        <TextBlock x:Name="AcceptedCountText" Style="{ThemeResource TitleTextBlockStyle}" Text="0" />
+                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Accepted" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock x:Name="RejectedCountText" Style="{ThemeResource TitleTextBlockStyle}" Text="0" />
+                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Rejected" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="2">
+                                        <TextBlock x:Name="SkippedCountText" Style="{ThemeResource TitleTextBlockStyle}" Text="0" />
+                                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Skipped" />
+                                    </StackPanel>
+                                </Grid>
+                                <TextBlock x:Name="FilterText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="CalibrationText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                                <TextBlock x:Name="CheckpointText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                <TextBlock x:Name="MonitorText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <Border
+                            Padding="16"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8">
+                            <StackPanel Spacing="8">
+                                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Stack depth" />
+                                <local:StackSnrChart x:Name="SnrChart" />
+                                <TextBlock x:Name="SnrSummaryText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
+                        </Border>
+
+                        <InfoBar x:Name="RunInfoBar" IsClosable="False" IsOpen="False" Severity="Warning">
+                            <InfoBar.ActionButton>
+                                <Button
+                                    x:Name="CloseWithoutCheckpointButton"
+                                    AutomationProperties.Name="Discard unsaved live-stack changes and close"
+                                    Click="CloseWithoutCheckpoint_Click"
+                                    Content="Discard unsaved changes and close"
+                                    Visibility="Collapsed" />
+                            </InfoBar.ActionButton>
+                        </InfoBar>
+
+                        <Border
+                            x:Name="AttentionCard"
+                            Padding="16"
+                            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                            BorderThickness="1"
+                            CornerRadius="8"
+                            Visibility="Collapsed">
+                            <StackPanel Spacing="8">
+                                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Needs attention" />
+                                <ItemsControl x:Name="AttentionList">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate>
+                                            <TextBlock Margin="0,2" Text="{Binding}" TextWrapping="Wrap" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </StackPanel>
+                </ScrollViewer>
+
+                <InfoBar
+                    x:Name="PreviewInfoBar"
+                    Grid.Row="2"
+                    Margin="0,12,16,0"
+                    IsClosable="False"
+                    IsOpen="False"
+                    Severity="Informational" />
+            </Grid>
+        </Grid>
+
+        <Grid
+            Grid.Row="2"
+            Padding="24,14"
+            Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+            BorderThickness="0,1,0,0"
+            ColumnSpacing="8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock
+                x:Name="FooterHintText"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                Text="The folder is only read; checkpoints and outputs are stored separately."
+                TextWrapping="Wrap"
+                VerticalAlignment="Center" />
+            <Button x:Name="PauseButton" Grid.Column="1" AccessKey="P" Click="Pause_Click" Content="Pause and save" Visibility="Collapsed" />
+            <Button x:Name="SnapshotButton" Grid.Column="2" AccessKey="S" Click="SaveSnapshot_Click" Content="Save snapshot…" Visibility="Collapsed" />
+            <Button
+                x:Name="PrimaryButton"
+                Grid.Column="3"
+                AccessKey="F"
+                Click="Primary_Click"
+                Content="Start live stack"
+                Style="{ThemeResource AccentButtonStyle}" />
+        </Grid>
+    </Grid>
+</Window>

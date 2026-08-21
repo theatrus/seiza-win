@@ -54,12 +54,23 @@ if ($resolvedRevision -notmatch '^[0-9a-f]{40}$') {
 }
 
 $cargoAction = if ($Test) { "test" } else { "build" }
-$cargoCommand = "cargo $cargoAction --manifest-path `"$($nativePackage.manifest_path)`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked"
-$thumbnailCommand = "cargo $cargoAction --package seiza-thumbnail-provider --target-dir `"$targetDirectory`" --locked"
-if ($Configuration -eq "Release") {
-    $cargoCommand += " --release"
-    $thumbnailCommand += " --release"
+$releaseFlag = if ($Configuration -eq "Release") { " --release" } else { "" }
+$nativePackageSpec = "seiza-cabi@$($nativePackage.version)"
+$workspaceNativeBuildCommand = "cargo build --package $nativePackageSpec --target-dir `"$targetDirectory`" --locked$releaseFlag"
+if ($Test) {
+    # Cargo cannot run a dependency package's dev-targets from the consuming
+    # workspace, so exercise the published crate's own locked test suite, then
+    # also build the shipped DLL from the application's locked dependency graph.
+    $nativeTestCommand = "cargo test --manifest-path `"$($nativePackage.manifest_path)`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked$releaseFlag"
+    $cargoCommand = "$nativeTestCommand && $workspaceNativeBuildCommand"
 }
+else {
+    # Select the registry dependency from this workspace so the application
+    # lockfile, rather than the crate archive's release-time lockfile, controls
+    # compatible transitive patches such as seiza-calibration bug fixes.
+    $cargoCommand = $workspaceNativeBuildCommand
+}
+$thumbnailCommand = "cargo $cargoAction --package seiza-thumbnail-provider --target-dir `"$targetDirectory`" --locked$releaseFlag"
 
 $buildCommand = "call `"$developerCommand`" -no_logo -arch=x64 -host_arch=x64 && $cargoCommand && $thumbnailCommand"
 

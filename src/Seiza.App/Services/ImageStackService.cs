@@ -1,24 +1,13 @@
-using System.Runtime.InteropServices;
-using System.Text.Json;
-using Seiza.App.Interop;
 using Seiza.App.Models;
 
 namespace Seiza.App.Services;
 
 internal static class ImageStackService
 {
-    public static Task<ImageStackBatchResult> StackBatchAsync(
+    public static async Task<ImageStackBatchResult> StackBatchAsync(
         IReadOnlyList<ImageStackJob> jobs,
         IProgress<ImageStackProgress>? progress,
         CancellationToken cancellationToken = default)
-    {
-        return Task.Run(() => StackBatch(jobs, progress, cancellationToken), cancellationToken);
-    }
-
-    private static ImageStackBatchResult StackBatch(
-        IReadOnlyList<ImageStackJob> jobs,
-        IProgress<ImageStackProgress>? progress,
-        CancellationToken cancellationToken)
     {
         ImageStackValidation.ValidateBatch(jobs);
 
@@ -34,7 +23,7 @@ internal static class ImageStackService
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                result = Stack(
+                result = await StackAsync(
                     job.Request,
                     update => progress?.Report(update with
                     {
@@ -46,7 +35,7 @@ internal static class ImageStackService
                         AcceptedFrames = acceptedBeforeJob + update.AcceptedFrames,
                         RejectedFrames = rejectedBeforeJob + update.RejectedFrames,
                     }),
-                    cancellationToken);
+                    cancellationToken).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
@@ -69,7 +58,7 @@ internal static class ImageStackService
         return new ImageStackBatchResult(results);
     }
 
-    private static ImageStackResult Stack(
+    private static async Task<ImageStackResult> StackAsync(
         ImageStackRequest request,
         Action<ImageStackProgress>? progress,
         CancellationToken cancellationToken)
@@ -83,159 +72,148 @@ internal static class ImageStackService
             0,
             0));
 
-        nint error = 0;
-        nint stacker = NativeMethods.OpenLiveStacker(
+        await using ImageStackSession session = await ImageStackSession.OpenAsync(
             request.Inputs[0],
-            request.Calibration.BiasPath,
-            request.Calibration.DarkPath,
-            request.Calibration.FlatPath,
-            request.Calibration.OverridesDarkExposure
-                ? request.Calibration.DarkExposureSeconds
-                : 0,
-            request.Options.ToJson(),
-            out error);
-        if (stacker == 0)
-        {
-            throw ReadError(error, "The Seiza core could not open the reference image.");
-        }
+            request.Options,
+            request.Calibration,
+            cancellationToken).ConfigureAwait(false);
 
-        try
+        var dispositions = new List<ImageStackDisposition>(request.Inputs.Count - 1);
+        var snrSamples = new List<ImageStackSnrSample>();
+        var snrDepths = new HashSet<int>(
+            ImageStackSession.GetSnrMeasurementDepths(request.Inputs.Count));
+        var attemptedSnrDepths = new HashSet<int>();
+        string? snrWarning = null;
+        int failedFrames = 0;
+        ImageStackSessionCounts counts = await session.GetCountsAsync(cancellationToken)
+            .ConfigureAwait(false);
+        snrWarning = await TryMeasureSnrAsync(
+            session,
+            counts.AcceptedFrames,
+            snrDepths,
+            attemptedSnrDepths,
+            snrSamples,
+            includeCurrentDepth: false,
+            cancellationToken).ConfigureAwait(false);
+        progress?.Invoke(new ImageStackProgress(
+            ImageStackProgressPhase.Stacking,
+            Path.GetFileName(request.Inputs[0]),
+            1,
+            request.Inputs.Count,
+            counts.AcceptedFrames,
+            counts.RejectedFrames));
+
+        for (int index = 1; index < request.Inputs.Count; index++)
         {
-            var dispositions = new List<ImageStackDisposition>(request.Inputs.Count - 1);
-            int unreadableFrames = 0;
+            cancellationToken.ThrowIfCancellationRequested();
+            string path = request.Inputs[index];
+            ImageStackPushResult push = await session.PushFrameAsync(path, cancellationToken)
+                .ConfigureAwait(false);
+            dispositions.Add(push.Disposition);
+            if (push.NativeFailure)
+            {
+                failedFrames++;
+            }
+
+            counts = await session.GetCountsAsync(cancellationToken).ConfigureAwait(false);
+            string? measurementWarning = await TryMeasureSnrAsync(
+                session,
+                counts.AcceptedFrames,
+                snrDepths,
+                attemptedSnrDepths,
+                snrSamples,
+                includeCurrentDepth: false,
+                cancellationToken).ConfigureAwait(false);
+            snrWarning ??= measurementWarning;
             progress?.Invoke(new ImageStackProgress(
                 ImageStackProgressPhase.Stacking,
-                Path.GetFileName(request.Inputs[0]),
-                1,
+                Path.GetFileName(path),
+                index + 1,
                 request.Inputs.Count,
-                1,
-                0));
-
-            for (int index = 1; index < request.Inputs.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                string path = request.Inputs[index];
-                error = 0;
-                nint response = NativeMethods.PushLiveStackerFrameJson(stacker, path, out error);
-                if (response == 0)
-                {
-                    unreadableFrames++;
-                    dispositions.Add(new ImageStackDisposition(
-                        path,
-                        false,
-                        TakeErrorMessage(error, "The frame could not be read.")));
-                }
-                else
-                {
-                    try
-                    {
-                        string json = Marshal.PtrToStringUTF8(response)
-                            ?? throw new SeizaCoreException(
-                                "The Seiza core returned an invalid stacking result.");
-                        ImageStackDisposition disposition = JsonSerializer.Deserialize(
-                            json,
-                            SeizaJsonSerializerContext.Default.ImageStackDisposition)
-                            ?? throw new SeizaCoreException(
-                                "The Seiza core returned an invalid stacking result.");
-                        dispositions.Add(disposition);
-                    }
-                    finally
-                    {
-                        NativeMethods.FreeString(response);
-                    }
-                }
-
-                int accepted = checked((int)NativeMethods.GetLiveStackerAcceptedFrames(stacker));
-                int rejected = checked((int)NativeMethods.GetLiveStackerRejectedFrames(stacker))
-                    + unreadableFrames;
-                progress?.Invoke(new ImageStackProgress(
-                    ImageStackProgressPhase.Stacking,
-                    Path.GetFileName(path),
-                    index + 1,
-                    request.Inputs.Count,
-                    accepted,
-                    rejected));
-            }
-
-            cancellationToken.ThrowIfCancellationRequested();
-            if (NativeMethods.GetLiveStackerAcceptedFrames(stacker) <= 1)
-            {
-                string reason = dispositions.FirstOrDefault(item => !item.Accepted)?.Reason
-                    ?? "All additional frames were rejected.";
-                throw new SeizaCoreException(
-                    $"The stack needs at least two accepted frames. {reason}");
-            }
-
-            progress?.Invoke(new ImageStackProgress(
-                ImageStackProgressPhase.Writing,
-                $"Writing {Path.GetFileName(request.OutputPath)}…",
-                request.Inputs.Count,
-                request.Inputs.Count,
-                checked((int)NativeMethods.GetLiveStackerAcceptedFrames(stacker)),
-                checked((int)NativeMethods.GetLiveStackerRejectedFrames(stacker))
-                    + unreadableFrames));
-
-            error = 0;
-            nint snapshot = NativeMethods.FinishLiveStacker(ref stacker, out error);
-            if (snapshot == 0)
-            {
-                throw ReadError(error, "The Seiza core could not finish the image stack.");
-            }
-
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                AtomicOutputFile.Write(
-                    request.OutputPath,
-                    stagingPath =>
-                    {
-                        error = 0;
-                        if (!NativeMethods.WriteStackSnapshotFits(snapshot, stagingPath, out error))
-                        {
-                            throw ReadError(
-                                error,
-                                "The Seiza core could not write the stacked image.");
-                        }
-                    },
-                    cancellationToken);
-
-                return new ImageStackResult(
-                    request.OutputPath,
-                    checked((int)NativeMethods.GetStackSnapshotAcceptedFrames(snapshot)),
-                    checked((int)NativeMethods.GetStackSnapshotRejectedFrames(snapshot))
-                        + unreadableFrames,
-                    dispositions);
-            }
-            finally
-            {
-                NativeMethods.FreeStackSnapshot(snapshot);
-            }
+                counts.AcceptedFrames,
+                counts.RejectedFrames + failedFrames));
         }
-        finally
+
+        cancellationToken.ThrowIfCancellationRequested();
+        counts = await session.GetCountsAsync(cancellationToken).ConfigureAwait(false);
+        if (counts.AcceptedFrames <= 1)
         {
-            if (stacker != 0)
-            {
-                NativeMethods.FreeLiveStacker(stacker);
-            }
+            string reason = dispositions.FirstOrDefault(item => !item.Accepted)?.Reason
+                ?? "All additional frames were rejected.";
+            throw new SeizaCoreException(
+                $"The stack needs at least two accepted frames. {reason}");
         }
+
+        string? finalMeasurementWarning = await TryMeasureSnrAsync(
+            session,
+            counts.AcceptedFrames,
+            snrDepths,
+            attemptedSnrDepths,
+            snrSamples,
+            includeCurrentDepth: true,
+            cancellationToken).ConfigureAwait(false);
+        snrWarning ??= finalMeasurementWarning;
+
+        progress?.Invoke(new ImageStackProgress(
+            ImageStackProgressPhase.Writing,
+            $"Writing {Path.GetFileName(request.OutputPath)}…",
+            request.Inputs.Count,
+            request.Inputs.Count,
+            counts.AcceptedFrames,
+            counts.RejectedFrames + failedFrames));
+
+        await using ImageStackSnapshot snapshot = await session.FinishAsync(cancellationToken)
+            .ConfigureAwait(false);
+        await snapshot.WriteFitsAsync(request.OutputPath, cancellationToken).ConfigureAwait(false);
+
+        return new ImageStackResult(
+            request.OutputPath,
+            snapshot.AcceptedFrames,
+            snapshot.RejectedFrames + failedFrames,
+            dispositions,
+            StackSnrAnalyzer.Analyze(snrSamples.Select(sample => new StackSnrMeasurement(
+                sample.Frames,
+                sample.Noise,
+                sample.Background,
+                sample.Signal))),
+            snrWarning);
     }
 
-    private static SeizaCoreException ReadError(nint error, string fallbackMessage) =>
-        new(TakeErrorMessage(error, fallbackMessage));
-
-    private static string TakeErrorMessage(nint error, string fallbackMessage)
+    private static async Task<string?> TryMeasureSnrAsync(
+        ImageStackSession session,
+        int acceptedFrames,
+        IReadOnlySet<int> scheduledDepths,
+        ISet<int> attemptedDepths,
+        List<ImageStackSnrSample> samples,
+        bool includeCurrentDepth,
+        CancellationToken cancellationToken)
     {
-        if (error == 0)
+        if (!StackSnrMeasurementPolicy.TryBegin(
+                acceptedFrames,
+                scheduledDepths,
+                attemptedDepths,
+                includeCurrentDepth) ||
+            samples.Any(sample => sample.Frames == (uint)acceptedFrames))
         {
-            return fallbackMessage;
+            return null;
         }
         try
         {
-            return Marshal.PtrToStringUTF8(error) ?? fallbackMessage;
+            ImageStackSnrSample? sample = await session.MeasureDepthAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (sample is not null && sample.Frames == (uint)acceptedFrames)
+            {
+                samples.Add(sample);
+            }
+            return null;
         }
-        finally
+        catch (OperationCanceledException)
         {
-            NativeMethods.FreeString(error);
+            throw;
+        }
+        catch (Exception exception)
+        {
+            return $"SNR analysis was unavailable: {exception.Message}";
         }
     }
 }

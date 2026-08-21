@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<UserControl
+    x:Class="Seiza.App.StackSnrChart"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Grid MinHeight="180">
+        <Canvas x:Name="PlotCanvas" Margin="0,0,0,24" />
+        <TextBlock
+            x:Name="EmptyText"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Center"
+            Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+            Text="SNR measurements appear as the stack deepens." />
+        <Grid VerticalAlignment="Bottom" ColumnSpacing="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <StackPanel Orientation="Horizontal" Spacing="6">
+                <Rectangle Width="18" Height="3" Fill="{ThemeResource AccentFillColorDefaultBrush}" />
+                <TextBlock Text="Measured" />
+            </StackPanel>
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="6">
+                <Rectangle Width="18" Height="2" Fill="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock Text="Ideal square-root" />
+            </StackPanel>
+            <TextBlock
+                x:Name="RangeText"
+                Grid.Column="3"
+                Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+        </Grid>
+    </Grid>
+</UserControl>

@@ -107,6 +107,15 @@ internal sealed class ImageStackCalibration
     public bool OverridesDarkExposure { get; set; }
     public double DarkExposureSeconds { get; set; } = 300.0;
 
+    public ImageStackCalibration Copy() => new()
+    {
+        BiasPath = BiasPath,
+        DarkPath = DarkPath,
+        FlatPath = FlatPath,
+        OverridesDarkExposure = OverridesDarkExposure,
+        DarkExposureSeconds = DarkExposureSeconds,
+    };
+
     public string? ValidationMessage(IReadOnlyList<string> inputs)
     {
         if (DarkPath is null && OverridesDarkExposure)
@@ -400,7 +409,9 @@ internal sealed record ImageStackResult(
     string OutputPath,
     int AcceptedFrames,
     int RejectedFrames,
-    IReadOnlyList<ImageStackDisposition> Dispositions);
+    IReadOnlyList<ImageStackDisposition> Dispositions,
+    StackSnrAnalysis SnrAnalysis,
+    string? SnrWarning);
 
 internal sealed record ImageStackBatchResult(IReadOnlyList<ImageStackResult> Results)
 {
