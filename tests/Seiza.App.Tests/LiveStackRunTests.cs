@@ -83,6 +83,36 @@ public sealed class LiveStackRunTests
         Assert.Contains("camera", reason, StringComparison.OrdinalIgnoreCase);
     }
 
+    [Fact]
+    public void ManagedLiveAdmissionLeavesDarkScalingPolicyToTheNativeStacker()
+    {
+        var reference = new CalibrationFrameSignature
+        {
+            Camera = "ASI2600MM",
+            Width = 6248,
+            Height = 4176,
+            Channels = 1,
+            BinningX = 1,
+            BinningY = 1,
+            Gain = 100,
+            Offset = 50,
+            ReadoutMode = 1,
+            ExposureSeconds = 300,
+            CameraTempC = -10,
+        };
+        CalibrationFrameSignature differentExposureAndTemperature = reference with
+        {
+            ExposureSeconds = 120,
+            CameraTempC = -5,
+        };
+
+        Assert.True(LiveStackCalibrationIdentity.Matches(
+            reference,
+            differentExposureAndTemperature,
+            out string? reason));
+        Assert.Null(reason);
+    }
+
     [Theory]
     [InlineData(1, true)]
     [InlineData(2, true)]

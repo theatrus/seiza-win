@@ -18,7 +18,7 @@ core.
 This work will ship in the next Windows release. The stable download above
 remains Seiza 0.6.1.
 
-- Upgrade the native processing core to Seiza 0.18.1 for resumable live-stack
+- Upgrade the native processing core to Seiza 0.18.2 for resumable live-stack
   checkpoints, calibration planning and master construction, native SNR
   measurements, and bounded preview and export support.
 
@@ -45,7 +45,15 @@ without a Windows restart.
   workflow. Choose existing masters or point Seiza at raw bias, dark,
   dark-flat, and flat frames; the shared core matches camera metadata and
   proves one safe calibration set against every target light in each group
-  before building the dependency chain.
+  before building the dependency chain. Matching uses target, proximity,
+  alternate-anchor, and coherent session passes; a recognized filename filter
+  can identify a target light whose FILTER header is missing, while an
+  unresolved target filter withholds flat calibration. Published Seiza 0.18.2
+  builds fail closed if their final admission pass omits an input ambiguously;
+  Windows is ready to name accepted and skipped inputs when the corrected
+  schema-2 report ships upstream. Windows also rechecks the written master;
+  Seiza 0.18.2 flats that lose known telescope, focal-length, or rotation
+  metadata are withheld until the upstream preservation fix is released.
 - Stacking runs off the UI thread with per-frame progress, accepted/rejected
   counts, cancellation between frames, and automatic opening of the result.
   Measurements at progressively deeper checkpoints show SNR and achieved

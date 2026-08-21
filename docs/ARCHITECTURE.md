@@ -116,6 +116,16 @@ disable process isolation.
   schedule batches, but header classification, calibration planning, and frame
   disposition cross the C ABI as versioned JSON rather than being
   reimplemented in C#.
+- Treat calibration matching as layered admission: every target light is
+  checked during native planning, candidate sets are proximity-ordered and
+  reduced through alternate-anchor plus coherent-session passes, and the
+  native master builder checks the actual reread headers once more. A corrected
+  schema-2 master report partitions requested paths into accepted `inputs` and
+  reasoned `skippedInputs`; schema-1 partial reports are ambiguous and must fail
+  closed. Windows uses Seiza's exported matching functions while preparing a
+  flat dependency chain; the native live stacker remains authoritative for
+  per-light calibration admission, including scalable darks and restored
+  calibration state.
 - Cache built calibration masters by a core-versioned input fingerprint and
   publish them atomically. Bound the shared library cache by age and size,
   protect every master still needed by a multi-group preparation run, and use

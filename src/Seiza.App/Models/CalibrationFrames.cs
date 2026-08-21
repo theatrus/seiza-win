@@ -50,6 +50,34 @@ internal sealed record CalibrationFrameProbe
     public CalibrationFrameState CalibrationState { get; init; } = new();
 }
 
+/// <summary>
+/// Enriches a target light used for calibration planning. A FITS header remains
+/// authoritative. When FILTER is absent, a recognized filename token supplies
+/// its actual conventional header spelling (for example Ha), never a private
+/// managed-only identity. Calibration candidates are deliberately not enriched:
+/// the native builder rereads their files and must see the same metadata that
+/// the planner used.
+/// </summary>
+internal static class CalibrationTargetMetadata
+{
+    public static CalibrationFrameProbe Enrich(CalibrationFrameProbe probe)
+    {
+        ArgumentNullException.ThrowIfNull(probe);
+        if (!string.IsNullOrWhiteSpace(probe.Signature.Filter))
+        {
+            return probe;
+        }
+
+        ImageFilenameFilter? filter = ImageFilenameFilter.Detect(probe.Path);
+        return filter is null
+            ? probe
+            : probe with
+            {
+                Signature = probe.Signature with { Filter = filter.FilenameSuffix },
+            };
+    }
+}
+
 internal static class CalibrationLightEligibility
 {
     public static bool IsEligible(CalibrationFrameProbe probe) =>
@@ -164,6 +192,12 @@ internal sealed record CalibrationMasterInputResult
     public ulong RejectedSamples { get; init; }
 }
 
+internal sealed record CalibrationMasterSkippedInputResult
+{
+    public string Path { get; init; } = string.Empty;
+    public string Reason { get; init; } = string.Empty;
+}
+
 internal sealed record CalibrationMasterBuildResult
 {
     public int SchemaVersion { get; init; }
@@ -172,6 +206,7 @@ internal sealed record CalibrationMasterBuildResult
     public int Width { get; init; }
     public int Height { get; init; }
     public int Channels { get; init; }
+    public int RequestedFrames { get; init; }
     public int InputFrames { get; init; }
     public ulong AcceptedSamples { get; init; }
     public ulong RejectedSamples { get; init; }
@@ -183,4 +218,5 @@ internal sealed record CalibrationMasterBuildResult
     public double? OutputExposureSeconds { get; init; }
     public CalibrationMasterRejection Rejection { get; init; } = new();
     public CalibrationMasterInputResult[] Inputs { get; init; } = [];
+    public CalibrationMasterSkippedInputResult[] SkippedInputs { get; init; } = [];
 }

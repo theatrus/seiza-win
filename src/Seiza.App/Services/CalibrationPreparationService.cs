@@ -171,10 +171,12 @@ internal sealed class CalibrationPreparationService
             darkFlatKind,
             request.Options.MinimumDarkFlatFrames);
         BuildOutcome darkFlat;
-        CalibrationFrameProbe? selectedFlatReference = flatPlan.Ready
-            ? FindSelectedFlatReference(flatPlan, rawCandidates)
-            : null;
-        if (selectedFlatReference is null)
+        CalibrationFrameProbe[] selectedFlatReferences = flatPlan.Ready
+            ? FindSelectedFlatReferences(flatPlan, rawCandidates)
+            : [];
+        CalibrationFrameProbe? selectedFlatReference = selectedFlatReferences.FirstOrDefault();
+        if (selectedFlatReference is null ||
+            selectedFlatReferences.Length != flatPlan.SelectedPaths.Length)
         {
             string reason = flatPlan.Ready
                 ? "Dark-flat preparation was skipped because the selected flat was invalid."
@@ -187,7 +189,7 @@ internal sealed class CalibrationPreparationService
                 darkFlatKind,
                 request.Options.MinimumDarkFlatFrames,
                 selectedFlatReference,
-                [selectedFlatReference],
+                selectedFlatReferences,
                 rawCandidates,
                 request.Options,
                 bias.MasterPath is not null,
@@ -224,21 +226,20 @@ internal sealed class CalibrationPreparationService
                 flatDark?.Summary.Build?.OutputExposureSeconds is double darkExposure &&
                 double.IsFinite(darkExposure) &&
                 darkExposure > 0;
+            bool darkMatchesEveryFlatWithoutBias = bias.MasterPath is null &&
+                exposuresKnown &&
+                flatDark is not null &&
+                DarkMatchesEverySelectedFlat(
+                    flatPlan,
+                    flatDark,
+                    rawCandidates,
+                    request.Options.Tolerances);
             if (bias.MasterPath is null &&
                 (flatDark?.MasterPath is null ||
                     flatDark.Summary.Build?.BiasSubtracted != false ||
-                    !exposuresKnown))
+                    !darkMatchesEveryFlatWithoutBias))
             {
                 flatSafetyWarning = FlatPedestalWarning;
-            }
-            else if (bias.MasterPath is not null && flatDark?.MasterPath is not null &&
-                !exposuresKnown)
-            {
-                flatDark = null;
-                warnings.Add(
-                    "The master dark-flat/dark was not used while building the flat because " +
-                    "its exposure or the flat exposure metadata is missing. The master bias " +
-                    "still removes the pedestal safely.");
             }
         }
 
@@ -261,6 +262,12 @@ internal sealed class CalibrationPreparationService
                 flatDark,
                 warnings,
                 progress,
+                cancellationToken).ConfigureAwait(false);
+            flat = await VerifyBuiltFlatAsync(
+                flat,
+                targetLights,
+                request.Options.Tolerances,
+                warnings,
                 cancellationToken).ConfigureAwait(false);
         }
 
@@ -310,6 +317,17 @@ internal sealed class CalibrationPreparationService
         string? message = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        if (kind == CalibrationFrameRoles.Flat &&
+            references.Any(static target =>
+                string.IsNullOrWhiteSpace(target.Signature.Filter)))
+        {
+            string warning =
+                "The master flat was withheld because at least one target light has no " +
+                "FILTER header or recognized filename filter. Seiza cannot prove which " +
+                "optical response belongs to that light.";
+            warnings.Add(warning);
+            return EmptyPlan(kind, minimum);
+        }
         progress?.Report(new(
             CalibrationPreparationStage.Planning,
             message ?? $"Matching raw {kind} frames to every target light.",
@@ -332,6 +350,7 @@ internal sealed class CalibrationPreparationService
                 },
                 cancellationToken).ConfigureAwait(false);
             ValidatePlanResult(plan, kind, minimum);
+            AddCoherentSetWarning(kind, plan, warnings);
             return plan;
         }
         catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -437,6 +456,7 @@ internal sealed class CalibrationPreparationService
                 fingerprint,
                 coreVersion,
                 selectedPaths.Length,
+                plan.Minimum,
                 buildRequest,
                 cancellationToken).ConfigureAwait(false);
             if (cached is not null)
@@ -444,7 +464,12 @@ internal sealed class CalibrationPreparationService
                 EnsureInputsUnchanged(identities);
                 TouchCacheEntryBestEffort(reportPath);
                 retentionLeases.Retain(masterPath);
-                return BuildOutcome.FromCache(plan, cached);
+                string? skippedWarning = DescribeSkippedInputs(kind, cached.Build);
+                if (skippedWarning is not null)
+                {
+                    warnings.Add(skippedWarning);
+                }
+                return BuildOutcome.FromCache(plan, cached, skippedWarning);
             }
 
             progress?.Report(new(
@@ -467,7 +492,8 @@ internal sealed class CalibrationPreparationService
                     built,
                     buildRequest,
                     stagingMaster,
-                    selectedPaths.Length);
+                    selectedPaths.Length,
+                    plan.Minimum);
                 EnsureInputsUnchanged(identities);
                 File.Move(stagingMaster, masterPath, overwrite: true);
 
@@ -496,7 +522,12 @@ internal sealed class CalibrationPreparationService
                 cancellationToken.ThrowIfCancellationRequested();
                 File.Move(stagingReport, reportPath, overwrite: true);
                 retentionLeases.Retain(masterPath);
-                return BuildOutcome.Built(plan, report);
+                string? skippedWarning = DescribeSkippedInputs(kind, published);
+                if (skippedWarning is not null)
+                {
+                    warnings.Add(skippedWarning);
+                }
+                return BuildOutcome.Built(plan, report, skippedWarning);
             }
             finally
             {
@@ -689,6 +720,143 @@ internal sealed class CalibrationPreparationService
             exposure > 0);
     }
 
+    private static bool DarkMatchesEverySelectedFlat(
+        CalibrationPlanResult flatPlan,
+        BuildOutcome flatDark,
+        IReadOnlyList<CalibrationFrameProbe> candidates,
+        CalibrationPlanTolerances requestedTolerances)
+    {
+        CalibrationMasterBuildResult? build = flatDark.Summary.Build;
+        if (build?.OutputExposureSeconds is not double outputExposure ||
+            !double.IsFinite(outputExposure) ||
+            outputExposure <= 0 ||
+            build.Inputs.Length == 0)
+        {
+            return false;
+        }
+
+        var byPath = candidates.ToDictionary(
+            static probe => Path.GetFullPath(probe.Path),
+            StringComparer.OrdinalIgnoreCase);
+        if (!byPath.TryGetValue(
+                Path.GetFullPath(build.Inputs[0].Path),
+                out CalibrationFrameProbe? darkInput))
+        {
+            return false;
+        }
+
+        CalibrationFrameSignature darkSignature = darkInput.Signature with
+        {
+            ExposureSeconds = outputExposure,
+        };
+        CalibrationMatchTolerances tolerances = ResolveMatchTolerances(requestedTolerances);
+        foreach (string path in flatPlan.SelectedPaths)
+        {
+            if (!byPath.TryGetValue(
+                    Path.GetFullPath(path),
+                    out CalibrationFrameProbe? flat) ||
+                !CalibrationMatchingService.DarkMatches(
+                    flat.Signature,
+                    darkSignature,
+                    tolerances))
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private async Task<BuildOutcome> VerifyBuiltFlatAsync(
+        BuildOutcome flat,
+        IReadOnlyList<CalibrationFrameProbe> targetLights,
+        CalibrationPlanTolerances requestedTolerances,
+        List<string> warnings,
+        CancellationToken cancellationToken)
+    {
+        if (flat.MasterPath is null)
+        {
+            return flat;
+        }
+
+        string? mismatch = null;
+        try
+        {
+            CalibrationFrameProbe master = await _probeAsync(
+                    flat.MasterPath,
+                    cancellationToken)
+                .ConfigureAwait(false);
+            if (!master.IsMaster ||
+                !string.Equals(
+                    master.Role,
+                    CalibrationFrameRoles.Flat,
+                    StringComparison.OrdinalIgnoreCase) ||
+                !master.CalibrationState.FlatNormalized)
+            {
+                mismatch = "the written file does not identify itself as a normalized master flat";
+            }
+            else
+            {
+                CalibrationMatchTolerances tolerances =
+                    ResolveMatchTolerances(requestedTolerances);
+                foreach (CalibrationFrameProbe target in targetLights)
+                {
+                    if (!CalibrationMatchingService.SensorMatches(
+                            target.Signature,
+                            master.Signature))
+                    {
+                        mismatch = "its sensor or readout metadata no longer matches every target";
+                        break;
+                    }
+                    if (!CalibrationMatchingService.OpticsMatch(
+                            target.Signature,
+                            master.Signature,
+                            tolerances))
+                    {
+                        mismatch = "its optical metadata no longer matches every target";
+                        break;
+                    }
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            mismatch = $"its written metadata could not be verified ({exception.Message})";
+        }
+
+        if (mismatch is null)
+        {
+            return flat;
+        }
+
+        string warning =
+            $"The built master flat was withheld because {mismatch}. " +
+            "The actual master file must pass the same native compatibility rules as its " +
+            "source frames.";
+        warnings.Add(warning);
+        return BuildOutcome.WithheldBuilt(flat, warning);
+    }
+
+    private static CalibrationMatchTolerances ResolveMatchTolerances(
+        CalibrationPlanTolerances requested)
+    {
+        CalibrationMatchTolerances defaults =
+            CalibrationMatchingService.GetDefaultTolerances();
+        return defaults with
+        {
+            ExposureSeconds = requested.ExposureSeconds ?? defaults.ExposureSeconds,
+            ExposureFraction = requested.ExposureFraction ?? defaults.ExposureFraction,
+            DarkTemperatureC = requested.DarkTemperatureC ?? defaults.DarkTemperatureC,
+            MasterTemperatureC = requested.MasterTemperatureC ?? defaults.MasterTemperatureC,
+            RotationDeg = requested.RotationDeg ?? defaults.RotationDeg,
+            FocalLengthMm = requested.FocalLengthMm ?? defaults.FocalLengthMm,
+            FlatSessionSeconds = requested.FlatSessionSeconds ?? defaults.FlatSessionSeconds,
+        };
+    }
+
     private static InputIdentity[] CaptureInputIdentities(IEnumerable<string> paths) =>
         paths.Select(static path =>
         {
@@ -765,7 +933,8 @@ internal sealed class CalibrationPreparationService
         string kind,
         string fingerprint,
         string coreVersion,
-        int inputFrames,
+        int requestedFrames,
+        int minimumFrames,
         CalibrationMasterBuildRequest request,
         CancellationToken cancellationToken)
     {
@@ -804,7 +973,8 @@ internal sealed class CalibrationPreparationService
                 report.Build.Height > 0 &&
                 report.Build.Channels > 0 &&
                 HasExpectedCalibrationState(report.Build, request) &&
-                report.Build.InputFrames == inputFrames
+                requestedFrames == request.Inputs.Count &&
+                HasValidInputPartition(report.Build, request.Inputs, minimumFrames)
                     ? report
                     : null;
         }
@@ -1257,7 +1427,8 @@ internal sealed class CalibrationPreparationService
         void Add(CalibrationFrameProbe probe)
         {
             string path = Path.GetFullPath(probe.Path);
-            CalibrationFrameProbe normalized = probe with { Path = path };
+            CalibrationFrameProbe normalized = CalibrationTargetMetadata.Enrich(
+                probe with { Path = path });
             if (byPath.TryGetValue(path, out CalibrationFrameProbe? existing))
             {
                 if (!EquivalentTargetProbe(existing, normalized))
@@ -1292,7 +1463,7 @@ internal sealed class CalibrationPreparationService
         return protectedPaths;
     }
 
-    private static CalibrationFrameProbe? FindSelectedFlatReference(
+    private static CalibrationFrameProbe[] FindSelectedFlatReferences(
         CalibrationPlanResult flatPlan,
         IReadOnlyList<CalibrationFrameProbe> candidates)
     {
@@ -1302,15 +1473,16 @@ internal sealed class CalibrationPreparationService
             .ToDictionary(
                 static candidate => Path.GetFullPath(candidate.Path),
                 StringComparer.OrdinalIgnoreCase);
+        var selected = new List<CalibrationFrameProbe>(flatPlan.SelectedPaths.Length);
         foreach (string selectedPath in flatPlan.SelectedPaths)
         {
             try
             {
                 if (flatsByPath.TryGetValue(
                     Path.GetFullPath(selectedPath),
-                    out CalibrationFrameProbe? selected))
+                    out CalibrationFrameProbe? selectedFlat))
                 {
-                    return selected;
+                    selected.Add(selectedFlat);
                 }
             }
             catch (Exception exception) when (
@@ -1319,7 +1491,7 @@ internal sealed class CalibrationPreparationService
                 // A malformed native selection is rejected by the flat build as well.
             }
         }
-        return null;
+        return selected.ToArray();
     }
 
     private static CalibrationPlanResult EmptyPlan(string kind, int minimum) => new()
@@ -1342,6 +1514,35 @@ internal sealed class CalibrationPreparationService
             throw new InvalidDataException(
                 $"The Seiza core returned an invalid {kind} calibration plan.");
         }
+    }
+
+    private static void AddCoherentSetWarning(
+        string kind,
+        CalibrationPlanResult plan,
+        List<string> warnings)
+    {
+        string[] excluded = plan.Excluded
+            .Where(static entry => string.Equals(
+                entry.Reason,
+                "outside-coherent-set",
+                StringComparison.Ordinal))
+            .Select(static entry => Path.GetFileName(entry.Path))
+            .Where(static name => !string.IsNullOrWhiteSpace(name))
+            .ToArray();
+        if (excluded.Length == 0)
+        {
+            return;
+        }
+
+        const int maximumNames = 3;
+        string names = string.Join(", ", excluded.Take(maximumNames));
+        string remainder = excluded.Length > maximumNames
+            ? $", and {excluded.Length - maximumNames} more"
+            : string.Empty;
+        warnings.Add(
+            $"Set aside {excluded.Length} raw {kind} frame" +
+            (excluded.Length == 1 ? string.Empty : "s") +
+            $" outside the selected temperature/session/rotation cohort: {names}{remainder}.");
     }
 
     private static bool IsAstronomyImage(string path) =>
@@ -1373,7 +1574,8 @@ internal sealed class CalibrationPreparationService
         CalibrationMasterBuildResult result,
         CalibrationMasterBuildRequest request,
         string output,
-        int inputFrames)
+        int requestedFrames,
+        int minimumFrames)
     {
         if (result.SchemaVersion < 1 ||
             !string.Equals(result.Kind, request.Kind, StringComparison.Ordinal) ||
@@ -1384,7 +1586,8 @@ internal sealed class CalibrationPreparationService
             result.Width <= 0 ||
             result.Height <= 0 ||
             result.Channels <= 0 ||
-            result.InputFrames != inputFrames ||
+            requestedFrames != request.Inputs.Count ||
+            !HasValidInputPartition(result, request.Inputs, minimumFrames) ||
             !HasExpectedCalibrationState(result, request) ||
             !File.Exists(output) ||
             new FileInfo(output).Length <= 0)
@@ -1392,6 +1595,111 @@ internal sealed class CalibrationPreparationService
             throw new InvalidDataException(
                 $"The Seiza core returned an invalid master-{request.Kind} build result.");
         }
+    }
+
+    private static bool HasValidInputPartition(
+        CalibrationMasterBuildResult result,
+        IReadOnlyList<string> requestedInputs,
+        int minimumFrames)
+    {
+        if (result.Inputs is null ||
+            result.SkippedInputs is null ||
+            result.InputFrames < minimumFrames ||
+            result.InputFrames > requestedInputs.Count ||
+            result.Inputs.Length != result.InputFrames ||
+            result.RequestedFrames < 0)
+        {
+            return false;
+        }
+
+        // Schema 1 did not report RequestedFrames/SkippedInputs. A complete legacy
+        // result is still unambiguous, but a partial legacy result is not: its
+        // compacted per-input statistics cannot identify which paths survived.
+        bool legacyResponse = result.SchemaVersion < 2;
+        if (legacyResponse)
+        {
+            if (result.RequestedFrames != 0 ||
+                result.InputFrames != requestedInputs.Count ||
+                result.SkippedInputs.Length != 0)
+            {
+                return false;
+            }
+        }
+        else if (result.RequestedFrames != requestedInputs.Count)
+        {
+            return false;
+        }
+
+        try
+        {
+            var requested = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (string path in requestedInputs)
+            {
+                if (string.IsNullOrWhiteSpace(path) ||
+                    !requested.Add(Path.GetFullPath(path)))
+                {
+                    return false;
+                }
+            }
+
+            var reported = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (CalibrationMasterInputResult input in result.Inputs)
+            {
+                if (input is null ||
+                    string.IsNullOrWhiteSpace(input.Path) ||
+                    !reported.Add(Path.GetFullPath(input.Path)))
+                {
+                    return false;
+                }
+            }
+            foreach (CalibrationMasterSkippedInputResult skipped in result.SkippedInputs)
+            {
+                if (skipped is null ||
+                    string.IsNullOrWhiteSpace(skipped.Path) ||
+                    string.IsNullOrWhiteSpace(skipped.Reason) ||
+                    !reported.Add(Path.GetFullPath(skipped.Path)))
+                {
+                    return false;
+                }
+            }
+            return reported.SetEquals(requested);
+        }
+        catch (Exception exception) when (
+            exception is ArgumentException or NotSupportedException or PathTooLongException)
+        {
+            return false;
+        }
+    }
+
+    private static string? DescribeSkippedInputs(
+        string kind,
+        CalibrationMasterBuildResult result)
+    {
+        if (result.SkippedInputs is not { Length: > 0 } skippedInputs)
+        {
+            return null;
+        }
+
+        const int maximumDetails = 3;
+        string[] details = skippedInputs
+            .Take(maximumDetails)
+            .Select(static skipped =>
+            {
+                string name = Path.GetFileName(skipped.Path);
+                if (string.IsNullOrWhiteSpace(name))
+                {
+                    name = skipped.Path;
+                }
+                string reason = skipped.Reason?.Trim().ReplaceLineEndings(" ") ?? string.Empty;
+                return string.IsNullOrWhiteSpace(reason) ? name : $"{name} ({reason})";
+            })
+            .ToArray();
+        string more = skippedInputs.Length > maximumDetails
+            ? $"; and {skippedInputs.Length - maximumDetails} more"
+            : string.Empty;
+        return $"The master {kind} used {result.InputFrames} of {result.RequestedFrames} " +
+            $"selected frames. Seiza skipped {skippedInputs.Length} after its final " +
+            $"compatibility check: {string.Join("; ", details)}{more}.";
     }
 
     private static bool HasExpectedCalibrationState(
@@ -1604,18 +1912,34 @@ internal sealed class CalibrationPreparationService
                 null,
                 null);
 
+        public static BuildOutcome WithheldBuilt(
+            BuildOutcome outcome,
+            string warning) => new(
+                outcome.Summary with
+                {
+                    MasterPath = null,
+                    Warning = string.IsNullOrWhiteSpace(outcome.Summary.Warning)
+                        ? warning
+                        : $"{outcome.Summary.Warning} {warning}",
+                },
+                null,
+                outcome.Fingerprint);
+
         public static BuildOutcome FromCache(
             CalibrationPlanResult plan,
-            CalibrationMasterCacheReport report) => FromReport(plan, report, cacheReused: true);
+            CalibrationMasterCacheReport report,
+            string? warning = null) => FromReport(plan, report, cacheReused: true, warning);
 
         public static BuildOutcome Built(
             CalibrationPlanResult plan,
-            CalibrationMasterCacheReport report) => FromReport(plan, report, cacheReused: false);
+            CalibrationMasterCacheReport report,
+            string? warning = null) => FromReport(plan, report, cacheReused: false, warning);
 
         private static BuildOutcome FromReport(
             CalibrationPlanResult plan,
             CalibrationMasterCacheReport report,
-            bool cacheReused) => new(
+            bool cacheReused,
+            string? warning) => new(
                 new CalibrationPreparationKindSummary
                 {
                     Kind = plan.Kind,
@@ -1624,6 +1948,7 @@ internal sealed class CalibrationPreparationService
                     MasterPath = report.MasterPath,
                     Fingerprint = report.Fingerprint,
                     CacheReused = cacheReused,
+                    Warning = warning,
                 },
                 report.MasterPath,
                 report.Fingerprint);

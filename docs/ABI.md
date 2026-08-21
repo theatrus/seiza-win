@@ -24,6 +24,18 @@ Rules:
 - Cancellation is cooperative at the shell boundary between frame pushes.
   Live stacker, snapshot, disposition, and error allocations are always freed
   by their matching ABI function.
+- Calibration master reports are versioned JSON. Schema 1 is accepted only
+  when every requested input appears in the accepted `inputs` array. Schema 2
+  additionally carries `requestedFrames` and `skippedInputs`; Windows verifies
+  that accepted and skipped paths are a disjoint, exact partition, that every
+  skip has a reason, and that enough accepted frames remain. An ambiguous
+  partial report from the currently bundled schema-1 Seiza 0.18.2 is discarded
+  rather than guessed or cached.
+- Calibration preparation calls the native signature matchers for sensor
+  settings, flat optics, and dark exposure/temperature using Seiza's exported
+  default tolerances. Live pushes rely on the stacker's authoritative native
+  calibration validation so scalable dark policy and restored calibration state
+  are not duplicated in C#.
 - ABI additions are backward-compatible. Breaking changes require an ABI version bump.
 
 The Windows interop layer uses source-generated `LibraryImport` declarations,

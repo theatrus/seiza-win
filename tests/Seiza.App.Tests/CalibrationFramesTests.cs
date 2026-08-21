@@ -35,6 +35,53 @@ public sealed class CalibrationFramesTests
     }
 
     [Fact]
+    public void MasterBuildResponseDeserializesAcceptedAndSkippedProvenance()
+    {
+        const string Json = """
+            {
+              "schemaVersion": 2,
+              "kind": "flat",
+              "output": "C:\\masters\\flat.fits",
+              "width": 16,
+              "height": 16,
+              "channels": 1,
+              "requestedFrames": 3,
+              "inputFrames": 2,
+              "acceptedSamples": 512,
+              "rejectedSamples": 0,
+              "fallbackPixels": 0,
+              "defectPixelsReplaced": 0,
+              "biasSubtracted": true,
+              "darkSubtracted": false,
+              "normalized": true,
+              "outputExposureSeconds": null,
+              "rejection": {"lowSigma": 3.0, "highSigma": 3.0},
+              "inputs": [
+                {"path": "C:\\flats\\a.fits", "acceptedSamples": 256,
+                 "rejectedSamples": 0},
+                {"path": "C:\\flats\\c.fits", "acceptedSamples": 256,
+                 "rejectedSamples": 0}
+              ],
+              "skippedInputs": [
+                {"path": "C:\\flats\\b.fits", "reason": "incompatible optical metadata"}
+              ]
+            }
+            """;
+
+        CalibrationMasterBuildResult? result = JsonSerializer.Deserialize(
+            Json,
+            SeizaJsonSerializerContext.Default.CalibrationMasterBuildResult);
+
+        Assert.NotNull(result);
+        Assert.Equal(3, result.RequestedFrames);
+        Assert.Equal(["a.fits", "c.fits"], result.Inputs.Select(input =>
+            Path.GetFileName(input.Path)));
+        CalibrationMasterSkippedInputResult skipped = Assert.Single(result.SkippedInputs);
+        Assert.Equal("b.fits", Path.GetFileName(skipped.Path));
+        Assert.Contains("optical", skipped.Reason, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void ProbeDeserializesHeaderSignatureAndCalibrationState()
     {
         const string Json = """
@@ -69,6 +116,45 @@ public sealed class CalibrationFramesTests
         Assert.Equal("L", probe.Signature.Filter);
         Assert.Equal(300, probe.Signature.ExposureSeconds);
         Assert.False(probe.CalibrationState.DarkSubtracted);
+    }
+
+    [Fact]
+    public void PlanningPreservesAuthoritativeHeaderFilterSpelling()
+    {
+        CalibrationFrameProbe shortName = CalibrationTargetMetadata.Enrich(new()
+        {
+            Path = @"C:\lights\M101_L_001.fits",
+            Role = CalibrationFrameRoles.Light,
+            Signature = new CalibrationFrameSignature { Filter = "L" },
+        });
+        CalibrationFrameProbe longName = CalibrationTargetMetadata.Enrich(new()
+        {
+            Path = @"C:\flats\flat-001.fits",
+            Role = CalibrationFrameRoles.Flat,
+            Signature = new CalibrationFrameSignature { Filter = " Luminance " },
+        });
+
+        Assert.Equal("L", shortName.Signature.Filter);
+        Assert.Equal(" Luminance ", longName.Signature.Filter);
+    }
+
+    [Fact]
+    public void PlanningUsesFilenameFilterOnlyWhenHeaderIsMissing()
+    {
+        CalibrationFrameProbe fallback = CalibrationTargetMetadata.Enrich(new()
+        {
+            Path = @"C:\lights\M101_Ha_001.fits",
+            Role = CalibrationFrameRoles.Light,
+        });
+        CalibrationFrameProbe header = CalibrationTargetMetadata.Enrich(new()
+        {
+            Path = @"C:\lights\M101_Ha_002.fits",
+            Role = CalibrationFrameRoles.Light,
+            Signature = new CalibrationFrameSignature { Filter = "OIII" },
+        });
+
+        Assert.Equal("Ha", fallback.Signature.Filter);
+        Assert.Equal("OIII", header.Signature.Filter);
     }
 
     [Fact]

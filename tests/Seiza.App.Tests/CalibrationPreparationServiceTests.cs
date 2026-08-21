@@ -1,3 +1,4 @@
+using System.Text.Json;
 using Seiza.App.Models;
 using Seiza.App.Services;
 using Xunit;
@@ -108,6 +109,288 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
     }
 
     [Fact]
+    public async Task ReportsFramesOutsideTheSelectedCoherentCohort()
+    {
+        string source = Path.Combine(_directory, "coherent-warning");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        string first = Path.Combine(source, "bias-1.fits");
+        string second = Path.Combine(source, "bias-2.fits");
+        string excluded = Path.Combine(source, "bias-other-night.fits");
+        foreach (string path in new[] { first, second, excluded })
+        {
+            await File.WriteAllBytesAsync(path, [1, 2]);
+        }
+
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) => Task.FromResult(Probe(path)),
+            planner: request =>
+            {
+                CalibrationPlanResult plan = Plan(request);
+                return request.Kind == CalibrationFrameRoles.Bias
+                    ? plan with
+                    {
+                        Ready = true,
+                        MatchedPaths = [first, second, excluded],
+                        SelectedPaths = [first, second],
+                        Excluded =
+                        [
+                            new CalibrationPlanExclusion(excluded, "outside-coherent-set"),
+                        ],
+                    }
+                    : plan;
+            });
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(
+            Request(source, cache));
+
+        Assert.Contains(result.Warnings, warning =>
+            warning.Contains("outside the selected", StringComparison.OrdinalIgnoreCase) &&
+            warning.Contains(Path.GetFileName(excluded), StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AcceptsAMiddleSkipWarnsAndReusesOnlyAValidCachedPartition()
+    {
+        string source = Path.Combine(_directory, "partial-biases");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        foreach (string name in new[] { "bias-1.fits", "bias-2.fits", "bias-3.fits" })
+        {
+            await File.WriteAllBytesAsync(Path.Combine(source, name), [1, 2]);
+        }
+
+        var builds = new List<CalibrationMasterBuildRequest>();
+        string? skippedPath = null;
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) => Task.FromResult(Probe(path)),
+            builder: async (request, token) =>
+            {
+                skippedPath = request.Inputs[1];
+                await File.WriteAllBytesAsync(request.Output, [7, 8, 9], token);
+                return BuildResult(
+                    request,
+                    [request.Inputs[0], request.Inputs[2]],
+                    [new CalibrationMasterSkippedInputResult
+                    {
+                        Path = skippedPath,
+                        Reason = "camera gain differs from the coherent subset",
+                    }]);
+            });
+        CalibrationPreparationRequest request = Request(source, cache);
+
+        using CalibrationPreparationResult first = await service.PrepareAsync(request);
+
+        CalibrationPreparationKindSummary firstBias = Assert.Single(
+            first.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Bias);
+        Assert.NotNull(first.Calibration.BiasPath);
+        Assert.Equal(3, firstBias.Build!.RequestedFrames);
+        Assert.Equal(2, firstBias.Build.InputFrames);
+        Assert.Equal(
+            [Path.GetFullPath(builds[0].Inputs[0]), Path.GetFullPath(builds[0].Inputs[2])],
+            firstBias.Build.Inputs.Select(input => Path.GetFullPath(input.Path)));
+        Assert.Equal(Path.GetFullPath(skippedPath!), Path.GetFullPath(
+            Assert.Single(firstBias.Build.SkippedInputs).Path));
+        Assert.Contains("skipped 1", firstBias.Warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(first.Warnings, warning => warning.Contains(
+            Path.GetFileName(skippedPath!)!,
+            StringComparison.OrdinalIgnoreCase));
+
+        using CalibrationPreparationResult second = await service.PrepareAsync(request);
+
+        Assert.Single(builds);
+        CalibrationPreparationKindSummary cachedBias = Assert.Single(
+            second.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Bias);
+        Assert.True(cachedBias.CacheReused);
+        Assert.Contains("skipped 1", cachedBias.Warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(second.Warnings, warning => warning.Contains(
+            Path.GetFileName(skippedPath!)!,
+            StringComparison.OrdinalIgnoreCase));
+
+        string reportPath = Path.ChangeExtension(firstBias.MasterPath!, ".json");
+        CalibrationMasterCacheReport cached = JsonSerializer.Deserialize(
+            await File.ReadAllTextAsync(reportPath),
+            CalibrationPreparationJsonContext.Default.CalibrationMasterCacheReport)!;
+        CalibrationMasterCacheReport malformed = cached with
+        {
+            Build = cached.Build with
+            {
+                SkippedInputs =
+                [
+                    new CalibrationMasterSkippedInputResult
+                    {
+                        Path = cached.Build.Inputs[0].Path,
+                        Reason = "duplicates an accepted path",
+                    },
+                ],
+            },
+        };
+        await File.WriteAllTextAsync(
+            reportPath,
+            JsonSerializer.Serialize(
+                malformed,
+                CalibrationPreparationJsonContext.Default.CalibrationMasterCacheReport));
+
+        using CalibrationPreparationResult third = await service.PrepareAsync(request);
+
+        Assert.Equal(2, builds.Count);
+        CalibrationPreparationKindSummary rebuiltBias = Assert.Single(
+            third.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Bias);
+        Assert.False(rebuiltBias.CacheReused);
+    }
+
+    [Fact]
+    public async Task RejectsAPartialLegacyResultWithoutASkippedInputPartition()
+    {
+        string source = Path.Combine(_directory, "legacy-partial-biases");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        foreach (string name in new[] { "bias-1.fits", "bias-2.fits", "bias-3.fits" })
+        {
+            await File.WriteAllBytesAsync(Path.Combine(source, name), [1, 2]);
+        }
+
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) => Task.FromResult(Probe(path)),
+            builder: async (request, token) =>
+            {
+                await File.WriteAllBytesAsync(request.Output, [7, 8, 9], token);
+                return BuildResult(
+                    request,
+                    [request.Inputs[0], request.Inputs[2]],
+                    [],
+                    schemaVersion: 1);
+            });
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(
+            Request(source, cache));
+
+        Assert.Null(result.Calibration.BiasPath);
+        CalibrationPreparationKindSummary bias = Assert.Single(
+            result.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Bias);
+        Assert.Null(bias.Build);
+        Assert.Contains("invalid", bias.Warning, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AcceptsACompleteLegacyInputPartition()
+    {
+        string source = Path.Combine(_directory, "legacy-complete-biases");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        await File.WriteAllBytesAsync(Path.Combine(source, "bias-1.fits"), [1, 2]);
+        await File.WriteAllBytesAsync(Path.Combine(source, "bias-2.fits"), [1, 2]);
+
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) => Task.FromResult(Probe(path)),
+            builder: async (request, token) =>
+            {
+                await File.WriteAllBytesAsync(request.Output, [7, 8, 9], token);
+                return BuildResult(request, request.Inputs, [], schemaVersion: 1);
+            });
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(
+            Request(source, cache));
+
+        Assert.NotNull(result.Calibration.BiasPath);
+        CalibrationPreparationKindSummary bias = Assert.Single(
+            result.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Bias);
+        Assert.Equal(1, bias.Build!.SchemaVersion);
+        Assert.Equal(0, bias.Build.RequestedFrames);
+        Assert.Empty(bias.Build.SkippedInputs);
+    }
+
+    [Fact]
+    public async Task RejectsAnOverlappingAcceptedAndSkippedPartition()
+    {
+        string source = Path.Combine(_directory, "malformed-partial-biases");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        foreach (string name in new[] { "bias-1.fits", "bias-2.fits", "bias-3.fits" })
+        {
+            await File.WriteAllBytesAsync(Path.Combine(source, name), [1, 2]);
+        }
+
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) => Task.FromResult(Probe(path)),
+            builder: async (request, token) =>
+            {
+                await File.WriteAllBytesAsync(request.Output, [7, 8, 9], token);
+                return BuildResult(
+                    request,
+                    [request.Inputs[0], request.Inputs[1]],
+                    [new CalibrationMasterSkippedInputResult
+                    {
+                        Path = request.Inputs[1],
+                        Reason = "duplicates an accepted path",
+                    }]);
+            });
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(
+            Request(source, cache));
+
+        Assert.Null(result.Calibration.BiasPath);
+        CalibrationPreparationKindSummary bias = Assert.Single(
+            result.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Bias);
+        Assert.Null(bias.Build);
+        Assert.Contains("invalid", bias.Warning, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task RejectsASkippedInputWithoutAReason()
+    {
+        string source = Path.Combine(_directory, "reasonless-partial-biases");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        foreach (string name in new[] { "bias-1.fits", "bias-2.fits", "bias-3.fits" })
+        {
+            await File.WriteAllBytesAsync(Path.Combine(source, name), [1, 2]);
+        }
+
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) => Task.FromResult(Probe(path)),
+            builder: async (request, token) =>
+            {
+                await File.WriteAllBytesAsync(request.Output, [7, 8, 9], token);
+                return BuildResult(
+                    request,
+                    [request.Inputs[0], request.Inputs[1]],
+                    [new CalibrationMasterSkippedInputResult
+                    {
+                        Path = request.Inputs[2],
+                        Reason = " ",
+                    }]);
+            });
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(
+            Request(source, cache));
+
+        Assert.Null(result.Calibration.BiasPath);
+        CalibrationPreparationKindSummary bias = Assert.Single(
+            result.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Bias);
+        Assert.Null(bias.Build);
+        Assert.Contains("invalid", bias.Warning, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public async Task UsesAnExposureMatchedDarkFlatWhenNoBiasIsAvailable()
     {
         string source = Path.Combine(_directory, "dark-flats-and-flats");
@@ -121,9 +404,11 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
             await File.WriteAllBytesAsync(Path.Combine(source, name), [1, 2]);
         }
         var builds = new List<CalibrationMasterBuildRequest>();
+        var plans = new List<CalibrationPlanRequest>();
         CalibrationPreparationService service = CreateService(
             builds,
-            (path, _) => Task.FromResult(Probe(path)));
+            (path, _) => Task.FromResult(Probe(path)),
+            plans: plans);
 
         using CalibrationPreparationResult result =
             await service.PrepareAsync(Request(source, cache));
@@ -137,6 +422,97 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
             summary => summary.Kind == CalibrationFrameRoles.DarkFlat);
         Assert.Equal(darkFlat.MasterPath, builds[1].Dark);
         Assert.False(darkFlat.Build!.BiasSubtracted);
+        CalibrationPlanRequest darkFlatPlan = Assert.Single(
+            plans,
+            plan => plan.Kind == CalibrationFrameRoles.DarkFlat);
+        Assert.Equal(
+            ["flat-1.fits", "flat-2.fits"],
+            darkFlatPlan.References.Select(reference => Path.GetFileName(reference.Path)));
+    }
+
+    [Fact]
+    public async Task WithholdsFlatWhenAnUnbiasedDarkFlatDoesNotMatchEveryFlatExposure()
+    {
+        string source = Path.Combine(_directory, "mixed-flat-exposures");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        foreach (string name in new[]
+        {
+            "dark-flat-1.fits", "dark-flat-2.fits", "flat-2s.fits", "flat-3s.fits",
+        })
+        {
+            await File.WriteAllBytesAsync(Path.Combine(source, name), [1, 2]);
+        }
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) =>
+            {
+                CalibrationFrameProbe probe = Probe(path);
+                return Task.FromResult(Path.GetFileName(path).Contains(
+                    "flat-3s",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? probe with
+                    {
+                        Signature = probe.Signature with { ExposureSeconds = 3 },
+                    }
+                    : probe);
+            });
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(
+            Request(source, cache));
+
+        CalibrationMasterBuildRequest darkFlatBuild = Assert.Single(builds);
+        Assert.Equal(CalibrationFrameRoles.Dark, darkFlatBuild.Kind);
+        Assert.Null(result.Calibration.FlatPath);
+        CalibrationPreparationKindSummary flat = Assert.Single(
+            result.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Flat);
+        Assert.Contains("pedestal", flat.Warning, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task BiasAllowsTheDarkFlatToScaleAcrossMixedFlatExposures()
+    {
+        string source = Path.Combine(_directory, "scaled-dark-flat");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        foreach (string name in new[]
+        {
+            "bias-1.fits", "bias-2.fits",
+            "dark-flat-1.fits", "dark-flat-2.fits",
+            "flat-2s.fits", "flat-3s.fits",
+        })
+        {
+            await File.WriteAllBytesAsync(Path.Combine(source, name), [1, 2]);
+        }
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) =>
+            {
+                CalibrationFrameProbe probe = Probe(path);
+                return Task.FromResult(Path.GetFileName(path).Contains(
+                    "flat-3s",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? probe with
+                    {
+                        Signature = probe.Signature with { ExposureSeconds = 3 },
+                    }
+                    : probe);
+            });
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(
+            Request(source, cache));
+
+        Assert.Equal(["bias", "dark", "flat"], builds.Select(build => build.Kind));
+        CalibrationMasterBuildRequest flatBuild = builds[2];
+        CalibrationPreparationKindSummary darkFlat = Assert.Single(
+            result.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.DarkFlat);
+        Assert.Equal(darkFlat.MasterPath, flatBuild.Dark);
+        Assert.NotNull(flatBuild.Bias);
+        Assert.NotNull(result.Calibration.FlatPath);
     }
 
     [Fact]
@@ -196,6 +572,153 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
         Assert.Contains(
             result.Warnings,
             warning => warning.Contains("withheld", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task WithholdsFlatPlanningWhenTargetFilterCannotBeEstablished()
+    {
+        string source = Path.Combine(_directory, "unknown-target-filter");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        await File.WriteAllBytesAsync(Path.Combine(source, "flat-1.fits"), [1]);
+        await File.WriteAllBytesAsync(Path.Combine(source, "flat-2.fits"), [2]);
+        var plans = new List<CalibrationPlanRequest>();
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) => Task.FromResult(Probe(path)),
+            plans: plans);
+        CalibrationPreparationRequest baseline = Request(source, cache);
+        CalibrationPreparationRequest request = baseline with
+        {
+            Reference = baseline.Reference with
+            {
+                Path = Path.Combine(_directory, "plain-light.fits"),
+                Signature = baseline.Reference.Signature with { Filter = null },
+            },
+        };
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(request);
+
+        Assert.DoesNotContain(plans, plan => plan.Kind == CalibrationFrameRoles.Flat);
+        Assert.Null(result.Calibration.FlatPath);
+        Assert.Contains(result.Warnings, warning =>
+            warning.Contains("recognized filename filter", StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public async Task FilenameFilterEnrichmentAppliesOnlyToTargetLights()
+    {
+        string source = Path.Combine(_directory, "target-only-filter-enrichment");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        string headerlessCandidate = Path.Combine(source, "flat-OIII-1.fits");
+        string headerCandidate = Path.Combine(source, "flat-Ha-2.fits");
+        await File.WriteAllBytesAsync(headerlessCandidate, [1]);
+        await File.WriteAllBytesAsync(headerCandidate, [2]);
+
+        var plans = new List<CalibrationPlanRequest>();
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) =>
+            {
+                CalibrationFrameProbe probe = Probe(path);
+                return Task.FromResult(Path.GetFullPath(path) == Path.GetFullPath(headerCandidate)
+                    ? probe with
+                    {
+                        Signature = probe.Signature with { Filter = " Luminance " },
+                    }
+                    : probe with
+                    {
+                        Signature = probe.Signature with { Filter = null },
+                    });
+            },
+            plans: plans);
+        CalibrationPreparationRequest baseline = Request(source, cache);
+        CalibrationPreparationRequest request = baseline with
+        {
+            Reference = baseline.Reference with
+            {
+                Path = Path.Combine(_directory, "M101-Ha-001.fits"),
+                Signature = baseline.Reference.Signature with { Filter = null },
+            },
+        };
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(request);
+
+        CalibrationPlanRequest flatPlan = Assert.Single(
+            plans,
+            plan => plan.Kind == CalibrationFrameRoles.Flat);
+        Assert.Equal("Ha", flatPlan.Reference.Signature.Filter);
+        Assert.All(flatPlan.References, target => Assert.Equal("Ha", target.Signature.Filter));
+        CalibrationPlanRecord headerless = Assert.Single(
+            flatPlan.Candidates,
+            candidate => Path.GetFullPath(candidate.Path) ==
+                Path.GetFullPath(headerlessCandidate));
+        CalibrationPlanRecord withHeader = Assert.Single(
+            flatPlan.Candidates,
+            candidate => Path.GetFullPath(candidate.Path) == Path.GetFullPath(headerCandidate));
+        Assert.Null(headerless.Signature.Filter);
+        Assert.Equal(" Luminance ", withHeader.Signature.Filter);
+    }
+
+    [Fact]
+    public async Task WithholdsABuiltFlatWhoseWrittenOpticsNoLongerMatchTheTarget()
+    {
+        string source = Path.Combine(_directory, "master-metadata-recheck");
+        string cache = Path.Combine(_directory, "cache");
+        Directory.CreateDirectory(source);
+        foreach (string name in new[]
+        {
+            "bias-1.fits", "bias-2.fits", "flat-1.fits", "flat-2.fits",
+        })
+        {
+            await File.WriteAllBytesAsync(Path.Combine(source, name), [1, 2]);
+        }
+
+        var builds = new List<CalibrationMasterBuildRequest>();
+        CalibrationPreparationService service = CreateService(
+            builds,
+            (path, _) =>
+            {
+                CalibrationFrameProbe probe = Probe(path);
+                return Task.FromResult(path.Contains(
+                    "master-flat-",
+                    StringComparison.OrdinalIgnoreCase)
+                    ? probe with
+                    {
+                        Signature = probe.Signature with { Telescope = null },
+                    }
+                    : probe with
+                    {
+                        Signature = probe.Signature with { Telescope = "Askar107PHQ" },
+                    });
+            });
+        CalibrationPreparationRequest baseline = Request(source, cache);
+        CalibrationPreparationRequest request = baseline with
+        {
+            Reference = baseline.Reference with
+            {
+                Signature = baseline.Reference.Signature with
+                {
+                    Telescope = "Askar107PHQ",
+                },
+            },
+        };
+
+        using CalibrationPreparationResult result = await service.PrepareAsync(request);
+
+        Assert.Null(result.Calibration.FlatPath);
+        CalibrationPreparationKindSummary flat = Assert.Single(
+            result.Summaries,
+            summary => summary.Kind == CalibrationFrameRoles.Flat);
+        Assert.NotNull(flat.Build);
+        Assert.Null(flat.MasterPath);
+        Assert.Contains("optical metadata", flat.Warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains(result.Warnings, warning => warning.Contains(
+            "actual master file",
+            StringComparison.OrdinalIgnoreCase));
     }
 
     [Fact]
@@ -725,7 +1248,9 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
         Func<string, CancellationToken, Task<CalibrationFrameProbe>> probe,
         Func<string>? coreVersion = null,
         List<CalibrationPlanRequest>? plans = null,
-        Func<CalibrationPlanRequest, CalibrationPlanResult>? planner = null) => new(
+        Func<CalibrationPlanRequest, CalibrationPlanResult>? planner = null,
+        Func<CalibrationMasterBuildRequest, CancellationToken,
+            Task<CalibrationMasterBuildResult>>? builder = null) => new(
             probe,
             (request, _) =>
             {
@@ -735,37 +1260,52 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
             async (request, token) =>
             {
                 builds.Add(request);
-                await File.WriteAllBytesAsync(request.Output, [7, 8, 9], token);
-                return new CalibrationMasterBuildResult
+                if (builder is not null)
                 {
-                    SchemaVersion = 1,
-                    Kind = request.Kind,
-                    Output = request.Output,
-                    Width = 16,
-                    Height = 16,
-                    Channels = 1,
-                    InputFrames = request.Inputs.Count,
-                    AcceptedSamples = (ulong)(request.Inputs.Count * 256),
-                    BiasSubtracted = request.Kind == CalibrationFrameRoles.Flat ||
-                        (request.Kind == CalibrationFrameRoles.Dark && request.Bias is not null),
-                    DarkSubtracted = request.Kind == CalibrationFrameRoles.Flat &&
-                        request.Dark is not null,
-                    Normalized = request.Kind == CalibrationFrameRoles.Flat,
-                    OutputExposureSeconds = request.Kind == CalibrationFrameRoles.Dark
-                        ? request.Inputs.Any(path => Path.GetFileName(path).Contains(
-                            "unknown",
-                            StringComparison.OrdinalIgnoreCase))
-                            ? null
-                            : request.Inputs.Any(path => Path.GetFileName(path).StartsWith(
-                                "dark-flat-",
-                                StringComparison.OrdinalIgnoreCase))
-                            ? 2
-                            : 300
-                        : null,
-                    Rejection = request.Rejection,
-                };
+                    return await builder(request, token);
+                }
+                await File.WriteAllBytesAsync(request.Output, [7, 8, 9], token);
+                return BuildResult(request, request.Inputs, []);
             },
             coreVersion ?? (() => "0.18.0"));
+
+    private static CalibrationMasterBuildResult BuildResult(
+        CalibrationMasterBuildRequest request,
+        IReadOnlyList<string> acceptedInputs,
+        IReadOnlyList<CalibrationMasterSkippedInputResult> skippedInputs,
+        int schemaVersion = 2) => new()
+        {
+            SchemaVersion = schemaVersion,
+            Kind = request.Kind,
+            Output = request.Output,
+            Width = 16,
+            Height = 16,
+            Channels = 1,
+            RequestedFrames = schemaVersion >= 2 ? request.Inputs.Count : 0,
+            InputFrames = acceptedInputs.Count,
+            AcceptedSamples = (ulong)(acceptedInputs.Count * 256),
+            BiasSubtracted = request.Kind == CalibrationFrameRoles.Flat ||
+                (request.Kind == CalibrationFrameRoles.Dark && request.Bias is not null),
+            DarkSubtracted = request.Kind == CalibrationFrameRoles.Flat &&
+                request.Dark is not null,
+            Normalized = request.Kind == CalibrationFrameRoles.Flat,
+            OutputExposureSeconds = request.Kind == CalibrationFrameRoles.Dark
+                ? request.Inputs.Any(path => Path.GetFileName(path).Contains(
+                    "unknown",
+                    StringComparison.OrdinalIgnoreCase))
+                    ? null
+                    : request.Inputs.Any(path => Path.GetFileName(path).StartsWith(
+                        "dark-flat-",
+                        StringComparison.OrdinalIgnoreCase))
+                    ? 2
+                    : 300
+                : null,
+            Rejection = request.Rejection,
+            Inputs = acceptedInputs
+                .Select(path => new CalibrationMasterInputResult { Path = path })
+                .ToArray(),
+            SkippedInputs = skippedInputs.ToArray(),
+        };
 
     private CalibrationPreparationRequest Request(string source, string cache) => new()
     {
@@ -790,13 +1330,18 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
     private static CalibrationFrameProbe Probe(string path)
     {
         string name = Path.GetFileName(path);
-        string role = name.StartsWith("bias-", StringComparison.OrdinalIgnoreCase)
+        bool isMaster = name.StartsWith("master-", StringComparison.OrdinalIgnoreCase);
+        string role = name.StartsWith("bias-", StringComparison.OrdinalIgnoreCase) ||
+            name.StartsWith("master-bias-", StringComparison.OrdinalIgnoreCase)
             ? CalibrationFrameRoles.Bias
-            : name.StartsWith("dark-flat-", StringComparison.OrdinalIgnoreCase)
+            : name.StartsWith("dark-flat-", StringComparison.OrdinalIgnoreCase) ||
+                name.StartsWith("master-dark-flat-", StringComparison.OrdinalIgnoreCase)
                 ? CalibrationFrameRoles.DarkFlat
-                : name.StartsWith("dark-", StringComparison.OrdinalIgnoreCase)
+                : name.StartsWith("dark-", StringComparison.OrdinalIgnoreCase) ||
+                    name.StartsWith("master-dark-", StringComparison.OrdinalIgnoreCase)
                     ? CalibrationFrameRoles.Dark
-                    : name.StartsWith("flat-", StringComparison.OrdinalIgnoreCase)
+                    : name.StartsWith("flat-", StringComparison.OrdinalIgnoreCase) ||
+                        name.StartsWith("master-flat-", StringComparison.OrdinalIgnoreCase)
                         ? CalibrationFrameRoles.Flat
                         : CalibrationFrameRoles.Bias;
         return new CalibrationFrameProbe
@@ -807,10 +1352,11 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
                 ? "XISF"
                 : "FITS",
             Role = role,
-            IsMaster = name.StartsWith("master-", StringComparison.OrdinalIgnoreCase),
+            IsMaster = isMaster,
             CalibrationState = new CalibrationFrameState
             {
                 BiasSubtracted = name.Contains("processed", StringComparison.OrdinalIgnoreCase),
+                FlatNormalized = isMaster && role == CalibrationFrameRoles.Flat,
             },
             Signature = new CalibrationFrameSignature
             {

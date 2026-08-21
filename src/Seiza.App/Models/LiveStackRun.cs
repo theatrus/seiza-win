@@ -67,44 +67,12 @@ internal sealed record LiveStackFilterIdentity(
         string name,
         LiveStackFilterSource source)
     {
-        string displayName = CollapseWhitespace(name);
-        string token = string.Concat(displayName
-            .Where(char.IsLetterOrDigit)
-            .Select(char.ToLowerInvariant));
-        string key = token switch
-        {
-            "l" or "lum" or "luminance" => "luminance",
-            "r" or "red" => "red",
-            "g" or "green" => "green",
-            "b" or "blue" => "blue",
-            "ha" or "halpha" or "hydrogenalpha" => "hydrogen-alpha",
-            "oiii" or "o3" or "oxygeniii" => "oxygen-iii",
-            "sii" or "s2" or "sulfurii" or "sulphurii" => "sulfur-ii",
-            "hb" or "hbeta" or "hydrogenbeta" => "hydrogen-beta",
-            _ when token.Length > 0 => $"named:{token}",
-            _ => "unfiltered",
-        };
-        string knownDisplayName = key switch
-        {
-            "luminance" => "Luminance",
-            "red" => "Red",
-            "green" => "Green",
-            "blue" => "Blue",
-            "hydrogen-alpha" => "H-alpha",
-            "oxygen-iii" => "OIII",
-            "sulfur-ii" => "SII",
-            "hydrogen-beta" => "H-beta",
-            "unfiltered" => "Unfiltered",
-            _ => displayName,
-        };
-        return new LiveStackFilterIdentity(key, knownDisplayName, source);
+        ImageFilenameFilter filter = ImageFilenameFilter.FromName(name);
+        return new LiveStackFilterIdentity(filter.Id, filter.Title, source);
     }
 
     private static LiveStackFilterIdentity Unspecified() =>
         new("unfiltered", "Unfiltered", LiveStackFilterSource.Unspecified);
-
-    private static string CollapseWhitespace(string value) =>
-        string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
 
     private static string? NullIfWhiteSpace(string? value) =>
         string.IsNullOrWhiteSpace(value) ? null : value;

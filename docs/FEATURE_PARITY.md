@@ -9,11 +9,11 @@ merely because its Rust implementation exists.
 
 - macOS reference: `main` at
   [`d0b3e20`](https://github.com/theatrus/seiza-mac/commit/d0b3e2039e7676d1565d62b4e61ce713ca0da286)
-- Seiza core reference: crates.io `seiza-cabi 0.18.1` from
-  [`a6e367c`](https://github.com/theatrus/seiza/commit/a6e367c9d55513ad22083b484550b543605c80d4)
+- Seiza core reference: crates.io `seiza-cabi 0.18.2` from
+  [`972726b`](https://github.com/theatrus/seiza/commit/972726b8c2c6b34854c3f169453e85eaf1669ceb)
 - Windows reference: live-stack implementation at
   [`f83dab0`](https://github.com/theatrus/seiza-win/commit/f83dab0b50f365db4570f7972f618f1a12565160)
-- Last audited: 2026-08-20
+- Last audited: 2026-08-21
 
 Update this baseline and the affected rows whenever the macOS app gains a
 feature or changes an interaction. A Windows feature is **Complete** only after
@@ -68,7 +68,7 @@ test exist.
 | Copy/paste image | Available | **Complete** | Runtime-tested full 6,167 x 4,094 XISF render through the Windows bitmap clipboard, including Windows BMP/DIB normalization back to a PNG source. |
 | Copy/paste processing adjustments | Available | **Partial** | The versioned schema round-trips the ordered stretch stack, color strategy, complete Seiza 0.14 background configuration, and deconvolution with validation and undo; final interactive clipboard QA remains. |
 | Directory image stacking | Available | **Complete** | Native WinUI frame/reference selection, filename-filter grouping, normalization, delta-sigma rejection, registration limits, progress/cancel, 32-bit FITS output, and automatic result opening match macOS. Runtime-tested through `seiza-cabi` by registering two 6,248 x 4,176 telescope FITS frames and reopening the 104,371,200-byte output. |
-| Calibration-frame preparation | Available | **Partial** | Windows can header-probe raw bias, dark, dark-flat, and flat libraries; delegate matching/coherent selection to shared Rust; build masters in dependency order; reject unsafe flat calibration; and reuse a fingerprinted atomic cache. Unit/native coverage is complete; final UI runtime QA with a representative raw calibration library remains. |
+| Calibration-frame preparation | Available | **Partial** | Windows header-probes raw bias, dark, dark-flat, and flat libraries; delegates target/proximity/alternate-anchor/coherent-session matching to shared Rust; builds masters in dependency order; rejects unsafe flat calibration; and reuses a fingerprinted atomic cache. A recognized filename filter can identify a target light with no FILTER header. Published Seiza 0.18.2 partial master reports fail closed; its flats are also withheld when the written master loses known telescope/focal/rotation metadata. The host and upstream [#146](https://github.com/theatrus/seiza/pull/146) contain the corrected provenance and metadata contracts awaiting release. Each directory group and live epoch still requires one common safe master set; psf-guard-style automatic partitioning into multiple calibration sessions remains follow-up work. |
 | Stack SNR analysis | Available | **Complete** | Directory and live stacks measure the native accumulator at doubling depths plus the final depth and present noise improvement against the square-root ideal. Runtime-tested with four distinct 6,248 x 4,176, 30-second telescope FITS lights: measured noise fell from 41.76 at one frame to 19.83 at four frames, a 2.11x improvement against the ideal 2.00x. |
 | Resumable live folder stacking | Available | **Complete** | A native WinUI window watches and reconciles stable FITS/XISF arrivals, locks one compatible filter/camera geometry, renders bounded previews, snapshots or finishes FITS output, and checkpoints exact native online state with current/previous generation recovery. Runtime-tested end to end through pause, app relaunch, exact resume, new-file ingestion, a 104,371,200-byte non-destructive snapshot, final export, and completion-tombstone retirement. |
 

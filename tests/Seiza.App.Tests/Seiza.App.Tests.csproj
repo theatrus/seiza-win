@@ -4,7 +4,18 @@
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))\</RepositoryRoot>
+    <RustProfile Condition="'$(Configuration)' == 'Release'">release</RustProfile>
+    <RustProfile Condition="'$(Configuration)' != 'Release'">debug</RustProfile>
+    <SeizaNativeDll>$(RepositoryRoot)target\$(RustProfile)\seiza_cabi.dll</SeizaNativeDll>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="$(SeizaNativeDll)" Condition="Exists('$(SeizaNativeDll)')">
+      <Link>seiza_cabi.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
@@ -36,6 +47,7 @@
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationPreparationService.cs" Link="Services\CalibrationPreparationService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationCachePaths.cs" Link="Services\CalibrationCachePaths.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationService.cs" Link="Services\CalibrationService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationMatchingService.cs" Link="Services\CalibrationMatchingService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackCheckpointWriter.cs" Link="Services\ImageStackCheckpointWriter.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackExportSnapshot.cs" Link="Services\ImageStackExportSnapshot.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackSession.cs" Link="Services\ImageStackSession.cs" />
@@ -49,6 +61,7 @@
     <Compile Include="..\..\src\Seiza.App\Services\UpdateInstallerNaming.cs" Link="Services\UpdateInstallerNaming.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\SeizaCoreException.cs" Link="Services\SeizaCoreException.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.cs" Link="Interop\NativeMethods.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.CalibrationMatching.cs" Link="Interop\NativeMethods.CalibrationMatching.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\NativeString.cs" Link="Interop\NativeString.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\SafeCancelSignalHandle.cs" Link="Interop\SafeCancelSignalHandle.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\SafeLiveStackerHandle.cs" Link="Interop\SafeLiveStackerHandle.cs" />
