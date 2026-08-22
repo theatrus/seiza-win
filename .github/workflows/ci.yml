@@ -33,7 +33,7 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Test Rust core
-        run: .\scripts\build-rust.ps1 -Test
+        run: .\scripts\build-rust.ps1 -Configuration Release -Test
 
       - name: Restore WinUI app
         run: dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
