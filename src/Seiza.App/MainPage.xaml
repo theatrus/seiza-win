@@ -68,6 +68,16 @@
             </AppBarButton>
 
             <AppBarButton
+                x:Name="LiveStackButton"
+                Click="LiveStack_Click"
+                Label="Live stack"
+                ToolTipService.ToolTip="Watch a capture folder and build a resumable live stack">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE9D9;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarButton
                 x:Name="ImageBrowserButton"
                 Click="ImageBrowser_Click"
                 IsEnabled="False"

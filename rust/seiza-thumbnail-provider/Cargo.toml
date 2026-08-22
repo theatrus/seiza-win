@@ -11,7 +11,7 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 quick-xml = "0.41.0"
 seiza-fits = "0.2.1"
-seiza-xisf = "0.1.0"
+seiza-xisf = "0.2.0"
 windows = { version = "0.62.2", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",

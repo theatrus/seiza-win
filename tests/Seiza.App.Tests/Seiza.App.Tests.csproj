@@ -3,7 +3,19 @@
     <TargetFramework>net10.0</TargetFramework>
     <IsPackable>false</IsPackable>
     <IsTestProject>true</IsTestProject>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))\</RepositoryRoot>
+    <RustProfile Condition="'$(Configuration)' == 'Release'">release</RustProfile>
+    <RustProfile Condition="'$(Configuration)' != 'Release'">debug</RustProfile>
+    <SeizaNativeDll>$(RepositoryRoot)target\$(RustProfile)\seiza_cabi.dll</SeizaNativeDll>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="$(SeizaNativeDll)" Condition="Exists('$(SeizaNativeDll)')">
+      <Link>seiza_cabi.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
@@ -18,8 +30,44 @@
     <Compile Include="..\..\src\Seiza.App\Models\FitsBackground.cs" Link="Models\FitsBackground.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\FitsStretch.cs" Link="Models\FitsStretch.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageStacking.cs" Link="Models\ImageStacking.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ImageStackSession.cs" Link="Models\ImageStackSession.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ImageMetadata.cs" Link="Models\ImageMetadata.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\CatalogStatus.cs" Link="Models\CatalogStatus.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\CatalogSetupProgress.cs" Link="Models\CatalogSetupProgress.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\SolveResult.cs" Link="Models\SolveResult.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\RenderedImageData.cs" Link="Models\RenderedImageData.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\RenderedImage16Data.cs" Link="Models\RenderedImage16Data.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\CalibrationFrames.cs" Link="Models\CalibrationFrames.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\CalibrationPreparation.cs" Link="Models\CalibrationPreparation.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\LiveStackSessionPersistence.cs" Link="Models\LiveStackSessionPersistence.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\LiveStackRun.cs" Link="Models\LiveStackRun.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\StackSnrPresentation.cs" Link="Models\StackSnrPresentation.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\SeizaJsonSerializerContext.cs" Link="Models\SeizaJsonSerializerContext.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\AtomicOutputFile.cs" Link="Services\AtomicOutputFile.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationPreparationService.cs" Link="Services\CalibrationPreparationService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationCachePaths.cs" Link="Services\CalibrationCachePaths.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationService.cs" Link="Services\CalibrationService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationMatchingService.cs" Link="Services\CalibrationMatchingService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ImageStackCheckpointWriter.cs" Link="Services\ImageStackCheckpointWriter.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ImageStackExportSnapshot.cs" Link="Services\ImageStackExportSnapshot.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ImageStackSession.cs" Link="Services\ImageStackSession.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ImageStackSnapshot.cs" Link="Services\ImageStackSnapshot.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\LiveStackCoordinator.cs" Link="Services\LiveStackCoordinator.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\LiveStackSessionStore.cs" Link="Services\LiveStackSessionStore.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\LiveStackSessionPaths.cs" Link="Services\LiveStackSessionPaths.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\Rgba16Compositor.cs" Link="Services\Rgba16Compositor.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\SeizaCore.cs" Link="Services\SeizaCore.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\StackFolderMonitor.cs" Link="Services\StackFolderMonitor.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\UpdateInstallerNaming.cs" Link="Services\UpdateInstallerNaming.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\SeizaCoreException.cs" Link="Services\SeizaCoreException.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.cs" Link="Interop\NativeMethods.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.CalibrationMatching.cs" Link="Interop\NativeMethods.CalibrationMatching.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeString.cs" Link="Interop\NativeString.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeCancelSignalHandle.cs" Link="Interop\SafeCancelSignalHandle.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeLiveStackerHandle.cs" Link="Interop\SafeLiveStackerHandle.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeRenderedImage16Handle.cs" Link="Interop\SafeRenderedImage16Handle.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeRenderedImageHandle.cs" Link="Interop\SafeRenderedImageHandle.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeStackExportSnapshotHandle.cs" Link="Interop\SafeStackExportSnapshotHandle.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeStackSnapshotHandle.cs" Link="Interop\SafeStackSnapshotHandle.cs" />
   </ItemGroup>
 </Project>

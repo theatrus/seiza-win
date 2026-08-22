@@ -122,6 +122,38 @@ internal static partial class NativeMethods
 
     [LibraryImport(
         LibraryName,
+        EntryPoint = "seiza_live_stacker_open_context",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint OpenLiveStackerContext(string contextPath, out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_live_stacker_save_context",
+        StringMarshalling = StringMarshalling.Utf8)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool SaveLiveStackerContext(
+        nint stacker,
+        string contextPath,
+        out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_state_json")]
+    internal static partial nint GetLiveStackerStateJson(nint stacker, out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_live_stacker_set_calibration_fits",
+        StringMarshalling = StringMarshalling.Utf8)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool SetLiveStackerCalibration(
+        nint stacker,
+        string? biasPath,
+        string? darkPath,
+        string? flatPath,
+        double darkExposureSeconds,
+        out nint error);
+
+    [LibraryImport(
+        LibraryName,
         EntryPoint = "seiza_live_stacker_push_fits_json",
         StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint PushLiveStackerFrameJson(
@@ -129,11 +161,72 @@ internal static partial class NativeMethods
         string path,
         out nint error);
 
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_live_stacker_push_fits_pipelined_json",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint PushLiveStackerFramesJson(
+        nint stacker,
+        string pathsJson,
+        nuint workers,
+        nuint maxInFlightBytes,
+        float normalizedFullScale,
+        out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_width")]
+    internal static partial nuint GetLiveStackerWidth(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_height")]
+    internal static partial nuint GetLiveStackerHeight(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_channels")]
+    internal static partial nuint GetLiveStackerChannels(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_data_length")]
+    internal static partial nuint GetLiveStackerDataLength(nint stacker);
+
     [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_accepted_frames")]
     internal static partial uint GetLiveStackerAcceptedFrames(nint stacker);
 
     [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_rejected_frames")]
     internal static partial uint GetLiveStackerRejectedFrames(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_mean")]
+    internal static partial nint GetLiveStackerMean(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_coverage")]
+    internal static partial nint GetLiveStackerCoverage(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_rejected_samples")]
+    internal static partial nint GetLiveStackerRejectedSamples(nint stacker);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_measure_depth")]
+    internal static unsafe partial int MeasureLiveStackerDepth(
+        nint stacker,
+        NativeSnrSample* sample,
+        out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_checkpoint_depths")]
+    internal static unsafe partial nuint GetStackSnrCheckpointDepths(
+        nuint total,
+        nuint* output,
+        nuint outputLength);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_snapshot")]
+    internal static partial nint SnapshotLiveStacker(nint stacker, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_export_snapshot")]
+    internal static partial nint ExportLiveStackerSnapshot(nint stacker, out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_live_stacker_render_preview",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint RenderLiveStackerPreview(
+        nint stacker,
+        string configurationJson,
+        uint maxDimension,
+        out nint error);
 
     [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_finish")]
     internal static partial nint FinishLiveStacker(ref nint stacker, out nint error);
@@ -160,6 +253,63 @@ internal static partial class NativeMethods
     [LibraryImport(LibraryName, EntryPoint = "seiza_stack_snapshot_free")]
     internal static partial void FreeStackSnapshot(nint snapshot);
 
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_stack_export_snapshot_write_fits",
+        StringMarshalling = StringMarshalling.Utf8)]
+    [return: MarshalAs(UnmanagedType.U1)]
+    internal static partial bool WriteStackExportSnapshotFits(
+        nint snapshot,
+        string path,
+        out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_stack_export_snapshot_free")]
+    internal static partial void FreeStackExportSnapshot(nint snapshot);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_probe_frame_json",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint ProbeFrameJson(string path, out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_calibration_plan_json",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint PlanCalibrationJson(string requestJson, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_cancel_signal_create")]
+    internal static partial nint CreateCancelSignal();
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_cancel_signal_cancel")]
+    internal static partial void CancelSignal(nint signal);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_cancel_signal_free")]
+    internal static partial void FreeCancelSignal(nint signal);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_calibration_build_master_json",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint BuildCalibrationMasterJson(
+        string requestJson,
+        nint cancelSignal,
+        out nint error);
+
     [LibraryImport(LibraryName, EntryPoint = "seiza_string_free")]
     internal static partial void FreeString(nint value);
+}
+
+[StructLayout(LayoutKind.Sequential)]
+internal unsafe struct NativeSnrSample
+{
+    internal const int MaximumChannels = 3;
+
+    public uint Frames;
+    public double Noise;
+    public double Background;
+    public double Signal;
+    public double Snr;
+    public nuint ChannelCount;
+    public fixed double ChannelNoise[MaximumChannels];
 }

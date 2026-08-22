@@ -50,8 +50,10 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _syncingBrowserSelection;
     private bool _isPickingSymmetryPoint;
     private bool _didCheckForUpdates;
+    private bool _disposed;
     private FitsStretchWindow? _stretchWindow;
     private ImageStackWindow? _stackWindow;
+    private LiveStackWindow? _liveStackWindow;
     private MainWindow? _ownerWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
@@ -130,24 +132,65 @@ public sealed partial class MainPage : Page, IDisposable
         try
         {
             ImageStackBatchResult? result = await window.Completion;
-            if (result is null || result.OutputPaths.Count == 0)
+            if (_disposed || result is null || result.OutputPaths.Count == 0)
             {
                 return;
             }
 
             await OpenImageAndDiscoverSiblingsAsync(result.OutputPaths[0]);
-            if (result.Results.Count > 1 || result.RejectedFrames > 0)
+            if (result.Results.Count > 1 ||
+                result.RejectedFrames > 0 ||
+                result.Results.Any(item =>
+                    item.SnrAnalysis.Points.Count > 1 || item.SnrWarning is not null))
             {
                 string outputs = string.Join(
                     Environment.NewLine,
                     result.Results.Select(item =>
                         $"{Path.GetFileName(item.OutputPath)}: " +
-                        $"{item.AcceptedFrames} accepted, {item.RejectedFrames} rejected"));
+                        $"{item.AcceptedFrames} accepted, {item.RejectedFrames} rejected" +
+                        DescribeStackSnrInline(item.SnrAnalysis)));
+                var content = new StackPanel { Spacing = 10 };
+                content.Children.Add(new TextBlock
+                {
+                    Text = outputs,
+                    TextWrapping = TextWrapping.Wrap,
+                });
+                ImageStackResult? chartResult = result.Results.Count == 1
+                    ? result.Results[0]
+                    : null;
+                if (chartResult?.SnrAnalysis.Points.Count > 1)
+                {
+                    var chart = new StackSnrChart { Height = 220 };
+                    chart.SetPoints(chartResult.SnrAnalysis.Points);
+                    content.Children.Add(chart);
+                    content.Children.Add(new TextBlock
+                    {
+                        Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                            "TextFillColorSecondaryBrush"],
+                        Text = DescribeStackSnr(chartResult.SnrAnalysis),
+                        TextWrapping = TextWrapping.Wrap,
+                    });
+                }
+                string[] analysisWarnings = result.Results
+                    .Select(item => item.SnrWarning)
+                    .OfType<string>()
+                    .Distinct(StringComparer.Ordinal)
+                    .ToArray();
+                if (analysisWarnings.Length > 0)
+                {
+                    content.Children.Add(new TextBlock
+                    {
+                        Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
+                            "TextFillColorSecondaryBrush"],
+                        Text = string.Join(Environment.NewLine, analysisWarnings),
+                        TextWrapping = TextWrapping.Wrap,
+                    });
+                }
                 var dialog = new ContentDialog
                 {
                     XamlRoot = XamlRoot,
                     Title = result.Results.Count == 1 ? "Stack complete" : "Stacks complete",
-                    Content = outputs,
+                    Content = content,
                     CloseButtonText = "Done",
                     DefaultButton = ContentDialogButton.Close,
                 };
@@ -160,7 +203,71 @@ public sealed partial class MainPage : Page, IDisposable
             {
                 _stackWindow = null;
             }
-            UpdateVisualState();
+            if (!_disposed)
+            {
+                UpdateVisualState();
+            }
+        }
+    }
+
+    private static string DescribeStackSnrInline(StackSnrAnalysis analysis) =>
+        analysis.Points.Count > 1
+            ? $" · noise {analysis.NoiseImprovement:N2}× lower"
+            : string.Empty;
+
+    private static string DescribeStackSnr(StackSnrAnalysis analysis) =>
+        $"Measured noise improved {analysis.NoiseImprovement:N2}×; " +
+        $"an ideal square-root stack at this depth improves {analysis.IdealImprovement:N2}× " +
+        $"({analysis.Efficiency:P0} efficiency).";
+
+    private async void LiveStack_Click(object sender, RoutedEventArgs e)
+    {
+        if (_disposed)
+        {
+            return;
+        }
+        if (_liveStackWindow is not null)
+        {
+            _liveStackWindow.Activate();
+            return;
+        }
+
+        string? initialFolder = _currentPath is null
+            ? null
+            : Path.GetDirectoryName(_currentPath);
+        if (initialFolder is null || !Directory.Exists(initialFolder))
+        {
+            initialFolder = await ImageFileService.PickFolderAsync(OwnerWindowHandle);
+        }
+        if (initialFolder is null || _disposed)
+        {
+            return;
+        }
+
+        var window = new LiveStackWindow(initialFolder);
+        _liveStackWindow = window;
+        UpdateVisualState();
+        window.Activate();
+        try
+        {
+            string? outputPath = await window.Completion;
+            if (!_disposed &&
+                !string.IsNullOrWhiteSpace(outputPath) &&
+                File.Exists(outputPath))
+            {
+                await OpenImageAndDiscoverSiblingsAsync(outputPath);
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_liveStackWindow, window))
+            {
+                _liveStackWindow = null;
+            }
+            if (!_disposed)
+            {
+                UpdateVisualState();
+            }
         }
     }
 
@@ -1375,6 +1482,10 @@ public sealed partial class MainPage : Page, IDisposable
 
     private void UpdateVisualState()
     {
+        if (_disposed)
+        {
+            return;
+        }
         WelcomePanel.Visibility = !ViewModel.HasImage && !ViewModel.IsLoading
             ? Visibility.Visible
             : Visibility.Collapsed;
@@ -1409,6 +1520,7 @@ public sealed partial class MainPage : Page, IDisposable
             _stackWindow is null &&
             !ViewModel.IsLoading &&
             _imagePaths.Count(ImageFileService.IsStackableImage) >= 2;
+        LiveStackButton.IsEnabled = _liveStackWindow is null && !ViewModel.IsLoading;
         ImageBrowserButton.Label = _isBrowserOpen ? "Hide images" : "Images";
         ImageBrowserPane.Visibility = _isBrowserOpen && BrowserItems.Count > 1
             ? Visibility.Visible
@@ -1563,6 +1675,11 @@ public sealed partial class MainPage : Page, IDisposable
 
     public void Dispose()
     {
+        if (_disposed)
+        {
+            return;
+        }
+        _disposed = true;
         _solveCancellation?.Cancel();
         _solveCancellation = null;
         _loadCancellation?.Cancel();
@@ -1575,6 +1692,8 @@ public sealed partial class MainPage : Page, IDisposable
         _stretchWindow = null;
         _stackWindow?.Close();
         _stackWindow = null;
+        _liveStackWindow?.Close();
+        _liveStackWindow = null;
         if (!ReferenceEquals(_bitmap, _committedBitmap))
         {
             _bitmap?.Dispose();
