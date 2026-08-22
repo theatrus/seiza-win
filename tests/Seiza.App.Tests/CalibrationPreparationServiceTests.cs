@@ -716,8 +716,9 @@ public sealed class CalibrationPreparationServiceTests : IDisposable
         Assert.NotNull(flat.Build);
         Assert.Null(flat.MasterPath);
         Assert.Contains("optical metadata", flat.Warning, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("telescope", flat.Warning, StringComparison.OrdinalIgnoreCase);
         Assert.Contains(result.Warnings, warning => warning.Contains(
-            "actual master file",
+            "preserve enough metadata",
             StringComparison.OrdinalIgnoreCase));
     }
 

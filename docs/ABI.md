@@ -30,12 +30,15 @@ Rules:
   that accepted and skipped paths are a disjoint, exact partition, that every
   skip has a reason, and that enough accepted frames remain. An ambiguous
   legacy partial report is discarded rather than guessed or cached. Bundled
-  Seiza 0.18.3 emits the complete schema-2 partition.
+  Seiza 0.18.4 emits the complete schema-2 partition.
 - Calibration preparation calls the native signature matchers for sensor
   settings, flat optics, and dark exposure/temperature using Seiza's exported
-  default tolerances. Live pushes rely on the stacker's authoritative native
-  calibration validation so scalable dark policy and restored calibration state
-  are not duplicated in C#.
+  default tolerances. Native mismatch descriptions name the differing readings
+  and applicable tolerance in preparation warnings. Live pushes rely on the
+  stacker's authoritative native calibration validation so scalable dark policy
+  and restored calibration state are not duplicated in C#. A chosen legacy
+  master may omit an old metadata field, but two recorded conflicting readings
+  still reject the affected light.
 - ABI additions are backward-compatible. Breaking changes require an ABI version bump.
 
 The Windows interop layer uses source-generated `LibraryImport` declarations,

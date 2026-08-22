@@ -804,7 +804,12 @@ internal sealed class CalibrationPreparationService
                             target.Signature,
                             master.Signature))
                     {
-                        mismatch = "its sensor or readout metadata no longer matches every target";
+                        string details = CalibrationMatchingService.DescribeSensorMismatch(
+                            target.Signature,
+                            master.Signature);
+                        mismatch =
+                            "its sensor or readout metadata no longer matches every target " +
+                            $"({details})";
                         break;
                     }
                     if (!CalibrationMatchingService.OpticsMatch(
@@ -812,7 +817,13 @@ internal sealed class CalibrationPreparationService
                             master.Signature,
                             tolerances))
                     {
-                        mismatch = "its optical metadata no longer matches every target";
+                        string details = CalibrationMatchingService.DescribeOpticsMismatch(
+                            target.Signature,
+                            master.Signature,
+                            tolerances);
+                        mismatch =
+                            "its optical metadata no longer matches every target " +
+                            $"({details})";
                         break;
                     }
                 }
@@ -834,8 +845,8 @@ internal sealed class CalibrationPreparationService
 
         string warning =
             $"The built master flat was withheld because {mismatch}. " +
-            "The actual master file must pass the same native compatibility rules as its " +
-            "source frames.";
+            "Windows requires a newly built master to preserve enough metadata to prove it " +
+            "is safe for every selected target before native stacking begins.";
         warnings.Add(warning);
         return BuildOutcome.WithheldBuilt(flat, warning);
     }

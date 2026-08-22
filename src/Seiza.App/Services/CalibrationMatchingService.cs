@@ -121,6 +121,48 @@ internal static class CalibrationMatchingService
             "The Seiza core could not compare dark exposure and temperature.");
     }
 
+    public static string DescribeSensorMismatch(
+        CalibrationFrameSignature reference,
+        CalibrationFrameSignature candidate)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(candidate);
+        using var nativeReference = new NativeFrameSignatureLease(reference);
+        using var nativeCandidate = new NativeFrameSignatureLease(candidate);
+        nint error = 0;
+        nint description = NativeMethods.CalibrationDescribeSensorMismatch(
+            nativeReference.Value,
+            nativeCandidate.Value,
+            out error);
+        return ReadDescription(
+            description,
+            error,
+            "The Seiza core could not describe the sensor mismatch.");
+    }
+
+    public static string DescribeOpticsMismatch(
+        CalibrationFrameSignature reference,
+        CalibrationFrameSignature candidate,
+        CalibrationMatchTolerances? tolerances = null)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        ArgumentNullException.ThrowIfNull(candidate);
+        using var nativeReference = new NativeFrameSignatureLease(reference);
+        using var nativeCandidate = new NativeFrameSignatureLease(candidate);
+        NativeMatchTolerances nativeTolerances = ToNative(
+            tolerances ?? GetDefaultTolerances());
+        nint error = 0;
+        nint description = NativeMethods.CalibrationDescribeOpticsMismatch(
+            nativeReference.Value,
+            nativeCandidate.Value,
+            nativeTolerances,
+            out error);
+        return ReadDescription(
+            description,
+            error,
+            "The Seiza core could not describe the optics mismatch.");
+    }
+
     private static bool ReadMatchResult(int result, nint error, string fallback)
     {
         if (result < 0)
@@ -138,6 +180,21 @@ internal static class CalibrationMatchingService
             _ => throw new SeizaCoreException(
                 "The Seiza core returned an invalid calibration match result."),
         };
+    }
+
+    private static string ReadDescription(nint description, nint error, string fallback)
+    {
+        if (description == 0)
+        {
+            throw NativeString.TakeError(error, fallback);
+        }
+
+        string value = NativeString.TakeOwned(description, fallback);
+        if (error != 0)
+        {
+            throw NativeString.TakeError(error, value);
+        }
+        return value;
     }
 
     private static CalibrationMatchTolerances FromNative(NativeMatchTolerances value) =>

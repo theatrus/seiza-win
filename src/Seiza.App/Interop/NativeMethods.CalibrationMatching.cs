@@ -27,6 +27,23 @@ internal static partial class NativeMethods
         in NativeFrameSignature candidate,
         in NativeMatchTolerances tolerances,
         out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_calibration_describe_sensor_mismatch")]
+    internal static partial nint CalibrationDescribeSensorMismatch(
+        in NativeFrameSignature reference,
+        in NativeFrameSignature candidate,
+        out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_calibration_describe_optics_mismatch")]
+    internal static partial nint CalibrationDescribeOpticsMismatch(
+        in NativeFrameSignature reference,
+        in NativeFrameSignature candidate,
+        in NativeMatchTolerances tolerances,
+        out nint error);
 }
 
 [StructLayout(LayoutKind.Sequential)]

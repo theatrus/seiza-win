@@ -42,6 +42,16 @@ if ($nativePackages.Count -ne 1) {
 }
 
 $nativePackage = $nativePackages[0]
+$stackingPackages = @(
+    $metadata.packages | Where-Object {
+        $_.name -eq "seiza-stacking" -and
+        $_.source -like "registry+*"
+    }
+)
+if ($stackingPackages.Count -ne 1) {
+    throw "Expected exactly one registry seiza-stacking package, found $($stackingPackages.Count)."
+}
+$stackingPackage = $stackingPackages[0]
 $vcsInfoPath = Join-Path (Split-Path -Parent $nativePackage.manifest_path) ".cargo_vcs_info.json"
 if (-not (Test-Path -LiteralPath $vcsInfoPath)) {
     throw "The published seiza-cabi package does not contain Cargo VCS metadata."
@@ -60,9 +70,13 @@ $workspaceNativeBuildCommand = "cargo build --package $nativePackageSpec --targe
 if ($Test) {
     # Cargo cannot run a dependency package's dev-targets from the consuming
     # workspace, so exercise the published crate's own locked test suite, then
-    # also build the shipped DLL from the application's locked dependency graph.
+    # exercise the exact stacking leaf selected by the application lock. The
+    # C ABI archive can predate a compatible stacking patch and retain the
+    # earlier leaf in its packaged lockfile. Finally build the shipped DLL from
+    # the application's locked dependency graph.
     $nativeTestCommand = "cargo test --manifest-path `"$($nativePackage.manifest_path)`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked$releaseFlag"
-    $cargoCommand = "$nativeTestCommand && $workspaceNativeBuildCommand"
+    $stackingTestCommand = "cargo test --manifest-path `"$($stackingPackage.manifest_path)`" --package seiza-stacking --target-dir `"$targetDirectory`" --locked$releaseFlag"
+    $cargoCommand = "$nativeTestCommand && $stackingTestCommand && $workspaceNativeBuildCommand"
 }
 else {
     # Select the registry dependency from this workspace so the application
