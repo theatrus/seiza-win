@@ -107,6 +107,15 @@ internal sealed class ImageStackCalibration
     public bool OverridesDarkExposure { get; set; }
     public double DarkExposureSeconds { get; set; } = 300.0;
 
+    public ImageStackCalibration Copy() => new()
+    {
+        BiasPath = BiasPath,
+        DarkPath = DarkPath,
+        FlatPath = FlatPath,
+        OverridesDarkExposure = OverridesDarkExposure,
+        DarkExposureSeconds = DarkExposureSeconds,
+    };
+
     public string? ValidationMessage(IReadOnlyList<string> inputs)
     {
         if (DarkPath is null && OverridesDarkExposure)
@@ -205,8 +214,35 @@ internal sealed record ImageFilenameFilter(string Id, string Title, string Filen
         return null;
     }
 
+    public static ImageFilenameFilter FromName(string name)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        string displayName = string.Join(
+            ' ',
+            name.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));
+        string token = string.Concat(displayName
+            .Where(char.IsLetterOrDigit)
+            .Select(char.ToLowerInvariant));
+        string? id = token switch
+        {
+            "l" or "lum" or "luminance" => "luminance",
+            "r" or "red" => "red",
+            "g" or "green" => "green",
+            "b" or "blue" => "blue",
+            "ha" or "halpha" or "hydrogenalpha" => "hydrogen-alpha",
+            "oiii" or "o3" or "oxygeniii" => "oxygen-iii",
+            "sii" or "s2" or "sulfurii" or "sulphurii" => "sulfur-ii",
+            "hb" or "hbeta" or "hydrogenbeta" => "hydrogen-beta",
+            _ => null,
+        };
+        return id is null ? Named(displayName) : Known(id);
+    }
+
     private static ImageFilenameFilter Named(string name) =>
-        new($"named:{name.ToLowerInvariant()}", name, name);
+        new(
+            $"named:{string.Concat(name.Where(char.IsLetterOrDigit)).ToLowerInvariant()}",
+            name,
+            name);
 
     private static ImageFilenameFilter Known(string id) => id switch
     {
@@ -400,7 +436,9 @@ internal sealed record ImageStackResult(
     string OutputPath,
     int AcceptedFrames,
     int RejectedFrames,
-    IReadOnlyList<ImageStackDisposition> Dispositions);
+    IReadOnlyList<ImageStackDisposition> Dispositions,
+    StackSnrAnalysis SnrAnalysis,
+    string? SnrWarning);
 
 internal sealed record ImageStackBatchResult(IReadOnlyList<ImageStackResult> Results)
 {

@@ -43,6 +43,11 @@ internal static unsafe class SeizaCore
         }
 
         using SafeRenderedImageHandle image = new(rawHandle);
+        return CopyRenderedImage(image);
+    }
+
+    internal static RenderedImageData CopyRenderedImage(SafeRenderedImageHandle image)
+    {
         nint handle = image.DangerousGetHandle();
         int width = checked((int)NativeMethods.GetRenderedImageWidth(handle));
         int height = checked((int)NativeMethods.GetRenderedImageHeight(handle));

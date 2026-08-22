@@ -33,13 +33,16 @@ jobs:
         run: cargo fmt --all --check
 
       - name: Test Rust core
-        run: .\scripts\build-rust.ps1 -Test
+        run: .\scripts\build-rust.ps1 -Configuration Release -Test
 
       - name: Restore WinUI app
         run: dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
 
       - name: Build WinUI app (Release)
         run: dotnet build Seiza.slnx -c Release --no-restore
+
+      - name: Test managed stacking services
+        run: dotnet test tests\Seiza.App.Tests\Seiza.App.Tests.csproj -c Release --no-build --no-restore
 
       # Deliberately unsigned. Pull requests from forks cannot mint an OIDC token
       # for this repository, and the federated credential is bound to the

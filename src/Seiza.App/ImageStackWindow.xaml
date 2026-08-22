@@ -142,54 +142,87 @@
                         </StackPanel>
                     </Border>
 
-                    <Expander Header="Calibration masters">
+                    <Expander Header="Calibration">
                         <StackPanel Margin="0,12,0,0" Spacing="10">
-                            <Grid ColumnSpacing="8">
+                            <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="90" />
+                                    <ColumnDefinition Width="160" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Master bias" VerticalAlignment="Center" />
-                                <TextBlock x:Name="BiasPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                <Button Grid.Column="2" Click="ChooseBias_Click" Content="Choose…" />
-                                <Button Grid.Column="3" Click="ClearBias_Click" Content="Clear" />
+                                <TextBlock Text="Source" VerticalAlignment="Center" />
+                                <ComboBox
+                                    x:Name="CalibrationSourcePicker"
+                                    Grid.Column="1"
+                                    AutomationProperties.Name="Calibration source"
+                                    HorizontalAlignment="Stretch"
+                                    SelectionChanged="CalibrationSource_Changed">
+                                    <ComboBoxItem Content="None or existing masters" Tag="Masters" IsSelected="True" />
+                                    <ComboBoxItem Content="Build from calibration frames" Tag="Automatic" />
+                                </ComboBox>
                             </Grid>
-                            <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="90" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Master dark" VerticalAlignment="Center" />
-                                <TextBlock x:Name="DarkPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                <Button Grid.Column="2" Click="ChooseDark_Click" Content="Choose…" />
-                                <Button Grid.Column="3" Click="ClearDark_Click" Content="Clear" />
-                            </Grid>
-                            <Grid ColumnSpacing="8">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="90" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Text="Master flat" VerticalAlignment="Center" />
-                                <TextBlock x:Name="FlatPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
-                                <Button Grid.Column="2" Click="ChooseFlat_Click" Content="Choose…" />
-                                <Button Grid.Column="3" Click="ClearFlat_Click" Content="Clear" />
-                            </Grid>
-                            <ToggleSwitch x:Name="DarkExposureToggle" Header="Override master-dark exposure" Toggled="Options_Changed" />
-                            <NumberBox
-                                x:Name="DarkExposureBox"
-                                Header="Master-dark exposure (seconds)"
-                                IsEnabled="False"
-                                Minimum="0.001"
-                                Maximum="86400"
-                                SmallChange="1"
-                                Value="300"
-                                ValueChanged="Options_ValueChanged" />
+                            <StackPanel x:Name="ManualCalibrationPanel" Spacing="10">
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Master bias" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="BiasPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <Button AutomationProperties.Name="Choose master bias" Grid.Column="2" Click="ChooseBias_Click" Content="Choose…" />
+                                    <Button AutomationProperties.Name="Clear master bias" Grid.Column="3" Click="ClearBias_Click" Content="Clear" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Master dark" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="DarkPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <Button AutomationProperties.Name="Choose master dark" Grid.Column="2" Click="ChooseDark_Click" Content="Choose…" />
+                                    <Button AutomationProperties.Name="Clear master dark" Grid.Column="3" Click="ClearDark_Click" Content="Clear" />
+                                </Grid>
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="90" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Text="Master flat" VerticalAlignment="Center" />
+                                    <TextBlock x:Name="FlatPathText" Grid.Column="1" Text="None" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
+                                    <Button AutomationProperties.Name="Choose master flat" Grid.Column="2" Click="ChooseFlat_Click" Content="Choose…" />
+                                    <Button AutomationProperties.Name="Clear master flat" Grid.Column="3" Click="ClearFlat_Click" Content="Clear" />
+                                </Grid>
+                                <ToggleSwitch x:Name="DarkExposureToggle" Header="Override master-dark exposure" Toggled="Options_Changed" />
+                                <NumberBox
+                                    x:Name="DarkExposureBox"
+                                    Header="Master-dark exposure (seconds)"
+                                    IsEnabled="False"
+                                    Minimum="0.001"
+                                    Maximum="86400"
+                                    SmallChange="1"
+                                    Value="300"
+                                    ValueChanged="Options_ValueChanged" />
+                            </StackPanel>
+                            <StackPanel x:Name="AutomaticCalibrationPanel" Spacing="10" Visibility="Collapsed">
+                                <TextBlock
+                                    Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                    Text="Seiza proves one compatible calibration set across every selected light, builds bias, dark, dark-flat, and flat masters in dependency order, and caches them for reuse."
+                                    TextWrapping="Wrap" />
+                                <Grid ColumnSpacing="8">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBox x:Name="CalibrationLibraryTextBox" AutomationProperties.Name="Calibration library folder" IsReadOnly="True" PlaceholderText="Calibration library folder" />
+                                    <Button AutomationProperties.Name="Choose calibration library folder" Grid.Column="1" Click="ChooseCalibrationLibrary_Click" Content="Choose…" />
+                                </Grid>
+                                <TextBlock x:Name="AutomaticCalibrationHintText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
+                            </StackPanel>
                         </StackPanel>
                     </Expander>
 

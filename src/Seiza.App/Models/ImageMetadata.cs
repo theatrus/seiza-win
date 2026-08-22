@@ -40,10 +40,10 @@ public sealed record ImageBackgroundDiagnostics(
     int RejectedResidual);
 
 public sealed record ImageStatistics(
-    int Minimum,
-    int Maximum,
+    double Minimum,
+    double Maximum,
     double Mean,
-    int Median,
+    double Median,
     double Mad);
 
 public sealed record ImageHistogram(

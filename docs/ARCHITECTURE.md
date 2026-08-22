@@ -11,12 +11,14 @@ Seiza.App (WinUI 3 / C#)
     |-- Windows lifecycle, file activation, multi-window sessions
     |-- native controls, accessibility, settings, drag and drop
     |-- Win2D image viewport and overlay presentation
+    |-- watched-folder scheduling, checkpoint manifests, and session UI
     `-- generated P/Invoke bindings with SafeHandle ownership
                          |
                          `-- C ABI -- seiza-cabi.dll (Rust)
                                            |-- built from the crates.io seiza-cabi release
                                            |-- seiza-fits
                                            |-- seiza-xisf
+                                           |-- seiza-stacking live contexts / SNR
                                            |-- image
                                            `-- seiza
 
@@ -75,6 +77,14 @@ disable process isolation.
     The managed buffer remains 16-bit through optional overlay compositing and
     is passed directly to the Windows Imaging Component encoder without a
     second full-frame conversion copy.
+14. Calibration classification, compatibility matching, coherent-set
+    selection, master construction, live-stack registration, online rejection,
+    and SNR measurement remain shared Rust policy. Windows owns only file
+    discovery, workflow choices, progress, and presentation.
+15. A resumable live stack is one opaque, versioned Rust context paired with a
+    Windows manifest. Publication advances an atomic generation pointer only
+    after both files are durable, retains the preceding complete generation,
+    and accepts a restore only when native identity and manifest agree.
 
 ## Performance rules
 
@@ -95,15 +105,52 @@ disable process isolation.
   working-set estimate exceeds 1.5 GiB; process isolation is not a substitute
   for bounding attacker-controlled allocations.
 - Render interactive processing drafts through the shared JSON C ABI at a bounded 2,048-pixel dimension, cancel stale UI results, and retain the committed full-resolution bitmap until Save succeeds.
-- Keep the shared pixel pipeline ordered as background correction, optional
-  light deconvolution, then display stretch; the Windows shell only edits and
-  serializes configuration. Seiza 0.14 owns background sampling, automatic
-  held-out model selection, polynomial and radial-basis fitting, correction,
-  and diagnostics.
+- Keep the shared display pipeline ordered as background correction, optional
+  light deconvolution, optional linked robust `sample_domain` mapping, then
+  display stretch; the Windows shell only edits and serializes configuration.
+  Seiza owns range sampling and resolution as well as background sampling,
+  automatic held-out model selection, polynomial and radial-basis fitting,
+  correction, and diagnostics.
 - Keep image registration, normalization, rejection, calibration, and stack
-  accumulation in Rust. The Windows shell may group filenames and schedule
-  batches, but it only crosses the C ABI once per input frame and cancels at
-  frame boundaries.
+  accumulation in Rust. The Windows shell may discover/group filenames and
+  schedule batches, but header classification, calibration planning, and frame
+  disposition cross the C ABI as versioned JSON rather than being
+  reimplemented in C#.
+- Treat calibration matching as layered admission: every target light is
+  checked during native planning, candidate sets are proximity-ordered and
+  reduced through alternate-anchor plus coherent-session passes, and the
+  native master builder checks the actual reread headers once more. A corrected
+  schema-2 master report partitions requested paths into accepted `inputs` and
+  reasoned `skippedInputs`; schema-1 partial reports are ambiguous and must fail
+  closed. Windows uses Seiza's exported matching functions while preparing a
+  flat dependency chain; the native live stacker remains authoritative for
+  per-light calibration admission, including scalable darks and restored
+  calibration state.
+- Cache built calibration masters by a core-versioned input fingerprint and
+  publish them atomically. Bound the shared library cache by age and size,
+  protect every master still needed by a multi-group preparation run, and use
+  process plus file leases so cleanup cannot race a build.
+- Render live stacks directly from the native accumulator at a bounded output
+  dimension. The accumulator mean remains physical linear `f32`; only the
+  render buffer passes through the configured `sample_domain`. Robust mapping
+  resolves one linked percentile range across mono or RGB before display
+  stretch, avoiding an implicit per-channel color balance. Never copy the full
+  mean merely to refresh a preview; uncovered samples remain masked through
+  background fitting, deconvolution, sample-domain mapping, and stretch.
+- Export non-destructive live snapshots through a mean-only native snapshot.
+  Do not clone the accumulator's variance, coverage, or rejection maps merely
+  to write FITS; this keeps peak memory bounded for very large mono frames.
+- Keep display sample-domain mapping separate from frame-to-frame stack
+  normalization. SNR analysis, resumable checkpoints, snapshots, and final FITS
+  output use the physical accumulator and never persist or measure the mapped
+  preview pixels.
+- Serialize all operations on an opaque live-stack handle. Copy any borrowed
+  native view before releasing that gate, checkpoint calibration changes before
+  accepting more inputs, and treat the native ordered path ledger as the
+  authoritative resume/deduplication record.
+- Measure SNR from the accumulator at doubling frame depths and the final
+  depth. Recompute comparisons with one common deepest-stack signal so noisy
+  early-percentile estimates do not exaggerate improvement.
 
 ## Porting sequence
 
@@ -128,8 +175,13 @@ The detailed status and acceptance criteria live in
    independent document windows, export true RGBA16 PNG/TIFF files, and render
    FITS/XISF images in Explorer's Preview Pane through an isolated native COM
    handler.
-10. **Next:** add cached previews during full-resolution loads and Authenticode
-    signing.
+10. **Implemented:** prepare matched bias/dark/dark-flat/flat masters, report
+    stack-depth SNR, and run resumable live stacks from reconciled capture
+    folders with bounded previews and crash-safe checkpoints. Real telescope
+    data has exercised preview rendering, SNR sampling, snapshot export, pause,
+    relaunch, exact resume, continued ingestion, and completed-session
+    retirement.
+11. **Next:** add cached previews during full-resolution loads.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.

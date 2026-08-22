@@ -81,6 +81,29 @@ public sealed class ImageStackingTests
     }
 
     [Fact]
+    public void CalibrationCopyIsIndependentAndPreservesSettings()
+    {
+        var original = new ImageStackCalibration
+        {
+            BiasPath = @"C:\calibration\bias.fits",
+            DarkPath = @"C:\calibration\dark.fits",
+            FlatPath = @"C:\calibration\flat.fits",
+            OverridesDarkExposure = true,
+            DarkExposureSeconds = 120,
+        };
+
+        ImageStackCalibration copy = original.Copy();
+        copy.DarkPath = null;
+
+        Assert.NotSame(original, copy);
+        Assert.Equal(@"C:\calibration\dark.fits", original.DarkPath);
+        Assert.Equal(original.BiasPath, copy.BiasPath);
+        Assert.Equal(original.FlatPath, copy.FlatPath);
+        Assert.Equal(original.OverridesDarkExposure, copy.OverridesDarkExposure);
+        Assert.Equal(original.DarkExposureSeconds, copy.DarkExposureSeconds);
+    }
+
+    [Fact]
     public void BatchCancellationReportsCompletedOutputs()
     {
         string output = @"C:\stacks\M101-Ha.fits";
