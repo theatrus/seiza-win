@@ -7,6 +7,64 @@ namespace Seiza.App.Tests;
 public sealed class CalibrationFramesTests
 {
     [Fact]
+    public void TargetSelectionSetsAsideIneligibleFramesWithAWarning()
+    {
+        var master = new CalibrationFrameProbe
+        {
+            Path = @"C:\frames\master.fits",
+            Role = CalibrationFrameRoles.Light,
+            IsMaster = true,
+        };
+        var preprocessed = new CalibrationFrameProbe
+        {
+            Path = @"C:\frames\processed.fits",
+            Role = CalibrationFrameRoles.Light,
+            CalibrationState = new CalibrationFrameState
+            {
+                DarkSubtracted = true,
+            },
+        };
+        var flat = new CalibrationFrameProbe
+        {
+            Path = @"C:\frames\flat.fits",
+            Role = CalibrationFrameRoles.Flat,
+        };
+        var light = new CalibrationFrameProbe
+        {
+            Path = @"C:\frames\light.fits",
+            Role = CalibrationFrameRoles.Light,
+        };
+
+        CalibrationTargetSelection.Partition partition =
+            CalibrationTargetSelection.Split([master, preprocessed, flat, light]);
+
+        Assert.Equal([light.Path], partition.Eligible.Select(probe => probe.Path));
+        Assert.Equal(3, partition.Warnings.Count);
+        Assert.Contains("master.fits", partition.Warnings[0]);
+        Assert.Contains("already a master", partition.Warnings[0]);
+        Assert.Contains("already preprocessed", partition.Warnings[1]);
+        Assert.Contains("not a light frame", partition.Warnings[2]);
+    }
+
+    [Fact]
+    public void TargetSelectionKeepsAnAllEligibleGroupWarningFree()
+    {
+        CalibrationFrameProbe[] lights = Enumerable.Range(1, 3)
+            .Select(index => new CalibrationFrameProbe
+            {
+                Path = $@"C:\frames\light-{index}.fits",
+                Role = CalibrationFrameRoles.Light,
+            })
+            .ToArray();
+
+        CalibrationTargetSelection.Partition partition =
+            CalibrationTargetSelection.Split(lights);
+
+        Assert.Equal(3, partition.Eligible.Count);
+        Assert.Empty(partition.Warnings);
+    }
+
+    [Fact]
     public void MasterBuildRequestUsesTheCamelCaseCabiContract()
     {
         var request = new CalibrationMasterBuildRequest
