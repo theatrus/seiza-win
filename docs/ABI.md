@@ -42,7 +42,7 @@ Rules:
   that accepted and skipped paths are a disjoint, exact partition, that every
   skip has a reason, and that enough accepted frames remain. An ambiguous
   legacy partial report is discarded rather than guessed or cached. Bundled
-  Seiza 0.18.6 emits the complete schema-2 partition.
+  Seiza 0.18.7 emits the complete schema-2 partition.
 - Calibration preparation calls the native signature matchers for sensor
   settings, flat optics, and dark exposure/temperature using Seiza's exported
   default tolerances. Native mismatch descriptions name the differing readings
@@ -65,22 +65,28 @@ are globally serialized. Canceling or navigating away abandons only the UI
 wait; the synchronous native allocation is allowed to finish and free safely,
 and source-identity plus document-generation checks discard stale results.
 
-The Windows implementation is locked to the published Seiza 0.18.6 C ABI,
+The Windows implementation is locked to the published Seiza 0.18.7 C ABI,
 which supplies the path API and normalized-major-axis capability field. The
 stable 0.6.1 download predates this development feature.
 
-After a supporting native release is locked, Windows will explicitly request
-the additive triangle contract with `"triangleAngleDegrees": 0` in the
-star-detection options. Zero degrees points up in image coordinates and
-positive values rotate clockwise. A supporting core returns `triangleTilt`
-with the normalized angle, inner and outer radii,
-the core-owned minimum sample count, center statistics, three ordered
+Windows explicitly requests the additive triangle contract with
+`"triangleAngleDegrees": 0` in its interactive star-detection options. Zero
+degrees points up in image coordinates and positive values rotate clockwise.
+Seiza 0.18.7 returns `triangleTilt` with the normalized angle, inner and outer
+radii, the core-owned minimum sample count, center statistics, three ordered
 120-degree sectors, their HFR medians, the annular overall median, and a
-readiness-gated tilt/best/worst verdict. The field is absent when the option is
-absent. Windows validates this provenance and renders it directly; it does not
-re-bin stars or substitute the four-corner tilt summary. Published Seiza 0.18.6
-does not yet expose this additive response, so its Triangle menu item remains
-unavailable until the corresponding native release is locked.
+readiness-gated tilt/best/worst verdict. The field remains absent when the
+option is absent. Windows validates this provenance and renders it directly;
+it does not re-bin stars or substitute the four-corner tilt summary. The
+Triangle menu item is enabled only for a validated, ready native result, so a
+sparse response remains safely unavailable.
+
+The registry-built Seiza 0.18.7 DLL passed the managed
+`StarAnalysisService` real-file path end to end: a C925 FITS source returned 71
+stars and a ready triangle, while an XISF source returned 468 stars and a ready
+triangle. Validation preserved the exact native triangle fields and rechecked
+its radii, axes, readiness, best/worst sectors, and tilt formula. Both source
+files remained unchanged by analysis.
 
 Interactive edits are debounced in the WinUI shell and rendered at a maximum
 2,048-pixel dimension. Save submits the same processing stack at full

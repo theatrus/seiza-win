@@ -15,6 +15,7 @@ public sealed record StarAnalysisOptions
         DetectionBinning = 2,
         Sensitivity = 30,
         PsfType = StarPsfType.Moffat4,
+        TriangleAngleDegrees = 0,
     };
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]

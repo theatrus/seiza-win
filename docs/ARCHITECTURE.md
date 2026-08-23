@@ -228,9 +228,11 @@ The detailed status and acceptance criteria live in
     solve-independent star-analysis action, inspector results, measured-star
     overlay, nine-cell sensor-tilt grid, and parallelogram/triangle HFR diagrams
     through one composited viewport and export scene. The published Seiza
-    0.18.6 path-analysis C ABI is locked and exercised on real FITS/XISF data;
-    the additive native triangle-sector response and final composited-export QA
-    remain before completion.
+    0.18.7 path-analysis and triangle-sector C ABI is locked. Its registry-built
+    DLL passed the managed service path on a real C925 FITS image with 71 stars
+    and a real XISF image with 468; both triangles were ready, exact native
+    fields and formulas matched, and the sources remained unchanged. Only
+    packaged viewport plus 8- and 16-bit composited-export UI QA remains.
 12. **Next:** add cached previews during full-resolution loads.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view

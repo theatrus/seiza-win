@@ -1485,9 +1485,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "seiza"
-version = "0.18.6"
+version = "0.18.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "604fd0940ae004f594dc54ee332b48ce7aaf235d6ae2cdbd1e6d666aef777f9e"
+checksum = "d1be175fc992a90af0eb43f6d41faed5cdd9da0ef7bac359895de94b69f8a16e"
 dependencies = [
  "directories",
  "image",
@@ -1520,9 +1520,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.18.6"
+version = "0.18.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "82986cf9a24e986167439fe4277714183fd4a8b35c8a612a16cf863444274b5a"
+checksum = "eece13382cd51fa4482204a9f51a0a17dd816d91a0950b6c90a34393d0630d37"
 dependencies = [
  "cbindgen",
  "image",
@@ -1633,9 +1633,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-stars"
-version = "0.1.1"
+version = "0.1.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2c5b5d4eb1b4347b59226f34aa6140981db67213a0c43010c784e9c6c06d5d3c"
+checksum = "939218fed00874d38126f9ca2ef28a2fcb9fd2e431e03b0d6daf62c7246c0403"
 dependencies = [
  "nalgebra",
  "rayon",

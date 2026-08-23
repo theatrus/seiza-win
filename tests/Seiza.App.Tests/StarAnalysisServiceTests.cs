@@ -114,7 +114,7 @@ public sealed class StarAnalysisServiceTests
         Assert.False(root.TryGetProperty("preset", out _));
         Assert.False(root.TryGetProperty("focalLengthMm", out _));
         Assert.False(root.TryGetProperty("pixelSizeUm", out _));
-        Assert.False(root.TryGetProperty("triangleAngleDegrees", out _));
+        Assert.Equal(0, root.GetProperty("triangleAngleDegrees").GetDouble());
     }
 
     [Fact]
@@ -128,7 +128,7 @@ public sealed class StarAnalysisServiceTests
 
             StarAnalysisResult result = await service.AnalyzeAsync(
                 path,
-                new StarAnalysisOptions { TriangleAngleDegrees = 0 });
+                StarAnalysisOptions.InteractiveDefault);
 
             StarAnalysisTriangleTilt triangle = Assert.IsType<StarAnalysisTriangleTilt>(
                 result.TriangleTilt);
