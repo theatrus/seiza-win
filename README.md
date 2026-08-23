@@ -5,7 +5,7 @@ It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
 core.
 
-[Download Seiza 0.6.1 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.6.1/seiza-0.6.1-windows-x86_64.msi)
+[Download Seiza 0.7.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.0/seiza-0.7.0-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -13,10 +13,10 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Development highlights
+## Seiza for Windows 0.7.0
 
-This work will ship in the next Windows release. The stable download above
-remains Seiza 0.6.1.
+This release adds calibrated, resumable live stacking, native SNR depth
+analysis, and solve-independent star and sensor-tilt measurements.
 
 - Upgrade the native processing core to Seiza 0.18.7 for resumable live-stack
   checkpoints, calibration planning and master construction, native SNR
@@ -27,8 +27,8 @@ remains Seiza 0.6.1.
   tilt summary. The Windows inspector and overlay menu keep these measured
   stars distinct from plate-solve detections.
 
-The star-analysis work is an unreleased Windows development highlight, built
-against the published Seiza 0.18.7 C ABI. A registry-backed managed end-to-end
+The star-analysis workflow is built against the published Seiza 0.18.7 C ABI.
+A registry-backed managed end-to-end
 test measured 71 stars in a real C925 FITS image and 468 in a real XISF image;
 both returned a ready native triangle result. The test preserved the exact
 native triangle data and formulas and confirmed that analysis did not modify
@@ -40,8 +40,11 @@ regions and becomes available only when their native readiness verdict is
 satisfied. Direction lines remain hidden unless the native response explicitly
 guarantees normalized major-axis orientations; sparse regions are withheld,
 and tilt should be confirmed across multiple frames rather than inferred from
-one exposure. Packaged viewport and 8- and 16-bit composited-export UI checks
-remain before this development feature is complete.
+one exposure.
+
+| Measured stars and sensor grid | Parallelogram tilt diagram |
+| --- | --- |
+| ![A measured-star overlay and nine-region sensor-tilt grid beside the HFR, FWHM, noise, corner-tilt, and curvature inspector](docs/images/star-analysis-tilt.jpg) | ![A four-corner HFR parallelogram tilt diagram beside the sensor analysis inspector](docs/images/parallelogram-tilt-diagram.jpg) |
 
 ## Native Explorer previews and thumbnails
 
@@ -88,13 +91,11 @@ without a Windows restart.
 
 Open a folder containing FITS or XISF light frames, then choose **Stack** from
 the toolbar. Select the exposures to include and a reference frame, then tune
-normalization, pixel rejection, registration limits, or optional calibration
-masters. When filenames contain multiple filter names, Seiza enables a
+normalization, pixel rejection, registration limits, or automatic calibration
+library selection. When filenames contain multiple filter names, Seiza enables a
 separate output per filter by default so incompatible channels are not mixed.
 
-| Frame and reference selection | Registration and rejection controls |
-| --- | --- |
-| ![Selecting light frames and a reference for directory image stacking](docs/images/directory-image-stacking.png) | ![Normalization, pixel rejection, calibration, and registration controls](docs/images/directory-image-stacking-options.png) |
+![Selecting light frames and a reference for directory image stacking](docs/images/directory-image-stacking.png)
 
 Seiza reports per-frame progress without blocking the viewer, writes an
 unstretched 32-bit floating-point FITS result, and opens the completed stack
@@ -187,6 +188,9 @@ Other preview highlights still apply:
   Richardson-Lucy deconvolution.
 - Inspect image statistics, input/display RGB histograms, searchable source
   headers, processing provenance, and plate-solution quality.
+- Analyze FITS and XISF source pixels before display stretch to measure star
+  HFR/FWHM, inspect a nine-region sensor summary, and compare optional
+  parallelogram and triangle tilt diagrams without solving the image.
 - Blind-solve locally using downloaded catalogs, then draw a WCS grid, field
   center, named and field stars, deep-sky catalog objects and contours,
   transients, and solar-system motion overlays when their catalogs are present.
@@ -213,8 +217,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.6.1 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.6.1/seiza-0.6.1-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.6.1/SHA256SUMS.txt)
+Download the [Seiza 0.7.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.0/seiza-0.7.0-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.0/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -251,7 +255,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.6.1
+  -p:SeizaVersion=0.7.0
 ```
 
 The installer is written to `dist`. See the

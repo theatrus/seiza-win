@@ -219,21 +219,26 @@ The detailed status and acceptance criteria live in
    independent document windows, export true RGBA16 PNG/TIFF files, and render
    FITS/XISF images in Explorer's Preview Pane through an isolated native COM
    handler.
-10. **Implemented:** prepare matched bias/dark/dark-flat/flat masters, report
+10. **Complete:** prepare matched bias/dark/dark-flat/flat masters, report
     stack-depth SNR, and run resumable live stacks from reconciled capture
     folders with bounded previews and crash-safe checkpoints. Real telescope
     data has exercised preview rendering, SNR sampling, snapshot export, pause,
     relaunch, exact resume, continued ingestion, and completed-session
     retirement.
-11. **Implemented, final UI/export validation pending:** expose an explicit,
+11. **Complete:** expose an explicit,
     solve-independent star-analysis action, inspector results, measured-star
     overlay, nine-cell sensor-tilt grid, and parallelogram/triangle HFR diagrams
     through one composited viewport and export scene. The published Seiza
     0.18.7 path-analysis and triangle-sector C ABI is locked. Its registry-built
     DLL passed the managed service path on a real C925 FITS image with 71 stars
     and a real XISF image with 468; both triangles were ready, exact native
-    fields and formulas matched, and the sources remained unchanged. Only
-    packaged viewport plus 8- and 16-bit composited-export UI QA remains.
+    fields and formulas matched, and the sources remained unchanged. An isolated
+    Release-built x64 app then exercised viewport analysis and three
+    full-resolution composited exports of the 3,840 x 2,160 C925 source: a
+    32-bpp Bgra32 measured-stars/grid PNG, a 64-bpp Rgba64 parallelogram-only
+    PNG, and a 64-bpp Rgba64 triangle-only TIFF. WIC decoding and visual
+    inspection confirmed the requested layers, source registration, complete
+    labels, smooth gradients, and no chrome, corruption, seams, or rescaling.
 12. **Next:** add cached previews during full-resolution loads.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view

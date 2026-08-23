@@ -224,7 +224,7 @@ public sealed partial class ImageInspector : UserControl
         int count = result.Stars.Length;
         StarAnalysisStateText.Text = count == 0
             ? "No measurable stars were found."
-            : $"Measured {count:N0} stars in the linear source image.";
+            : $"Measured {count:N0} stars in the source image before display stretch.";
         StarAnalysisDetails.Add(new("Stars", count.ToString("N0", CultureInfo.CurrentCulture)));
         if (count > 0)
         {
