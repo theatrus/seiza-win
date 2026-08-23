@@ -17,13 +17,22 @@ internal sealed class OverlayScene
 
     public bool HasStarAnalysisOverlay => StarAnalysisOverlay is not null;
 
+    public bool HasParallelogramTiltOverlay =>
+        StarAnalysisOverlay?.HasTiltPerimeter == true;
+
+    public bool HasTriangleTiltOverlay =>
+        StarAnalysisOverlay?.HasTriangleTilt == true;
+
     public bool HasAnyOverlay => HasSolveOverlay || HasStarAnalysisOverlay;
 
     public bool HasVisibleOverlays(OverlayOptions options)
     {
         ArgumentNullException.ThrowIfNull(options);
         return (SolveOverlay is not null && options.HasVisibleSolveOverlays) ||
-            (StarAnalysisOverlay is not null && options.HasVisibleStarAnalysisOverlays);
+            (StarAnalysisOverlay is { } starAnalysisOverlay &&
+                options.HasVisibleStarAnalysisOverlays(
+                    starAnalysisOverlay.HasTiltPerimeter,
+                    starAnalysisOverlay.HasTriangleTilt));
     }
 
     public OverlayScene Snapshot() => new()
@@ -55,5 +64,9 @@ internal sealed class OverlayScene
         StarAnalysisOverlay?.DrawSensorTilt(drawingSession, options, transform);
         SolveOverlay?.Draw(drawingSession, options, scaleX, scaleY, offset);
         StarAnalysisOverlay?.DrawMeasuredStars(drawingSession, options, transform);
+        // The compact diagnostic is intentionally last so its outline and
+        // values remain legible over every other viewport and export layer.
+        StarAnalysisOverlay?.DrawTiltPerimeter(drawingSession, options, transform);
+        StarAnalysisOverlay?.DrawTriangleTilt(drawingSession, options, transform);
     }
 }

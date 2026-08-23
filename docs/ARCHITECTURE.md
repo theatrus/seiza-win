@@ -93,7 +93,10 @@ disable process isolation.
     stars, cells, tilt, and an explicit normalized-major-axis capability.
 17. Plate-solve detections and measured stars are separate overlay producers.
     A composite scene draws either or both through the same image-pixel
-    transform in the viewport and in full-resolution 8- or 16-bit export.
+    transform in the viewport and in full-resolution 8- or 16-bit export. The
+    optional parallelogram tilt diagram reuses the four native corner-cell HFR
+    medians. The triangle tilt diagram consumes native three-sector analysis;
+    neither renderer decodes pixels or recomputes detector measurements.
 
 ## Performance rules
 
@@ -182,6 +185,15 @@ disable process isolation.
   elongation only when a cell has at least three stars, the response advertises
   normalized major-axis angles, and directional coherence exceeds the
   threshold. The UI must remind users to confirm tilt across multiple frames.
+- Draw the parallelogram HFR diagram only when all four corner cells meet that
+  same three-star reliability rule. Normalize its four radial vertices to the
+  softest measured corner and 40% of the source image's shorter dimension,
+  label values explicitly as HFR, and keep the layer off by default so it does
+  not obscure the sensor grid or star markers.
+- Draw the triangle HFR diagram only from the native three-sector result, with
+  all sectors meeting the core-reported minimum sample count. Preserve the
+  returned image-coordinate angle, sector medians, and readiness verdict; do
+  not substitute the unrelated four-corner tilt percentage.
 
 ## Porting sequence
 
@@ -212,11 +224,13 @@ The detailed status and acceptance criteria live in
     data has exercised preview rendering, SNR sampling, snapshot export, pause,
     relaunch, exact resume, continued ingestion, and completed-session
     retirement.
-11. **Implemented, native runtime validation pending:** expose an explicit,
+11. **Implemented, final UI/export validation pending:** expose an explicit,
     solve-independent star-analysis action, inspector results, measured-star
-    overlay, and nine-cell sensor-tilt overlay through one composited viewport
-    and export scene. Completion requires the corresponding upstream C ABI
-    release to be published and locked, then exercised on real FITS/XISF data.
+    overlay, nine-cell sensor-tilt grid, and parallelogram/triangle HFR diagrams
+    through one composited viewport and export scene. The published Seiza
+    0.18.6 path-analysis C ABI is locked and exercised on real FITS/XISF data;
+    the additive native triangle-sector response and final composited-export QA
+    remain before completion.
 12. **Next:** add cached previews during full-resolution loads.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view

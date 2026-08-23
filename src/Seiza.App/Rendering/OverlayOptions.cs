@@ -39,6 +39,10 @@ internal sealed class OverlayOptions
 
     public bool ShowSensorTilt { get; set; }
 
+    public bool ShowParallelogramTilt { get; set; }
+
+    public bool ShowTriangleTilt { get; set; }
+
     public bool ShowFieldStars { get; set; }
 
     public bool ShowFieldCenter { get; set; } = true;
@@ -56,11 +60,18 @@ internal sealed class OverlayOptions
         ShowFieldStars ||
         ShowFieldCenter;
 
-    public bool HasVisibleStarAnalysisOverlays =>
-        ShowMeasuredStars || ShowSensorTilt;
+    public bool HasVisibleStarAnalysisOverlays(
+        bool hasTiltPerimeter,
+        bool hasTriangleTilt) =>
+        ShowMeasuredStars ||
+        ShowSensorTilt ||
+        (ShowParallelogramTilt && hasTiltPerimeter) ||
+        (ShowTriangleTilt && hasTriangleTilt);
 
     public bool HasVisibleOverlays =>
-        HasVisibleSolveOverlays || HasVisibleStarAnalysisOverlays;
+        HasVisibleSolveOverlays || HasVisibleStarAnalysisOverlays(
+            hasTiltPerimeter: true,
+            hasTriangleTilt: true);
 
     public OverlayOptions Snapshot()
     {
@@ -77,6 +88,8 @@ internal sealed class OverlayOptions
             ShowDetectedStars = ShowDetectedStars,
             ShowMeasuredStars = ShowMeasuredStars,
             ShowSensorTilt = ShowSensorTilt,
+            ShowParallelogramTilt = ShowParallelogramTilt,
+            ShowTriangleTilt = ShowTriangleTilt,
             ShowFieldStars = ShowFieldStars,
             ShowFieldCenter = ShowFieldCenter,
         };
@@ -95,6 +108,8 @@ internal sealed class OverlayOptions
         ShowDetectedStars = false;
         ShowMeasuredStars = false;
         ShowSensorTilt = false;
+        ShowParallelogramTilt = false;
+        ShowTriangleTilt = false;
         ShowFieldStars = false;
         ShowFieldCenter = false;
     }

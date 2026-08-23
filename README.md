@@ -18,7 +18,7 @@ core.
 This work will ship in the next Windows release. The stable download above
 remains Seiza 0.6.1.
 
-- Upgrade the native processing core to Seiza 0.18.4 for resumable live-stack
+- Upgrade the native processing core to Seiza 0.18.6 for resumable live-stack
   checkpoints, calibration planning and master construction, native SNR
   measurements, and bounded preview and export support.
 - Add an explicit **Analyze stars** action for FITS and XISF images. This is
@@ -27,16 +27,16 @@ remains Seiza 0.6.1.
   tilt summary. The Windows inspector and overlay menu keep these measured
   stars distinct from plate-solve detections.
 
-The star-analysis work is an unreleased development highlight. Its local
-feature build has been exercised end to end with real FITS and XISF telescope
-data; it still depends on the corresponding upstream Seiza C ABI being
-published and Cargo-locked here before it is part of the stable download. Its
-measured-star circles and sensor-tilt grid use the
-same image-space overlay scene for the live viewport and full-resolution 8- or
-16-bit composited export. Direction lines remain hidden unless the native
-response explicitly guarantees normalized major-axis orientations; sparse
-grid cells are labeled as low-sample, and tilt should be confirmed across
-multiple frames rather than inferred from one exposure.
+The star-analysis work is an unreleased Windows development highlight, built
+against the published Seiza 0.18.6 C ABI and exercised end to end with real
+FITS and XISF telescope data. Its measured-star circles, sensor-tilt grid, and
+optional **Parallelogram tilt diagram** use the same image-space overlay scene
+for the live viewport and full-resolution 8- or 16-bit composited export. A
+separate **Triangle tilt diagram** consumes three native adjustment regions and
+activates only when the additive triangle response is available. Direction
+lines remain hidden unless the native response explicitly guarantees normalized
+major-axis orientations; sparse regions are withheld, and tilt should be
+confirmed across multiple frames rather than inferred from one exposure.
 
 ## Native Explorer previews and thumbnails
 

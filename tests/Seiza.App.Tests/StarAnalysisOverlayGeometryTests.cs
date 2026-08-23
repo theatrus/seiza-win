@@ -1,4 +1,5 @@
 using System.Numerics;
+using Seiza.App.Models;
 using Seiza.App.Rendering;
 using Xunit;
 
@@ -142,5 +143,320 @@ public sealed class StarAnalysisOverlayGeometryTests
             coherence);
 
         Assert.Equal(expected, result);
+    }
+
+    [Fact]
+    public void FourEqualCornerHfrValuesCreateSquareInPerimeterOrder()
+    {
+        TiltCellOverlayMeasurement[] cells = CreateTiltCells((_, _) => 2);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTiltPerimeter(
+            cells,
+            1_000,
+            500,
+            out TiltPerimeterDiagram? diagram);
+
+        Assert.True(created);
+        Assert.NotNull(diagram);
+        Assert.Equal(new Vector2(500, 250), diagram.Center);
+        Assert.Equal(
+            [
+                new Vector2(300, 50),
+                new Vector2(700, 50),
+                new Vector2(700, 450),
+                new Vector2(300, 450),
+            ],
+            diagram.Vertices.Select(vertex => vertex.Point));
+        Assert.Equal((0, 0), (diagram.Vertices[0].Row, diagram.Vertices[0].Column));
+        Assert.Equal((0, 2), (diagram.Vertices[1].Row, diagram.Vertices[1].Column));
+        Assert.Equal((2, 2), (diagram.Vertices[2].Row, diagram.Vertices[2].Column));
+        Assert.Equal((2, 0), (diagram.Vertices[3].Row, diagram.Vertices[3].Column));
+        Assert.Equal(2, diagram.CenterMeasurement?.MedianHfr);
+        Assert.Equal(2, diagram.ReferenceCornerHfr);
+    }
+
+    [Fact]
+    public void SofterCornerPushesItsVertexFartherFromCenter()
+    {
+        TiltCellOverlayMeasurement[] cells = CreateTiltCells(
+            (row, column) => row == 0 && column == 2 ? 4 : 2);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTiltPerimeter(
+            cells,
+            1_000,
+            500,
+            out TiltPerimeterDiagram? diagram);
+
+        Assert.True(created);
+        Assert.NotNull(diagram);
+        Assert.Equal(4, diagram.ReferenceCornerHfr);
+        Assert.Equal(new Vector2(700, 50), diagram.Vertices[1].Point);
+        Assert.Equal(new Vector2(400, 150), diagram.Vertices[0].Point);
+    }
+
+    [Fact]
+    public void NonCornerCellsDoNotAffectTiltPerimeter()
+    {
+        TiltCellOverlayMeasurement[] cells = CreateTiltCells(
+            (row, column) => row != 1 && column != 1 ? 2 : null,
+            (row, column) => row != 1 && column != 1 ? 4 : 0);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTiltPerimeter(
+            cells,
+            1_000,
+            500,
+            out TiltPerimeterDiagram? diagram);
+
+        Assert.True(created);
+        Assert.NotNull(diagram);
+        Assert.Equal(2, diagram.ReferenceCornerHfr);
+        Assert.Equal(4, diagram.Vertices.Count);
+    }
+
+    [Fact]
+    public void TiltPerimeterRequiresAllFourReliableCornerMeasurements()
+    {
+        TiltCellOverlayMeasurement[] cells = CreateTiltCells(
+            (row, column) => row == 2 && column == 0 ? null : 2);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTiltPerimeter(
+            cells,
+            1_000,
+            500,
+            out TiltPerimeterDiagram? diagram);
+
+        Assert.False(created);
+        Assert.Null(diagram);
+    }
+
+    [Fact]
+    public void TiltPerimeterSuppressesLowSampleCorner()
+    {
+        TiltCellOverlayMeasurement[] cells = CreateTiltCells(
+            (_, _) => 2,
+            (row, column) => row == 0 && column == 2 ? 2 : 4);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTiltPerimeter(
+            cells,
+            1_000,
+            500,
+            out TiltPerimeterDiagram? diagram);
+
+        Assert.False(created);
+        Assert.Null(diagram);
+    }
+
+    [Fact]
+    public void TiltPerimeterKeepsDiagramWhenCenterMeasurementIsUnavailable()
+    {
+        TiltCellOverlayMeasurement[] cells = CreateTiltCells(
+            (row, column) => row == 1 && column == 1 ? null : 2,
+            (row, column) => row == 1 && column == 1 ? 0 : 4);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTiltPerimeter(
+            cells,
+            1_000,
+            500,
+            out TiltPerimeterDiagram? diagram);
+
+        Assert.True(created);
+        Assert.NotNull(diagram);
+        Assert.Null(diagram.CenterMeasurement);
+    }
+
+    [Fact]
+    public void TriangleTiltUsesNativeClockwiseAxes()
+    {
+        StarAnalysisTriangleTilt triangle = CreateTriangleTilt(
+            angleDegrees: 0,
+            medianHfr: _ => 2);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTriangleTilt(
+            triangle,
+            1_000,
+            500,
+            out TriangleTiltDiagram? diagram);
+
+        Assert.True(created);
+        Assert.NotNull(diagram);
+        Assert.Equal(new Vector2(500, 250), diagram.Center);
+        Assert.Equal([1, 2, 3], diagram.Vertices.Select(vertex => vertex.Sector));
+        AssertVectorNear(new(500, 50), diagram.Vertices[0].Point);
+        AssertVectorNear(new(673.2051f, 350), diagram.Vertices[1].Point);
+        AssertVectorNear(new(326.7949f, 350), diagram.Vertices[2].Point);
+    }
+
+    [Fact]
+    public void TriangleTiltScalesEachNativeMedianAgainstWorstSector()
+    {
+        StarAnalysisTriangleTilt triangle = CreateTriangleTilt(
+            angleDegrees: 0,
+            medianHfr: sector => sector == 2 ? 4 : 2);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTriangleTilt(
+            triangle,
+            1_000,
+            500,
+            out TriangleTiltDiagram? diagram);
+
+        Assert.True(created);
+        Assert.NotNull(diagram);
+        Assert.Equal(4, diagram.ReferenceWorstHfr);
+        AssertVectorNear(new(500, 150), diagram.Vertices[0].Point);
+        AssertVectorNear(new(673.2051f, 350), diagram.Vertices[1].Point);
+    }
+
+    [Fact]
+    public void TriangleTiltHonorsRotatedNativeAxis()
+    {
+        StarAnalysisTriangleTilt triangle = CreateTriangleTilt(
+            angleDegrees: 90,
+            medianHfr: _ => 2);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTriangleTilt(
+            triangle,
+            1_000,
+            500,
+            out TriangleTiltDiagram? diagram);
+
+        Assert.True(created);
+        Assert.NotNull(diagram);
+        AssertVectorNear(new(700, 250), diagram.Vertices[0].Point);
+    }
+
+    [Fact]
+    public void TriangleTiltRequiresNativeReadyVerdict()
+    {
+        StarAnalysisTriangleTilt triangle = CreateTriangleTilt(
+            ready: false,
+            medianHfr: _ => 2);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTriangleTilt(
+            triangle,
+            1_000,
+            500,
+            out TriangleTiltDiagram? diagram);
+
+        Assert.False(created);
+        Assert.Null(diagram);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void TriangleTiltRejectsIncompleteReadySector(bool lowCount)
+    {
+        StarAnalysisTriangleTilt triangle = CreateTriangleTilt(
+            ready: true,
+            medianHfr: sector => !lowCount && sector == 1 ? null : 2,
+            starCount: sector => lowCount && sector == 1 ? 2 : 3);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTriangleTilt(
+            triangle,
+            1_000,
+            500,
+            out TriangleTiltDiagram? diagram);
+
+        Assert.False(created);
+        Assert.Null(diagram);
+    }
+
+    [Fact]
+    public void TriangleTiltDoesNotGateOnCenterAndHidesLowSampleCenterHfr()
+    {
+        StarAnalysisTriangleTilt triangle = CreateTriangleTilt(
+            medianHfr: _ => 2,
+            centerStarCount: 1,
+            centerHfr: 1.5);
+
+        bool created = StarAnalysisOverlayGeometry.TryCreateTriangleTilt(
+            triangle,
+            1_000,
+            500,
+            out TriangleTiltDiagram? diagram);
+
+        Assert.True(created);
+        Assert.NotNull(diagram);
+        Assert.Equal(1, diagram.CenterStarCount);
+        Assert.Null(diagram.CenterHfr);
+    }
+
+    private static TiltCellOverlayMeasurement[] CreateTiltCells(
+        Func<int, int, double?> hfr,
+        Func<int, int, int>? starCount = null) =>
+        Enumerable.Range(0, 3)
+            .SelectMany(row => Enumerable.Range(0, 3)
+                .Select(column => new TiltCellOverlayMeasurement(
+                    row,
+                    column,
+                    starCount?.Invoke(row, column) ?? 4,
+                    hfr(row, column))))
+            .ToArray();
+
+    private static StarAnalysisTriangleTilt CreateTriangleTilt(
+        double angleDegrees = 0,
+        bool ready = true,
+        Func<int, double?>? medianHfr = null,
+        Func<int, int>? starCount = null,
+        int centerStarCount = 3,
+        double? centerHfr = 2)
+    {
+        StarAnalysisTriangleSector[] sectors = Enumerable.Range(1, 3)
+            .Select(sector => new StarAnalysisTriangleSector
+            {
+                Sector = sector,
+                AxisAngleDegrees = NormalizeDegrees(angleDegrees + ((sector - 1) * 120)),
+                StarCount = starCount?.Invoke(sector) ?? 3,
+                MedianHfr = medianHfr is null ? 2 : medianHfr(sector),
+            })
+            .ToArray();
+        StarAnalysisTriangleSector[] measured = sectors
+            .Where(sector => sector.MedianHfr.HasValue)
+            .ToArray();
+        int? bestSector = ready && measured.Length > 0
+            ? measured.MinBy(sector => sector.MedianHfr!.Value)!.Sector
+            : null;
+        int? worstSector = ready && measured.Length > 0
+            ? measured.MaxBy(sector => sector.MedianHfr!.Value)!.Sector
+            : null;
+        double overallMedianHfr = measured.Length > 0
+            ? measured.Average(sector => sector.MedianHfr!.Value)
+            : 2;
+        double? tiltPercent = ready && bestSector.HasValue && worstSector.HasValue
+            ? 100 *
+                (sectors[worstSector.Value - 1].MedianHfr!.Value -
+                    sectors[bestSector.Value - 1].MedianHfr!.Value) /
+                overallMedianHfr
+            : null;
+        return new StarAnalysisTriangleTilt
+        {
+            AngleDegrees = angleDegrees,
+            InnerRadiusPixels = 100,
+            OuterRadiusPixels = 200,
+            MinimumStarsPerRegion = 3,
+            Ready = ready,
+            Center = new StarAnalysisTriangleCenter
+            {
+                StarCount = centerStarCount,
+                MedianHfr = centerHfr,
+            },
+            Sectors = sectors,
+            OverallMedianHfr = overallMedianHfr,
+            TiltPercent = tiltPercent,
+            BestSector = bestSector,
+            WorstSector = worstSector,
+        };
+    }
+
+    private static double NormalizeDegrees(double value)
+    {
+        double normalized = value % 360;
+        return normalized < 0 ? normalized + 360 : normalized;
+    }
+
+    private static void AssertVectorNear(Vector2 expected, Vector2 actual)
+    {
+        Assert.InRange(Math.Abs(actual.X - expected.X), 0, 0.001);
+        Assert.InRange(Math.Abs(actual.Y - expected.Y), 0, 0.001);
     }
 }

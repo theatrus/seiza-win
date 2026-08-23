@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Nodes;
 using Seiza.App.Models;
 using Seiza.App.Services;
 using Xunit;
@@ -21,6 +22,7 @@ public sealed class StarAnalysisServiceTests
             Assert.Empty(result.Stars);
             Assert.Equal(9, result.Cells.Length);
             Assert.Null(result.Tilt.TiltPercent);
+            Assert.Null(result.TriangleTilt);
             Assert.False(result.HasPsfMeasurements);
             Assert.Equal(1, native.CallCount);
         }
@@ -40,7 +42,7 @@ public sealed class StarAnalysisServiceTests
             var native = new FakeNativeClient((_, options) =>
             {
                 capturedOptions = options;
-                return ValidResultJson();
+                return ValidTriangleResultJson(5);
             });
             var service = CreateService(native);
             var options = new StarAnalysisOptions
@@ -52,6 +54,7 @@ public sealed class StarAnalysisServiceTests
                 KeepSaturated = true,
                 NoiseReductionRadius = 3,
                 Sensitivity = 8.5,
+                TriangleAngleDegrees = 725,
             };
 
             await service.AnalyzeAsync(path, options);
@@ -65,6 +68,7 @@ public sealed class StarAnalysisServiceTests
             Assert.True(root.GetProperty("keepSaturated").GetBoolean());
             Assert.Equal(3, root.GetProperty("noiseReductionRadius").GetInt32());
             Assert.Equal(8.5, root.GetProperty("sensitivity").GetDouble());
+            Assert.Equal(725, root.GetProperty("triangleAngleDegrees").GetDouble());
             Assert.False(root.TryGetProperty("focalLengthMm", out _));
 
             var ambiguous = new StarAnalysisOptions
@@ -82,6 +86,13 @@ public sealed class StarAnalysisServiceTests
             };
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
                 () => service.AnalyzeAsync(path, unknownPreset));
+
+            var nonfiniteTriangleAngle = new StarAnalysisOptions
+            {
+                TriangleAngleDegrees = double.NaN,
+            };
+            await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+                () => service.AnalyzeAsync(path, nonfiniteTriangleAngle));
             Assert.Equal(1, native.CallCount);
         }
         finally
@@ -103,6 +114,230 @@ public sealed class StarAnalysisServiceTests
         Assert.False(root.TryGetProperty("preset", out _));
         Assert.False(root.TryGetProperty("focalLengthMm", out _));
         Assert.False(root.TryGetProperty("pixelSizeUm", out _));
+        Assert.False(root.TryGetProperty("triangleAngleDegrees", out _));
+    }
+
+    [Fact]
+    public async Task TriangleTiltContractIsDeserializedAndValidated()
+    {
+        string path = CreateImagePath();
+        try
+        {
+            var native = new FakeNativeClient((_, _) => ValidTriangleResultJson());
+            var service = CreateService(native);
+
+            StarAnalysisResult result = await service.AnalyzeAsync(
+                path,
+                new StarAnalysisOptions { TriangleAngleDegrees = 0 });
+
+            StarAnalysisTriangleTilt triangle = Assert.IsType<StarAnalysisTriangleTilt>(
+                result.TriangleTilt);
+            Assert.True(triangle.Ready);
+            Assert.Equal(0, triangle.AngleDegrees);
+            Assert.Equal([1, 2, 3], triangle.Sectors.Select(sector => sector.Sector));
+            Assert.Equal([0, 120, 240], triangle.Sectors.Select(
+                sector => sector.AxisAngleDegrees));
+            Assert.Equal(2, triangle.OverallMedianHfr);
+            Assert.Equal(50, triangle.TiltPercent);
+            Assert.Equal(1, triangle.BestSector);
+            Assert.Equal(3, triangle.WorstSector);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("angle", "triangle angle")]
+    [InlineData("radius", "image dimensions")]
+    [InlineData("minimum", "minimum stars per region must be 3")]
+    [InlineData("sector-order", "ordered 1, 2, 3")]
+    [InlineData("axis", "axis angle is inconsistent")]
+    [InlineData("median", "median HFR availability")]
+    [InlineData("readiness", "readiness is inconsistent")]
+    [InlineData("partial-verdict", "verdict and readiness")]
+    [InlineData("best-worst", "best/worst sectors")]
+    [InlineData("tilt", "tilt percent is inconsistent")]
+    [InlineData("overall", "overall median HFR availability")]
+    [InlineData("count", "exceed the detected-star count")]
+    [InlineData("empty-annulus", "without a usable annulus")]
+    public async Task InconsistentTriangleTiltContractIsRejected(
+        string defect,
+        string expectedMessage)
+    {
+        string path = CreateImagePath();
+        try
+        {
+            JsonObject root = JsonNode.Parse(ValidTriangleResultJson())!.AsObject();
+            JsonObject triangle = root["triangleTilt"]!.AsObject();
+            JsonArray sectors = triangle["sectors"]!.AsArray();
+            switch (defect)
+            {
+                case "angle":
+                    triangle["angleDegrees"] = 360;
+                    break;
+                case "radius":
+                    triangle["innerRadiusPixels"] = 17;
+                    break;
+                case "minimum":
+                    triangle["minimumStarsPerRegion"] = 2;
+                    break;
+                case "sector-order":
+                    sectors[0]!["sector"] = 2;
+                    break;
+                case "axis":
+                    sectors[1]!["axisAngleDegrees"] = 121;
+                    break;
+                case "median":
+                    sectors[0]!["medianHfr"] = null;
+                    break;
+                case "readiness":
+                    triangle["ready"] = false;
+                    break;
+                case "partial-verdict":
+                    triangle["bestSector"] = null;
+                    break;
+                case "best-worst":
+                    triangle["bestSector"] = 2;
+                    break;
+                case "tilt":
+                    triangle["tiltPercent"] = 51;
+                    break;
+                case "overall":
+                    triangle["overallMedianHfr"] = null;
+                    break;
+                case "count":
+                    triangle["center"]!["starCount"] = 1;
+                    triangle["center"]!["medianHfr"] = 2;
+                    break;
+                case "empty-annulus":
+                    root["width"] = 1000;
+                    root["height"] = 100;
+                    triangle["innerRadiusPixels"] =
+                        0.25 * Math.Sqrt(Math.Pow(500, 2) + Math.Pow(50, 2));
+                    triangle["outerRadiusPixels"] = 50;
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown defect {defect}.");
+            }
+
+            var native = new FakeNativeClient((_, _) => root.ToJsonString());
+            var service = CreateService(native);
+
+            InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(
+                () => service.AnalyzeAsync(
+                    path,
+                    new StarAnalysisOptions { TriangleAngleDegrees = 0 }));
+            Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task SparseTriangleRetainsMeasurementsButWithholdsVerdict()
+    {
+        string path = CreateImagePath();
+        try
+        {
+            JsonObject root = JsonNode.Parse(ValidTriangleResultJson())!.AsObject();
+            JsonObject triangle = root["triangleTilt"]!.AsObject();
+            triangle["sectors"]![2]!["starCount"] = 2;
+            triangle["ready"] = false;
+            triangle["tiltPercent"] = null;
+            triangle["bestSector"] = null;
+            triangle["worstSector"] = null;
+            var native = new FakeNativeClient((_, _) => root.ToJsonString());
+            var service = CreateService(native);
+
+            StarAnalysisResult result = await service.AnalyzeAsync(
+                path,
+                new StarAnalysisOptions { TriangleAngleDegrees = 0 });
+
+            Assert.False(result.TriangleTilt!.Ready);
+            Assert.Equal(2.5, result.TriangleTilt.Sectors[2].MedianHfr);
+            Assert.Equal(2, result.TriangleTilt.OverallMedianHfr);
+            Assert.Null(result.TriangleTilt.TiltPercent);
+            Assert.Null(result.TriangleTilt.BestSector);
+            Assert.Null(result.TriangleTilt.WorstSector);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task CacheKeyIncludesExplicitTriangleAngle()
+    {
+        string path = CreateImagePath();
+        try
+        {
+            var native = new FakeNativeClient((_, optionsJson) =>
+            {
+                using JsonDocument document = JsonDocument.Parse(optionsJson);
+                return document.RootElement.TryGetProperty(
+                    "triangleAngleDegrees",
+                    out JsonElement angle)
+                    ? ValidTriangleResultJson(NormalizeDegrees(angle.GetDouble()))
+                    : ValidResultJson();
+            });
+            var service = CreateService(native);
+
+            await service.AnalyzeAsync(path);
+            await service.AnalyzeAsync(
+                path,
+                new StarAnalysisOptions { TriangleAngleDegrees = 0 });
+            await service.AnalyzeAsync(
+                path,
+                new StarAnalysisOptions { TriangleAngleDegrees = 0 });
+            await service.AnalyzeAsync(
+                path,
+                new StarAnalysisOptions { TriangleAngleDegrees = 120 });
+
+            Assert.Equal(3, native.CallCount);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Theory]
+    [InlineData("missing", "missing from a request")]
+    [InlineData("unexpected", "without being requested")]
+    [InlineData("angle", "does not match the requested angle")]
+    public async Task TriangleTiltMustCorrelateWithItsRequest(
+        string defect,
+        string expectedMessage)
+    {
+        string path = CreateImagePath();
+        try
+        {
+            string response = defect switch
+            {
+                "missing" => ValidResultJson(),
+                "unexpected" => ValidTriangleResultJson(),
+                "angle" => ValidTriangleResultJson(120),
+                _ => throw new InvalidOperationException($"Unknown defect {defect}."),
+            };
+            var native = new FakeNativeClient((_, _) => response);
+            var service = CreateService(native);
+            StarAnalysisOptions? options = defect == "unexpected"
+                ? null
+                : new StarAnalysisOptions { TriangleAngleDegrees = 0 };
+
+            InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(
+                () => service.AnalyzeAsync(path, options));
+            Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
     }
 
     [Fact]
@@ -472,6 +707,119 @@ public sealed class StarAnalysisServiceTests
           }
         }
         """;
+
+    private static string ValidTriangleResultJson(double angleDegrees = 0)
+    {
+        StarAnalysisStar[] stars = Enumerable.Range(0, 9)
+            .Select(index => new StarAnalysisStar
+            {
+                X = 10 + index,
+                Y = 20,
+                Hfr = 1.5 + (index / 3) * 0.5,
+                Fwhm = 3,
+                Brightness = 1000,
+                Background = 900,
+                Snr = 20,
+                Flux = 5000,
+                PixelCount = 12,
+                Saturated = false,
+                Eccentricity = null,
+                Theta = null,
+                RSquared = null,
+            })
+            .ToArray();
+        StarAnalysisCell[] cells = Enumerable.Range(0, 9)
+            .Select(index => new StarAnalysisCell
+            {
+                Row = index / 3,
+                Col = index % 3,
+                StarCount = index == 0 ? stars.Length : 0,
+                MedianHfr = index == 0 ? 2 : null,
+                MedianEccentricity = null,
+                MeanTheta = null,
+                ThetaCoherence = 0,
+            })
+            .ToArray();
+        var result = new StarAnalysisResult
+        {
+            SchemaVersion = 1,
+            Width = 100,
+            Height = 80,
+            MajorAxisOrientationsNormalized = true,
+            AverageHfr = 2,
+            AverageFwhm = 3,
+            NoiseSigma = 12.5,
+            BackgroundMean = 900,
+            Stars = stars,
+            Cells = cells,
+            Tilt = new StarAnalysisTilt
+            {
+                CenterHfr = null,
+                Corners =
+                [
+                    new() { Corner = StarAnalysisCornerPosition.TopLeft, Hfr = 2 },
+                    new() { Corner = StarAnalysisCornerPosition.TopRight, Hfr = null },
+                    new() { Corner = StarAnalysisCornerPosition.BottomLeft, Hfr = null },
+                    new() { Corner = StarAnalysisCornerPosition.BottomRight, Hfr = null },
+                ],
+                MeanHfr = 2,
+                TiltPercent = null,
+                CurvaturePercent = null,
+                WorstCorner = null,
+                BestCorner = null,
+            },
+            TriangleTilt = new StarAnalysisTriangleTilt
+            {
+                AngleDegrees = angleDegrees,
+                InnerRadiusPixels = 0.25 * Math.Sqrt(Math.Pow(50, 2) + Math.Pow(40, 2)),
+                OuterRadiusPixels = 40,
+                MinimumStarsPerRegion = 3,
+                Ready = true,
+                Center = new StarAnalysisTriangleCenter
+                {
+                    StarCount = 0,
+                    MedianHfr = null,
+                },
+                Sectors =
+                [
+                    new()
+                    {
+                        Sector = 1,
+                        AxisAngleDegrees = angleDegrees,
+                        StarCount = 3,
+                        MedianHfr = 1.5,
+                    },
+                    new()
+                    {
+                        Sector = 2,
+                        AxisAngleDegrees = NormalizeDegrees(angleDegrees + 120),
+                        StarCount = 3,
+                        MedianHfr = 2,
+                    },
+                    new()
+                    {
+                        Sector = 3,
+                        AxisAngleDegrees = NormalizeDegrees(angleDegrees + 240),
+                        StarCount = 3,
+                        MedianHfr = 2.5,
+                    },
+                ],
+                OverallMedianHfr = 2,
+                TiltPercent = 50,
+                BestSector = 1,
+                WorstSector = 3,
+            },
+        };
+        return JsonSerializer.Serialize(
+            result,
+            SeizaJsonSerializerContext.Default.StarAnalysisResult);
+    }
+
+    private static double NormalizeDegrees(double value)
+    {
+        double normalized = value % 360;
+        return normalized < 0 ? normalized + 360 : normalized;
+    }
 
     private sealed class FakeNativeClient(
         Func<string, string, string> handler) : IStarAnalysisNativeClient

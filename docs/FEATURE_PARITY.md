@@ -9,12 +9,12 @@ merely because its Rust implementation exists.
 
 - macOS reference: `main` at
   [`d0b3e20`](https://github.com/theatrus/seiza-mac/commit/d0b3e2039e7676d1565d62b4e61ce713ca0da286)
-- Seiza core reference: crates.io `seiza-cabi 0.18.4` from
-  [`58ad796`](https://github.com/theatrus/seiza/commit/58ad796fcbc0375139a67880c22a70dbe2dccbfa),
+- Seiza core reference: crates.io `seiza-cabi 0.18.6` from
+  [`02a3c78`](https://github.com/theatrus/seiza/commit/02a3c7857d1636c6376f60d1d989da8b9afd3b17),
   resolving [`seiza-stacking 0.11.4`](https://github.com/theatrus/seiza/commit/d17fad906d83f91920489e3af9e87f7f344a014e)
 - Windows reference: live-stack implementation at
   [`f83dab0`](https://github.com/theatrus/seiza-win/commit/f83dab0b50f365db4570f7972f618f1a12565160)
-- Last audited: 2026-08-21
+- Last audited: 2026-08-22
 
 Update this baseline and the affected rows whenever the macOS app gains a
 feature or changes an interaction. A Windows feature is **Complete** only after
@@ -104,18 +104,20 @@ contract while retaining Windows BGRA render output.
 Measured-star analysis is a separate workflow from plate solving. It requires
 neither a catalog install nor a WCS solution: the user explicitly chooses
 **Analyze stars** from the toolbar or inspector, and the native core measures
-the original linear FITS/XISF source. This is implemented and locally
-runtime-tested on real FITS and XISF data, but remains **Partial** until its
-merged upstream C ABI dependency is published and Cargo-locked and both export
-paths complete their packaged-runtime checks.
+the original linear FITS/XISF source. This is implemented against the
+published, Cargo-locked Seiza 0.18.6 C ABI and locally runtime-tested on real
+FITS and XISF data. The rows remain **Partial** until the final packaged-runtime
+viewport and both export-path checks complete.
 
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
-| Explicit, solve-independent Analyze stars action | Not yet exposed | **Partial** | Toolbar and inspector actions invoke the native FITS/XISF path decoder without catalog access, solving, a stretched-viewport round trip, or C# per-pixel work. Locally exercised on real FITS and XISF sources; complete after the published release is locked. |
-| Schema-1 measurement model | Not yet exposed | **Partial** | Source-generated models validate source dimensions, individual star HFR/FWHM and optional PSF fields, exactly nine row/column cells, and the aggregate tilt/curvature summary before presentation. Real FITS and XISF responses passed the full validator; repeat against the registry-built runtime before completion. |
+| Explicit, solve-independent Analyze stars action | Not yet exposed | **Partial** | Toolbar and inspector actions invoke the native FITS/XISF path decoder without catalog access, solving, a stretched-viewport round trip, or C# per-pixel work. Exercised on real FITS and XISF sources through the registry-built Seiza 0.18.6 runtime. |
+| Schema-1 measurement model | Not yet exposed | **Partial** | Source-generated models validate source dimensions, individual star HFR/FWHM and optional PSF fields, exactly nine row/column cells, and the aggregate tilt/curvature summary before presentation. Real FITS and XISF responses passed the full validator against the registry-built runtime. |
 | Measured-star overlay | Not yet exposed | **Partial** | Yellow HFR circles are explicitly labeled **Measured stars**, distinct from the solver's **Plate-solve detections**. The renderer selects at most the 1,000 sharpest usable measurements and caps HFR labels at 100 when screen space permits so pan and zoom remain responsive. |
 | 3x3 sensor-tilt overlay and inspector | Not yet exposed | **Partial** | Cells show median HFR and star count, compare reliable cells with restrained good/warning/poor coloring, mark fewer than three measurements as a low sample, and suppress best/worst emphasis when the reliable spread is negligible. The guidance says to confirm tilt across multiple frames. |
-| Major-axis direction safety | Not yet exposed | **Partial** | Mean elongation is drawn only when a cell has at least three stars, the native response advertises normalized PSF major-axis angles, and coherence exceeds the threshold; missing capability safely disables direction lines. Validate against the published native runtime before completion. |
+| Parallelogram tilt diagram | Not yet exposed | **Partial** | A separate, off-by-default overlay joins the four reliable corner-cell medians into a corner-scaled HFR perimeter with both diagonals; equal corner HFR forms a square. It is suppressed unless every corner has at least three measurements and shares viewport/export transforms. |
+| Triangle tilt diagram | Not yet exposed | **Partial** | The renderer consumes three native 120-degree sector medians at a defined image-space angle and does not reuse the four-corner tilt percentage. Completion requires the additive native triangle-sector response to be published, locked, and runtime-tested. |
+| Major-axis direction safety | Not yet exposed | **Partial** | Mean elongation is drawn only when a cell has at least three stars, the native response advertises normalized PSF major-axis angles, and coherence exceeds the threshold; missing capability safely disables direction lines. Validated against the published native runtime. |
 | Freshness, cache, and bounded execution | Windows-specific | **Partial** | The bounded cache key combines normalized absolute source path, length, timestamp, core version, and serialized options; identical requests share work and only one native detector job runs at a time. Source identity, source dimensions, path, and document generation prevent a result from attaching after navigation. |
 | Viewport and composited export parity | Not yet exposed | **Partial** | Measured stars and tilt join solve layers in one image-space scene, so the same geometry is used for zoom-stable viewing and full-resolution 8- or 16-bit export. Runtime-test both export paths before completion. |
 
@@ -203,9 +205,11 @@ These remain tracked beyond the current macOS parity surface:
    activation, true 16-bit PNG/TIFF export, the all-users self-contained WiX
    MSI, Authenticode signing, and installer CI and tag-driven releases are
    complete.
-6. **Implemented, runtime validation pending: Image-quality analysis** — the
-   explicit catalog-free action, schema-1 models, measured-star and nine-cell
-   tilt overlays, inspector, bounded cache, stale-result protection, and shared
-   viewport/export scene are present. Mark complete only after the matching
-   upstream C ABI release is published and Cargo-locked, then real FITS/XISF
-   analysis plus 8- and 16-bit composited export are exercised end to end.
+6. **Implemented, final UI/export validation pending: Image-quality analysis** —
+   the explicit catalog-free action, schema-1 models, measured-star, nine-cell
+   tilt-grid, and parallelogram overlay, inspector, bounded cache,
+   stale-result protection, and shared viewport/export scene are present. The
+   published Seiza 0.18.6 C ABI is Cargo-locked and real FITS/XISF analysis is
+   complete; land the native triangle sectors, then exercise the final viewport
+   plus 8- and 16-bit composited export end to end before marking the rows
+   complete.

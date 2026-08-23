@@ -730,6 +730,14 @@ public sealed partial class MainPage : Page, IDisposable
         {
             _overlayOptions.ShowSensorTilt = SensorTiltOverlayItem.IsChecked;
         }
+        else if (ReferenceEquals(sender, ParallelogramTiltOverlayItem))
+        {
+            _overlayOptions.ShowParallelogramTilt = ParallelogramTiltOverlayItem.IsChecked;
+        }
+        else if (ReferenceEquals(sender, TriangleTiltOverlayItem))
+        {
+            _overlayOptions.ShowTriangleTilt = TriangleTiltOverlayItem.IsChecked;
+        }
 
         ImageCanvas.Invalidate();
         UpdateVisualState();
@@ -1711,6 +1719,8 @@ public sealed partial class MainPage : Page, IDisposable
         DetectedStarsOverlayItem.IsChecked = _overlayOptions.ShowDetectedStars;
         MeasuredStarsOverlayItem.IsChecked = _overlayOptions.ShowMeasuredStars;
         SensorTiltOverlayItem.IsChecked = _overlayOptions.ShowSensorTilt;
+        ParallelogramTiltOverlayItem.IsChecked = _overlayOptions.ShowParallelogramTilt;
+        TriangleTiltOverlayItem.IsChecked = _overlayOptions.ShowTriangleTilt;
 
         MessierCatalogItem.IsChecked = !_overlayOptions.HiddenDeepSkyCatalogs.Contains(DeepSkyCatalog.Messier);
         NgcCatalogItem.IsChecked = !_overlayOptions.HiddenDeepSkyCatalogs.Contains(DeepSkyCatalog.Ngc);
@@ -1729,6 +1739,9 @@ public sealed partial class MainPage : Page, IDisposable
     {
         MeasuredStarsOverlayItem.IsEnabled = _overlayScene.HasStarAnalysisOverlay;
         SensorTiltOverlayItem.IsEnabled = _overlayScene.HasStarAnalysisOverlay;
+        ParallelogramTiltOverlayItem.IsEnabled =
+            _overlayScene.HasParallelogramTiltOverlay;
+        TriangleTiltOverlayItem.IsEnabled = _overlayScene.HasTriangleTiltOverlay;
 
         bool hasSolveOverlay = _overlayScene.HasSolveOverlay && _solveResult is not null;
         if (hasSolveOverlay)

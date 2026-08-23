@@ -14,6 +14,8 @@ internal sealed class StarAnalysisOverlayRenderer
     private const float EmphasisStrokeWidth = 2.5f;
 
     private static readonly Color MeasuredStarColor = ColorFromHex(0xFFD479);
+    private static readonly Color TiltPerimeterColor = ColorFromHex(0xFFD479);
+    private static readonly Color TriangleTiltColor = ColorFromHex(0x62D9FF);
     private static readonly Color GridColor = ColorFromHex(0xD5E0E5, 205);
     private static readonly Color NeutralFillColor = ColorFromHex(0x82909A, 28);
     private static readonly Color NeutralLabelColor = ColorFromHex(0xD5E0E5);
@@ -37,6 +39,12 @@ internal sealed class StarAnalysisOverlayRenderer
     private readonly bool _hasMeaningfulSpread;
     private readonly (int Row, int Column)? _sharpestCell;
     private readonly (int Row, int Column)? _softestCell;
+    private readonly TiltPerimeterDiagram? _tiltPerimeterDiagram;
+    private readonly TriangleTiltDiagram? _triangleTiltDiagram;
+
+    internal bool HasTiltPerimeter => _tiltPerimeterDiagram is not null;
+
+    internal bool HasTriangleTilt => _triangleTiltDiagram is not null;
 
     public StarAnalysisOverlayRenderer(
         StarAnalysisResult result,
@@ -91,6 +99,16 @@ internal sealed class StarAnalysisOverlayRenderer
             }
         }
         _cellMeasurements = [.. cellMeasurements];
+        StarAnalysisOverlayGeometry.TryCreateTiltPerimeter(
+            _cellMeasurements,
+            _sourceWidth,
+            _sourceHeight,
+            out _tiltPerimeterDiagram);
+        StarAnalysisOverlayGeometry.TryCreateTriangleTilt(
+            result.TriangleTilt,
+            _sourceWidth,
+            _sourceHeight,
+            out _triangleTiltDiagram);
         _sharpestReliableHfr = StarAnalysisOverlayGeometry.FindSharpestReliableHfr(
             _cellMeasurements);
         _hasMeaningfulSpread = StarAnalysisOverlayGeometry.HasMeaningfulReliableSpread(
@@ -105,6 +123,196 @@ internal sealed class StarAnalysisOverlayRenderer
             _sharpestCell = (sharpest.Row, sharpest.Column);
             _softestCell = (softest.Row, softest.Column);
         }
+    }
+
+    internal void DrawTriangleTilt(
+        CanvasDrawingSession drawingSession,
+        OverlayOptions options,
+        ImageSpaceTransform transform)
+    {
+        ArgumentNullException.ThrowIfNull(drawingSession);
+        ArgumentNullException.ThrowIfNull(options);
+        if (!options.ShowTriangleTilt || _triangleTiltDiagram is not { } diagram)
+        {
+            return;
+        }
+
+        Vector2 center = transform.ToTarget(diagram.Center);
+        Vector2[] vertices = diagram.Vertices
+            .Select(vertex => transform.ToTarget(vertex.Point))
+            .ToArray();
+        if (!IsFinite(center) || vertices.Any(vertex => !IsFinite(vertex)))
+        {
+            return;
+        }
+
+        for (int index = 0; index < vertices.Length; index++)
+        {
+            Vector2 start = vertices[index];
+            Vector2 end = vertices[(index + 1) % vertices.Length];
+            drawingSession.DrawLine(start, end, TriangleTiltColor, EmphasisStrokeWidth);
+            drawingSession.DrawLine(center, start, TriangleTiltColor, ScreenStrokeWidth);
+            drawingSession.FillCircle(start, 2.75f, TriangleTiltColor);
+        }
+
+        float sourceFontSize = Math.Clamp(
+            (float)(Math.Min(_sourceWidth, _sourceHeight) / 55),
+            20,
+            72);
+        float targetFontSize = MathF.Max(
+            sourceFontSize * transform.AverageAbsoluteScale,
+            0.1f);
+        if (targetFontSize < 8)
+        {
+            return;
+        }
+
+        using CanvasTextFormat valueFormat = new()
+        {
+            FontFamily = "Segoe UI",
+            FontSize = targetFontSize,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            HorizontalAlignment = CanvasHorizontalAlignment.Center,
+            VerticalAlignment = CanvasVerticalAlignment.Center,
+            WordWrapping = CanvasWordWrapping.NoWrap,
+        };
+        TargetRectangle targetImageBounds = transform.ToTarget(
+            new SourceRectangle(0, 0, _sourceWidth, _sourceHeight));
+        for (int index = 0; index < vertices.Length; index++)
+        {
+            Vector2 outward = vertices[index] - center;
+            if (outward.LengthSquared() > 0)
+            {
+                outward = Vector2.Normalize(outward);
+            }
+            Vector2 labelCenter = vertices[index] +
+                (outward * MathF.Max(targetFontSize * 0.85f, 5));
+            float labelWidth = targetFontSize * 7.2f;
+            float labelHeight = targetFontSize * 1.45f;
+            labelCenter = ClampLabelCenter(
+                labelCenter,
+                targetImageBounds,
+                labelWidth,
+                labelHeight);
+            TriangleTiltVertex vertex = diagram.Vertices[index];
+            string label = string.Create(
+                CultureInfo.InvariantCulture,
+                $"S{vertex.Sector}  HFR {vertex.MedianHfr:0.00}");
+            DrawCenteredLabel(
+                drawingSession,
+                label,
+                labelCenter,
+                labelWidth,
+                labelHeight,
+                TriangleTiltColor,
+                valueFormat);
+        }
+
+        string centerLabel = FormatTriangleTiltCenterLabel(diagram);
+        int centerLabelLines = centerLabel.Count(character => character == '\n') + 1;
+        DrawCenteredLabel(
+            drawingSession,
+            centerLabel,
+            center,
+            targetFontSize * 10.5f,
+            targetFontSize * (1.25f + (centerLabelLines * 0.85f)),
+            TriangleTiltColor,
+            valueFormat);
+    }
+
+    internal void DrawTiltPerimeter(
+        CanvasDrawingSession drawingSession,
+        OverlayOptions options,
+        ImageSpaceTransform transform)
+    {
+        ArgumentNullException.ThrowIfNull(drawingSession);
+        ArgumentNullException.ThrowIfNull(options);
+        if (!options.ShowParallelogramTilt || _tiltPerimeterDiagram is not { } diagram)
+        {
+            return;
+        }
+
+        Vector2 center = transform.ToTarget(diagram.Center);
+        Vector2[] vertices = diagram.Vertices
+            .Select(vertex => transform.ToTarget(vertex.Point))
+            .ToArray();
+        if (!IsFinite(center) || vertices.Any(vertex => !IsFinite(vertex)))
+        {
+            return;
+        }
+
+        Color color = TiltPerimeterColor;
+        for (int index = 0; index < vertices.Length; index++)
+        {
+            Vector2 start = vertices[index];
+            Vector2 end = vertices[(index + 1) % vertices.Length];
+            drawingSession.DrawLine(start, end, color, EmphasisStrokeWidth);
+            drawingSession.FillCircle(start, 2.75f, color);
+        }
+        drawingSession.DrawLine(vertices[0], vertices[2], color, ScreenStrokeWidth);
+        drawingSession.DrawLine(vertices[1], vertices[3], color, ScreenStrokeWidth);
+
+        float sourceFontSize = Math.Clamp(
+            (float)(Math.Min(_sourceWidth, _sourceHeight) / 55),
+            20,
+            72);
+        float targetFontSize = MathF.Max(
+            sourceFontSize * transform.AverageAbsoluteScale,
+            0.1f);
+        if (targetFontSize < 8)
+        {
+            return;
+        }
+
+        using CanvasTextFormat valueFormat = new()
+        {
+            FontFamily = "Segoe UI",
+            FontSize = targetFontSize,
+            FontWeight = Microsoft.UI.Text.FontWeights.SemiBold,
+            HorizontalAlignment = CanvasHorizontalAlignment.Center,
+            VerticalAlignment = CanvasVerticalAlignment.Center,
+            WordWrapping = CanvasWordWrapping.NoWrap,
+        };
+        TargetRectangle targetImageBounds = transform.ToTarget(
+            new SourceRectangle(0, 0, _sourceWidth, _sourceHeight));
+        for (int index = 0; index < vertices.Length; index++)
+        {
+            Vector2 outward = vertices[index] - center;
+            if (outward.LengthSquared() > 0)
+            {
+                outward = Vector2.Normalize(outward);
+            }
+            Vector2 labelCenter = vertices[index] +
+                (outward * MathF.Max(targetFontSize * 0.85f, 5));
+            float labelWidth = targetFontSize * 5.6f;
+            float labelHeight = targetFontSize * 1.45f;
+            labelCenter = ClampLabelCenter(
+                labelCenter,
+                targetImageBounds,
+                labelWidth,
+                labelHeight);
+            string label = "HFR " + diagram.Vertices[index].MedianHfr.ToString(
+                "0.00",
+                CultureInfo.InvariantCulture);
+            DrawCenteredLabel(
+                drawingSession,
+                label,
+                labelCenter,
+                labelWidth,
+                labelHeight,
+                color,
+                valueFormat);
+        }
+
+        string centerLabel = FormatTiltPerimeterCenterLabel(diagram);
+        DrawCenteredLabel(
+            drawingSession,
+            centerLabel,
+            center,
+            targetFontSize * 9.5f,
+            targetFontSize * (centerLabel.Contains('\n') ? 3.0f : 1.7f),
+            color,
+            valueFormat);
     }
 
     internal void DrawMeasuredStars(
@@ -363,6 +571,87 @@ internal sealed class StarAnalysisOverlayRenderer
             drawingSession.DrawText(label, position + shadowOffset, LabelShadowColor, format);
         }
         drawingSession.DrawText(label, position, color, format);
+    }
+
+    private static void DrawCenteredLabel(
+        CanvasDrawingSession drawingSession,
+        string label,
+        Vector2 center,
+        float width,
+        float height,
+        Color color,
+        CanvasTextFormat format)
+    {
+        var bounds = new Rect(
+            center.X - (width / 2),
+            center.Y - (height / 2),
+            width,
+            height);
+        ReadOnlySpan<Vector2> shadowOffsets =
+        [
+            new(-1, -1), new(0, -1), new(1, -1),
+            new(-1, 0), new(1, 0),
+            new(-1, 1), new(0, 1), new(1, 1),
+        ];
+        foreach (Vector2 shadowOffset in shadowOffsets)
+        {
+            var shadowBounds = new Rect(
+                bounds.X + shadowOffset.X,
+                bounds.Y + shadowOffset.Y,
+                bounds.Width,
+                bounds.Height);
+            drawingSession.DrawText(label, shadowBounds, LabelShadowColor, format);
+        }
+        drawingSession.DrawText(label, bounds, color, format);
+    }
+
+    private static Vector2 ClampLabelCenter(
+        Vector2 center,
+        TargetRectangle bounds,
+        float width,
+        float height)
+    {
+        float halfWidth = MathF.Min(width / 2, bounds.Width / 2);
+        float halfHeight = MathF.Min(height / 2, bounds.Height / 2);
+        return new(
+            Math.Clamp(center.X, bounds.Left + halfWidth, bounds.Right - halfWidth),
+            Math.Clamp(center.Y, bounds.Top + halfHeight, bounds.Bottom - halfHeight));
+    }
+
+    private string FormatTiltPerimeterCenterLabel(TiltPerimeterDiagram diagram)
+    {
+        var lines = new List<string>(2);
+        if (diagram.CenterMeasurement?.MedianHfr is double centerHfr)
+        {
+            lines.Add("CENTER HFR " + centerHfr.ToString(
+                "0.00",
+                CultureInfo.InvariantCulture));
+        }
+        if (_result.Tilt.TiltPercent is double tiltPercent)
+        {
+            lines.Add("CORNER TILT " + tiltPercent.ToString(
+                "0.0",
+                CultureInfo.InvariantCulture) + "%");
+        }
+        return lines.Count > 0 ? string.Join('\n', lines) : "HFR TILT";
+    }
+
+    private static string FormatTriangleTiltCenterLabel(TriangleTiltDiagram diagram)
+    {
+        var lines = new List<string>(3);
+        if (diagram.CenterHfr is double centerHfr)
+        {
+            lines.Add("CENTER HFR " + centerHfr.ToString(
+                "0.00",
+                CultureInfo.InvariantCulture));
+        }
+        lines.Add("MEDIAN HFR " + diagram.OverallMedianHfr.ToString(
+            "0.00",
+            CultureInfo.InvariantCulture));
+        lines.Add("SECTOR TILT " + diagram.TiltPercent.ToString(
+            "0.0",
+            CultureInfo.InvariantCulture) + "%");
+        return string.Join('\n', lines);
     }
 
     private static string FormatCellLabel(StarAnalysisCell? cell)

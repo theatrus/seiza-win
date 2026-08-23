@@ -30,6 +30,13 @@ public sealed class StarAnalysisResult
 
     public required StarAnalysisTilt Tilt { get; init; }
 
+    /// <summary>
+    /// Optional three-sector radial tilt analysis. Native cores omit this
+    /// field unless the request includes a triangle angle.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public StarAnalysisTriangleTilt? TriangleTilt { get; init; }
+
     [JsonIgnore]
     public bool HasPsfMeasurements => Stars.Any(star =>
         star.Eccentricity.HasValue && star.Theta.HasValue);
@@ -117,6 +124,55 @@ public sealed class StarAnalysisCorner
     public double? Hfr { get; init; }
 }
 
+public sealed class StarAnalysisTriangleTilt
+{
+    public required double AngleDegrees { get; init; }
+
+    public required double InnerRadiusPixels { get; init; }
+
+    public required double OuterRadiusPixels { get; init; }
+
+    public required int MinimumStarsPerRegion { get; init; }
+
+    public required bool Ready { get; init; }
+
+    public required StarAnalysisTriangleCenter Center { get; init; }
+
+    public required StarAnalysisTriangleSector[] Sectors { get; init; }
+
+    [JsonRequired]
+    public double? OverallMedianHfr { get; init; }
+
+    [JsonRequired]
+    public double? TiltPercent { get; init; }
+
+    [JsonRequired]
+    public int? BestSector { get; init; }
+
+    [JsonRequired]
+    public int? WorstSector { get; init; }
+}
+
+public sealed class StarAnalysisTriangleCenter
+{
+    public required int StarCount { get; init; }
+
+    [JsonRequired]
+    public double? MedianHfr { get; init; }
+}
+
+public sealed class StarAnalysisTriangleSector
+{
+    public required int Sector { get; init; }
+
+    public required double AxisAngleDegrees { get; init; }
+
+    public required int StarCount { get; init; }
+
+    [JsonRequired]
+    public double? MedianHfr { get; init; }
+}
+
 [JsonConverter(typeof(JsonStringEnumConverter<StarAnalysisCornerPosition>))]
 public enum StarAnalysisCornerPosition
 {
@@ -182,6 +238,36 @@ internal static class StarAnalysisValidator
 
         ValidateCells(result.Cells, result.Stars.Length);
         ValidateTilt(result.Tilt, result.Cells);
+        if (result.TriangleTilt is not null)
+        {
+            ValidateTriangleTilt(result.TriangleTilt, result);
+        }
+    }
+
+    internal static void ValidateTriangleRequest(
+        StarAnalysisResult result,
+        double? requestedAngleDegrees)
+    {
+        bool requested = requestedAngleDegrees.HasValue;
+        bool returned = result.TriangleTilt is not null;
+        if (requested && !returned)
+        {
+            throw Invalid("triangle tilt is missing from a request that enabled it");
+        }
+
+        if (!requested && returned)
+        {
+            throw Invalid("triangle tilt was returned without being requested");
+        }
+
+        if (requested)
+        {
+            double expectedAngle = NormalizeDegrees(requestedAngleDegrees!.Value);
+            RequireApproximately(
+                result.TriangleTilt!.AngleDegrees,
+                expectedAngle,
+                "triangle angle does not match the requested angle");
+        }
     }
 
     private static void ValidateStar(
@@ -387,6 +473,191 @@ internal static class StarAnalysisValidator
         StarAnalysisCornerPosition.BottomRight => (2, 2),
         _ => throw Invalid("unknown corner"),
     };
+
+    private static void ValidateTriangleTilt(
+        StarAnalysisTriangleTilt triangle,
+        StarAnalysisResult result)
+    {
+        RequireNormalizedDegrees(triangle.AngleDegrees, "triangle angle");
+        RequireFinitePositive(triangle.InnerRadiusPixels, "triangle inner radius");
+        RequireFinitePositive(triangle.OuterRadiusPixels, "triangle outer radius");
+
+        double expectedInnerRadius = 0.25 * Math.Sqrt(
+            Math.Pow(result.Width / 2.0, 2) +
+            Math.Pow(result.Height / 2.0, 2));
+        double expectedOuterRadius = 0.5 * Math.Min(result.Width, result.Height);
+        RequireApproximately(
+            triangle.InnerRadiusPixels,
+            expectedInnerRadius,
+            "triangle inner radius does not match the image dimensions");
+        RequireApproximately(
+            triangle.OuterRadiusPixels,
+            expectedOuterRadius,
+            "triangle outer radius does not match the image dimensions");
+
+        if (triangle.MinimumStarsPerRegion != 3)
+        {
+            throw Invalid("triangle minimum stars per region must be 3");
+        }
+
+        if (triangle.Center is null)
+        {
+            throw Invalid("triangle center statistics are missing");
+        }
+
+        ValidateTriangleRegion(
+            triangle.Center.StarCount,
+            triangle.Center.MedianHfr,
+            "triangle center");
+
+        if (triangle.Sectors is null || triangle.Sectors.Length != 3)
+        {
+            throw Invalid("triangle tilt must contain exactly three sectors");
+        }
+
+        long regionStarCount = triangle.Center.StarCount;
+        for (int index = 0; index < triangle.Sectors.Length; index++)
+        {
+            StarAnalysisTriangleSector? sector = triangle.Sectors[index];
+            int expectedSector = index + 1;
+            if (sector is null || sector.Sector != expectedSector)
+            {
+                throw Invalid("triangle sectors must be ordered 1, 2, 3");
+            }
+
+            RequireNormalizedDegrees(
+                sector.AxisAngleDegrees,
+                $"triangle sector {sector.Sector} axis angle");
+            double expectedAxis = NormalizeDegrees(
+                triangle.AngleDegrees + (sector.Sector - 1) * 120.0);
+            RequireApproximately(
+                sector.AxisAngleDegrees,
+                expectedAxis,
+                $"triangle sector {sector.Sector} axis angle is inconsistent");
+            ValidateTriangleRegion(
+                sector.StarCount,
+                sector.MedianHfr,
+                $"triangle sector {sector.Sector}");
+            regionStarCount += sector.StarCount;
+        }
+
+        if (regionStarCount > result.Stars.Length)
+        {
+            throw Invalid("triangle region star counts exceed the detected-star count");
+        }
+
+        long annularStarCount = triangle.Sectors.Sum(
+            sector => (long)sector.StarCount);
+        bool hasAnnulus = triangle.InnerRadiusPixels < triangle.OuterRadiusPixels;
+        if (!hasAnnulus && annularStarCount != 0)
+        {
+            throw Invalid("triangle sectors contain stars without a usable annulus");
+        }
+
+        ValidateOptionalPositive(triangle.OverallMedianHfr, "triangle overall median HFR");
+        if (triangle.OverallMedianHfr.HasValue != (annularStarCount > 0))
+        {
+            throw Invalid("triangle overall median HFR availability is inconsistent");
+        }
+
+        bool expectedReady =
+            hasAnnulus &&
+            triangle.Sectors.All(
+                sector => sector.StarCount >= triangle.MinimumStarsPerRegion);
+        if (triangle.Ready != expectedReady)
+        {
+            throw Invalid("triangle readiness is inconsistent with its region samples");
+        }
+
+        bool hasCompleteVerdict =
+            triangle.TiltPercent.HasValue &&
+            triangle.BestSector.HasValue &&
+            triangle.WorstSector.HasValue;
+        bool hasAnyVerdict =
+            triangle.TiltPercent.HasValue ||
+            triangle.BestSector.HasValue ||
+            triangle.WorstSector.HasValue;
+        if (hasAnyVerdict != hasCompleteVerdict || hasCompleteVerdict != triangle.Ready)
+        {
+            throw Invalid("triangle tilt verdict and readiness are inconsistent");
+        }
+
+        if (!triangle.Ready)
+        {
+            return;
+        }
+
+        RequireFiniteNonnegative(triangle.TiltPercent!.Value, "triangle tilt percent");
+        int expectedBestSector = triangle.Sectors
+            .OrderBy(sector => sector.MedianHfr!.Value)
+            .ThenBy(sector => sector.Sector)
+            .First()
+            .Sector;
+        int expectedWorstSector = triangle.Sectors
+            .OrderByDescending(sector => sector.MedianHfr!.Value)
+            .ThenBy(sector => sector.Sector)
+            .First()
+            .Sector;
+        if (triangle.BestSector != expectedBestSector ||
+            triangle.WorstSector != expectedWorstSector)
+        {
+            throw Invalid("triangle best/worst sectors are inconsistent with their medians");
+        }
+
+        double bestHfr = triangle.Sectors[expectedBestSector - 1].MedianHfr!.Value;
+        double worstHfr = triangle.Sectors[expectedWorstSector - 1].MedianHfr!.Value;
+        double expectedTiltPercent =
+            100.0 * (worstHfr - bestHfr) / triangle.OverallMedianHfr!.Value;
+        RequireApproximately(
+            triangle.TiltPercent.Value,
+            expectedTiltPercent,
+            "triangle tilt percent is inconsistent with its medians");
+    }
+
+    private static void ValidateTriangleRegion(
+        int starCount,
+        double? medianHfr,
+        string name)
+    {
+        if (starCount < 0)
+        {
+            throw Invalid($"{name} has a negative star count");
+        }
+
+        ValidateOptionalPositive(medianHfr, $"{name} median HFR");
+        if (medianHfr.HasValue != (starCount > 0))
+        {
+            throw Invalid($"{name} median HFR availability does not match its star count");
+        }
+    }
+
+    private static void ValidateOptionalPositive(double? value, string name)
+    {
+        if (value.HasValue)
+        {
+            RequireFinitePositive(value.Value, name);
+        }
+    }
+
+    private static void RequireNormalizedDegrees(double value, string name)
+    {
+        RequireFiniteRange(value, 0, 360, name, maximumInclusive: false);
+    }
+
+    private static double NormalizeDegrees(double value)
+    {
+        double normalized = value % 360;
+        return normalized < 0 ? normalized + 360 : normalized;
+    }
+
+    private static void RequireApproximately(double actual, double expected, string detail)
+    {
+        double tolerance = 1e-9 * Math.Max(1, Math.Max(Math.Abs(actual), Math.Abs(expected)));
+        if (Math.Abs(actual - expected) > tolerance)
+        {
+            throw Invalid(detail);
+        }
+    }
 
     private static void ValidateOptionalNonnegative(double? value, string name)
     {

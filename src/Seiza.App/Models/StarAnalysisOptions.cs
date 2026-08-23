@@ -44,6 +44,14 @@ public sealed record StarAnalysisOptions
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? Sensitivity { get; init; }
 
+    /// <summary>
+    /// Requests an additional three-sector radial tilt analysis rotated by
+    /// this clockwise angle from image-up. The native core normalizes any
+    /// finite value to [0, 360).
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public double? TriangleAngleDegrees { get; init; }
+
     internal string ToJson()
     {
         Validate();
@@ -93,6 +101,14 @@ public sealed record StarAnalysisOptions
             throw new ArgumentOutOfRangeException(
                 nameof(Sensitivity),
                 "Sensitivity must be a finite positive value.");
+        }
+
+        if (TriangleAngleDegrees is double triangleAngle &&
+            !double.IsFinite(triangleAngle))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(TriangleAngleDegrees),
+                "The triangle angle must be finite.");
         }
     }
 

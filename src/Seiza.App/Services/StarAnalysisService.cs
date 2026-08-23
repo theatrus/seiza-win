@@ -88,7 +88,8 @@ internal sealed class StarAnalysisService
         cancellationToken.ThrowIfCancellationRequested();
         FileStamp source = ReadFileStamp(path);
         EnsureSupportedPath(source.FullPath);
-        string optionsJson = (options ?? new StarAnalysisOptions()).ToJson();
+        StarAnalysisOptions effectiveOptions = options ?? new StarAnalysisOptions();
+        string optionsJson = effectiveOptions.ToJson();
         string coreVersion = _nativeClient.CoreVersion;
         if (string.IsNullOrWhiteSpace(coreVersion))
         {
@@ -104,7 +105,11 @@ internal sealed class StarAnalysisService
         }
 
         cancellationToken.ThrowIfCancellationRequested();
-        InflightEntry inflight = GetOrStartAnalysis(key, source, optionsJson);
+        InflightEntry inflight = GetOrStartAnalysis(
+            key,
+            source,
+            optionsJson,
+            effectiveOptions.TriangleAngleDegrees);
 
         try
         {
@@ -128,7 +133,8 @@ internal sealed class StarAnalysisService
     private InflightEntry GetOrStartAnalysis(
         CacheKey key,
         FileStamp source,
-        string optionsJson)
+        string optionsJson,
+        double? triangleAngleDegrees)
     {
         lock (_cacheLock)
         {
@@ -139,7 +145,12 @@ internal sealed class StarAnalysisService
             }
 
             var entry = new InflightEntry { WaiterCount = 1 };
-            entry.Operation = AnalyzeAndCacheAsync(key, source, optionsJson, entry);
+            entry.Operation = AnalyzeAndCacheAsync(
+                key,
+                source,
+                optionsJson,
+                triangleAngleDegrees,
+                entry);
             _inflight.Add(key, entry);
             _ = entry.Operation.ContinueWith(
                 completed => CompleteInflight(key, entry, completed),
@@ -154,6 +165,7 @@ internal sealed class StarAnalysisService
         CacheKey key,
         FileStamp source,
         string optionsJson,
+        double? triangleAngleDegrees,
         InflightEntry entry)
     {
         bool gateAcquired = false;
@@ -179,7 +191,10 @@ internal sealed class StarAnalysisService
 
             EnsureUnchanged(source);
             StarAnalysisResult result = await Task.Run(
-                    () => DetectAndValidate(source, optionsJson))
+                    () => DetectAndValidate(
+                        source,
+                        optionsJson,
+                        triangleAngleDegrees))
                 .ConfigureAwait(false);
             EnsureUnchanged(source);
             AddCached(key, result);
@@ -245,7 +260,10 @@ internal sealed class StarAnalysisService
         }
     }
 
-    private StarAnalysisResult DetectAndValidate(FileStamp source, string optionsJson)
+    private StarAnalysisResult DetectAndValidate(
+        FileStamp source,
+        string optionsJson,
+        double? triangleAngleDegrees)
     {
         string json = _nativeClient.DetectPath(source.FullPath, optionsJson);
         StarAnalysisResult result;
@@ -264,6 +282,7 @@ internal sealed class StarAnalysisService
         }
 
         result.Validate();
+        StarAnalysisValidator.ValidateTriangleRequest(result, triangleAngleDegrees);
         EnsureUnchanged(source);
         return result;
     }
