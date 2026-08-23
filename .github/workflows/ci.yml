@@ -52,10 +52,10 @@ jobs:
       # which is the budget releases depend on. Authenticode is applied by
       # release.yml alone.
       - name: Build all-users MSI
-        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.6.1
+        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.7.0
 
       - name: Verify installer Finish launch action
-        run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi .\dist\seiza-0.6.1-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi .\dist\seiza-0.7.0-windows-x86_64.msi
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7
@@ -65,4 +65,4 @@ jobs:
           if-no-files-found: error
 
       - name: Smoke-test Windows installer
-        run: .\.github\scripts\test-windows-installer.ps1 -Msi .\dist\seiza-0.6.1-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-installer.ps1 -Msi .\dist\seiza-0.7.0-windows-x86_64.msi

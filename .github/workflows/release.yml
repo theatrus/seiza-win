@@ -101,6 +101,31 @@ jobs:
       - name: Check Rust formatting
         run: cargo fmt --all --check
 
+      - name: Require the Authenticode signing configuration
+        shell: pwsh
+        env:
+          AZURE_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+          AZURE_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+          AZURE_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+          SIGNING_ENDPOINT: ${{ vars.SIGNING_ENDPOINT }}
+          SIGNING_ACCOUNT: ${{ vars.SIGNING_ACCOUNT }}
+          SIGNING_PROFILE: ${{ vars.SIGNING_PROFILE }}
+        run: |
+          $required = @(
+            "AZURE_CLIENT_ID",
+            "AZURE_TENANT_ID",
+            "AZURE_SUBSCRIPTION_ID",
+            "SIGNING_ENDPOINT",
+            "SIGNING_ACCOUNT",
+            "SIGNING_PROFILE"
+          )
+          $missing = $required | Where-Object {
+            [string]::IsNullOrWhiteSpace([Environment]::GetEnvironmentVariable($_))
+          }
+          if ($missing) {
+            throw "Production signing configuration is missing: $($missing -join ', ')"
+          }
+
       - name: Test Rust core
         run: .\scripts\build-rust.ps1 -Test
 
@@ -115,7 +140,6 @@ jobs:
         run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=${{ env.SEIZA_VERSION }} -t:PublishSeizaApp
 
       - name: Resolve the application binaries to sign
-        if: vars.AZURE_CLIENT_ID != ''
         shell: pwsh
         run: |
           # Named one by one, never a folder-and-recurse sweep. This is a
@@ -158,11 +182,10 @@ jobs:
       # missing role but is purely about elapsed time. A credential that lives
       # five minutes has to be acquired next to where it is used.
       #
-      # Every signing step is gated on the variable being present so a fork,
-      # which has neither the variables nor access to the federated credential,
-      # still produces an installer rather than failing outright.
+      # The job itself runs only in the canonical repository, and the explicit
+      # configuration check above makes both release tags and dry runs fail
+      # closed rather than publishing an unsigned build.
       - name: Authenticate to Azure (for binary signing)
-        if: vars.AZURE_CLIENT_ID != ''
         uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -175,7 +198,6 @@ jobs:
       # authenticates through DefaultAzureCredential and rides the azure/login
       # session above.
       - name: Sign the application binaries
-        if: vars.AZURE_CLIENT_ID != ''
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: ${{ vars.SIGNING_ENDPOINT }}
@@ -194,7 +216,6 @@ jobs:
       # Fresh assertion again: harvesting and cab-compressing a self-contained
       # payload sits between this and the previous login.
       - name: Authenticate to Azure (for installer signing)
-        if: vars.AZURE_CLIENT_ID != ''
         uses: azure/login@v3
         with:
           client-id: ${{ vars.AZURE_CLIENT_ID }}
@@ -205,7 +226,6 @@ jobs:
       # signing them again would spend quota twice and append a second signature
       # to a file that already carries a good one.
       - name: Sign the MSI
-        if: vars.AZURE_CLIENT_ID != ''
         uses: azure/trusted-signing-action@v2
         with:
           endpoint: ${{ vars.SIGNING_ENDPOINT }}
@@ -221,7 +241,6 @@ jobs:
       # the MSI alone would pass happily while shipping unsigned executables
       # inside a signed wrapper.
       - name: Verify Windows signatures
-        if: vars.AZURE_CLIENT_ID != ''
         shell: pwsh
         run: |
           $signtool = Get-ChildItem -LiteralPath "C:\Program Files (x86)\Windows Kits\10\bin" -Recurse -Filter signtool.exe |

@@ -8,14 +8,14 @@ merely because its Rust implementation exists.
 ## Baseline
 
 - macOS reference: `main` at
-  [`73f2633`](https://github.com/theatrus/seiza-mac/commit/73f26337fde90f53e620b68b70d4804948bbcc96)
+  [`9d1ec73`](https://github.com/theatrus/seiza-mac/commit/9d1ec73bac5d21d3475ae85b5f574acab83453e0)
 - Seiza core reference: crates.io `seiza-cabi 0.18.7` from
   [`8e6af29`](https://github.com/theatrus/seiza/commit/8e6af29742972bf84cc0669af5f6fe5f5188db28),
   resolving `seiza-stars 0.1.2` and
   [`seiza-stacking 0.11.4`](https://github.com/theatrus/seiza/commit/d17fad906d83f91920489e3af9e87f7f344a014e)
 - Windows reference: live-stack implementation at
-  [`f83dab0`](https://github.com/theatrus/seiza-win/commit/f83dab0b50f365db4570f7972f618f1a12565160)
-- Last audited: 2026-08-22
+  [`10ee0a6`](https://github.com/theatrus/seiza-win/commit/10ee0a6b5035e3034867546cb99b03a7f45a44dd)
+- Last audited: 2026-08-23
 
 Update this baseline and the affected rows whenever the macOS app gains a
 feature or changes an interaction. A Windows feature is **Complete** only after
@@ -105,25 +105,29 @@ contract while retaining Windows BGRA render output.
 Measured-star analysis is a separate workflow from plate solving. It requires
 neither a catalog install nor a WCS solution: the user explicitly chooses
 **Analyze stars** from the toolbar or inspector, and the native core measures
-the original linear FITS/XISF source. This is implemented against the
+FITS/XISF source samples before display stretch. This is implemented against the
 published, Cargo-locked Seiza 0.18.7 C ABI. A registry-backed managed service
 test measured 71 stars and a ready triangle in a real C925 FITS image, plus 468
 stars and a ready triangle in a real XISF image. It verified exact native
-triangle data and formulas and left both sources unchanged. The rows remain
-**Partial** only until the packaged viewport and 8- and 16-bit composited-export
-UI paths complete their checks.
+triangle data and formulas and left both sources unchanged. An isolated
+Release-built x64 app then completed viewport analysis and three
+full-resolution composited-export checks on the 3,840 x 2,160 C925 source: a
+32-bpp Bgra32 measured-stars/grid PNG, a 64-bpp Rgba64 parallelogram-only PNG,
+and a 64-bpp Rgba64 triangle-only TIFF. WIC decoding and visual inspection
+confirmed source dimensions and registration, the requested layers, complete
+labels, smooth gradients, and no chrome, corruption, seams, or rescaling.
 
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
-| Explicit, solve-independent Analyze stars action | Not yet exposed | **Partial** | Toolbar and inspector actions invoke the native FITS/XISF path decoder without catalog access, solving, a stretched-viewport round trip, or C# per-pixel work. The registry-built 0.18.7 runtime returned 71 stars from a real C925 FITS image and 468 from a real XISF image without modifying either source. |
-| Schema-1 measurement model | Not yet exposed | **Partial** | Source-generated models validate source dimensions, individual star HFR/FWHM and optional PSF fields, exactly nine row/column cells, aggregate tilt/curvature, and optional native triangle provenance before presentation. Both real-file responses passed the full validator with exact native triangle fields and formulas. |
-| Measured-star overlay | Not yet exposed | **Partial** | Yellow HFR circles are explicitly labeled **Measured stars**, distinct from the solver's **Plate-solve detections**. The renderer selects at most the 1,000 sharpest usable measurements and caps HFR labels at 100 when screen space permits so pan and zoom remain responsive. |
-| 3x3 sensor-tilt overlay and inspector | Not yet exposed | **Partial** | Cells show median HFR and star count, compare reliable cells with restrained good/warning/poor coloring, mark fewer than three measurements as a low sample, and suppress best/worst emphasis when the reliable spread is negligible. The guidance says to confirm tilt across multiple frames. |
-| Parallelogram tilt diagram | Not yet exposed | **Partial** | A separate, off-by-default overlay joins the four reliable corner-cell medians into a corner-scaled HFR perimeter with both diagonals; equal corner HFR forms a square. It is suppressed unless every corner has at least three measurements and shares viewport/export transforms. |
-| Triangle tilt diagram | Not yet exposed | **Partial** | Interactive analysis requests the published native three-sector response at image-up angle 0. Both registry-backed real-file tests returned ready triangles with validated radii, axes, readiness, best/worst sectors, and tilt formula. The off-by-default menu becomes available only for a ready result, and the renderer consumes its three sector medians without reusing the four-corner tilt percentage. Only packaged viewport plus 8- and 16-bit export UI validation remains. |
-| Major-axis direction safety | Not yet exposed | **Partial** | Mean elongation is drawn only when a cell has at least three stars, the native response advertises normalized PSF major-axis angles, and coherence exceeds the threshold; missing capability safely disables direction lines. Validated against the published native runtime. |
-| Freshness, cache, and bounded execution | Windows-specific | **Partial** | The bounded cache key combines normalized absolute source path, length, timestamp, Windows file identity when available, core version, and serialized options; identical requests share work and only one native detector job runs at a time. Source identity, source dimensions, path, and document generation prevent a result from attaching after navigation. |
-| Viewport and composited export parity | Not yet exposed | **Partial** | Measured stars and tilt join solve layers in one image-space scene, so the same geometry is used for zoom-stable viewing and full-resolution 8- or 16-bit export. Packaged viewport plus both export UI paths are the remaining completion gate. |
+| Explicit, solve-independent Analyze stars action | Available | **Complete** | Toolbar and inspector actions invoke the native FITS/XISF path decoder without catalog access, solving, a stretched-viewport round trip, or C# per-pixel work. The registry-built 0.18.7 runtime returned 71 stars from a real C925 FITS image and 468 from a real XISF image without modifying either source. |
+| Schema-1 measurement model | Available | **Complete** | Source-generated models validate source dimensions, individual star HFR/FWHM and optional PSF fields, exactly nine row/column cells, aggregate tilt/curvature, and optional native triangle provenance before presentation. Both real-file responses passed the full validator with exact native triangle fields and formulas. |
+| Measured-star overlay | Available | **Complete** | Yellow HFR circles are explicitly labeled **Measured stars**, distinct from the solver's **Plate-solve detections**. The renderer selects at most the 1,000 sharpest usable measurements and caps HFR labels at 100 when screen space permits so pan and zoom remain responsive. |
+| 3x3 sensor-tilt overlay and inspector | Available | **Complete** | Cells show median HFR and star count, compare reliable cells with restrained good/warning/poor coloring, mark fewer than three measurements as a low sample, and suppress best/worst emphasis when the reliable spread is negligible. The guidance says to confirm tilt across multiple frames. |
+| Parallelogram tilt diagram | Available | **Complete** | A separate, off-by-default overlay joins the four reliable corner-cell medians into a corner-scaled HFR perimeter with both diagonals; equal corner HFR forms a square. It is suppressed unless every corner has at least three measurements and shares viewport/export transforms. |
+| Triangle tilt diagram | Available | **Complete** | Interactive analysis requests the published native three-sector response at image-up angle 0. Both registry-backed real-file tests returned ready triangles with validated radii, axes, readiness, best/worst sectors, and tilt formula. The off-by-default menu becomes available only for a ready result, and the renderer consumes its three sector medians without reusing the four-corner tilt percentage. |
+| Major-axis direction safety | Available | **Complete** | Mean elongation is drawn only when a cell has at least three stars, the native response advertises normalized PSF major-axis angles, and coherence exceeds the threshold; missing capability safely disables direction lines. Validated against the published native runtime. |
+| Freshness, cache, and bounded execution | Windows-specific | **Complete** | The bounded cache key combines normalized absolute source path, length, timestamp, Windows file identity when available, core version, and serialized options; identical requests share work and only one native detector job runs at a time. Source identity, source dimensions, path, and document generation prevent a result from attaching after navigation. |
+| Viewport and composited export parity | Not yet exposed | **Complete** | Measured stars and tilt join solve layers in one image-space scene. Release-built viewport analysis and WIC-decoded 32-bpp PNG plus 64-bpp PNG/TIFF exports confirmed zoom-stable source registration, requested-layer parity, complete labels, and smooth full-resolution output. |
 
 ## Plate solving
 
@@ -209,12 +213,12 @@ These remain tracked beyond the current macOS parity surface:
    activation, true 16-bit PNG/TIFF export, the all-users self-contained WiX
    MSI, Authenticode signing, and installer CI and tag-driven releases are
    complete.
-6. **Implemented, final UI/export validation pending: Image-quality analysis** —
+6. **Complete: Image-quality analysis** —
    the explicit catalog-free action, schema-1 models, measured-star, nine-cell
    tilt-grid, and parallelogram overlay, inspector, bounded cache,
    stale-result protection, and shared viewport/export scene are present. The
    published Seiza 0.18.7 C ABI and native triangle sectors are Cargo-locked,
    and registry-backed managed analysis is complete on real C925 FITS and XISF
    sources with ready triangles, exact native data/formulas, and immutable
-   inputs. Only packaged viewport plus 8- and 16-bit composited-export UI QA
-   remains before marking the rows complete.
+   inputs. Release-built viewport analysis and full-resolution 8- and 16-bit
+   composited-export checks are complete on the real C925 FITS source.
