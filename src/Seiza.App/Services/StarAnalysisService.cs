@@ -97,19 +97,25 @@ internal sealed class StarAnalysisService
         }
 
         CacheKey key = CacheKey.Create(source, coreVersion, optionsJson);
-        if (TryGetCached(key, out StarAnalysisResult? cached))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            EnsureUnchanged(source);
-            return cached!;
-        }
-
         cancellationToken.ThrowIfCancellationRequested();
-        InflightEntry inflight = GetOrStartAnalysis(
+        InflightEntry? inflight = GetCachedOrStartAnalysis(
             key,
             source,
             optionsJson,
-            effectiveOptions.TriangleAngleDegrees);
+            effectiveOptions.TriangleAngleDegrees,
+            out StarAnalysisResult? cached);
+        if (cached is not null)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            EnsureUnchanged(source);
+            return cached;
+        }
+
+        // The combined cache/in-flight lookup above always supplies one of
+        // these values while holding the same lock. Keeping that transition
+        // atomic prevents a completed operation from being duplicated in the
+        // gap between a cache miss and registration of a new native call.
+        InflightEntry pending = inflight!;
 
         try
         {
@@ -117,7 +123,7 @@ internal sealed class StarAnalysisService
             // has begun it owns and frees its buffers synchronously on its
             // worker; the abandoned operation is allowed to finish without
             // unsafe interruption.
-            StarAnalysisResult result = await inflight.Operation
+            StarAnalysisResult result = await pending.Operation
                 .WaitAsync(cancellationToken)
                 .ConfigureAwait(false);
             cancellationToken.ThrowIfCancellationRequested();
@@ -126,18 +132,28 @@ internal sealed class StarAnalysisService
         }
         finally
         {
-            ReleaseWaiter(key, inflight);
+            ReleaseWaiter(key, pending);
         }
     }
 
-    private InflightEntry GetOrStartAnalysis(
+    private InflightEntry? GetCachedOrStartAnalysis(
         CacheKey key,
         FileStamp source,
         string optionsJson,
-        double? triangleAngleDegrees)
+        double? triangleAngleDegrees,
+        out StarAnalysisResult? cached)
     {
         lock (_cacheLock)
         {
+            if (_cache.TryGetValue(key, out LinkedListNode<CacheEntry>? cachedNode))
+            {
+                _lru.Remove(cachedNode);
+                _lru.AddFirst(cachedNode);
+                cached = cachedNode.Value.Result;
+                return null;
+            }
+
+            cached = null;
             if (_inflight.TryGetValue(key, out InflightEntry? existing))
             {
                 existing.WaiterCount++;
@@ -287,23 +303,6 @@ internal sealed class StarAnalysisService
         return result;
     }
 
-    private bool TryGetCached(CacheKey key, out StarAnalysisResult? result)
-    {
-        lock (_cacheLock)
-        {
-            if (!_cache.TryGetValue(key, out LinkedListNode<CacheEntry>? node))
-            {
-                result = null;
-                return false;
-            }
-
-            _lru.Remove(node);
-            _lru.AddFirst(node);
-            result = node.Value.Result;
-            return true;
-        }
-    }
-
     private void AddCached(CacheKey key, StarAnalysisResult result)
     {
         lock (_cacheLock)
@@ -336,7 +335,11 @@ internal sealed class StarAnalysisService
             throw new FileNotFoundException("The image to analyze does not exist.", fullPath);
         }
 
-        return new FileStamp(file.FullName, file.Length, file.LastWriteTimeUtc.Ticks);
+        return new FileStamp(
+            file.FullName,
+            file.Length,
+            file.LastWriteTimeUtc.Ticks,
+            WindowsFileIdentity.TryGet(file.FullName));
     }
 
     private static void EnsureUnchanged(FileStamp expected)
@@ -352,7 +355,12 @@ internal sealed class StarAnalysisService
         }
 
         if (actual.Length != expected.Length ||
-            actual.LastWriteUtcTicks != expected.LastWriteUtcTicks)
+            actual.LastWriteUtcTicks != expected.LastWriteUtcTicks ||
+            (expected.FileIdentity is not null &&
+             !string.Equals(
+                 actual.FileIdentity,
+                 expected.FileIdentity,
+                 StringComparison.Ordinal)))
         {
             throw new StarAnalysisSourceChangedException(expected.FullPath);
         }
@@ -371,12 +379,14 @@ internal sealed class StarAnalysisService
     private readonly record struct FileStamp(
         string FullPath,
         long Length,
-        long LastWriteUtcTicks);
+        long LastWriteUtcTicks,
+        string? FileIdentity);
 
     private readonly record struct CacheKey(
         string NormalizedPath,
         long Length,
         long LastWriteUtcTicks,
+        string? FileIdentity,
         string CoreVersion,
         string OptionsJson)
     {
@@ -387,6 +397,7 @@ internal sealed class StarAnalysisService
                 source.FullPath.ToUpperInvariant(),
                 source.Length,
                 source.LastWriteUtcTicks,
+                source.FileIdentity,
                 coreVersion,
                 optionsJson);
     }

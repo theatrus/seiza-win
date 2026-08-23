@@ -112,6 +112,7 @@
                     Text="Stars and sensor tilt" />
                 <TextBlock
                     x:Name="StarAnalysisStateText"
+                    AutomationProperties.LiveSetting="Polite"
                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                     IsTextSelectionEnabled="True"
                     Text="Not analyzed"
@@ -120,6 +121,7 @@
                     x:Name="StarAnalysisProgressRing"
                     Width="20"
                     Height="20"
+                    AutomationProperties.Name="Analyzing stars and sensor tilt"
                     HorizontalAlignment="Left"
                     IsActive="False"
                     Visibility="Collapsed" />

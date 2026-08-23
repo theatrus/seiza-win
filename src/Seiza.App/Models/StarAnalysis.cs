@@ -192,6 +192,13 @@ public enum StarAnalysisCornerPosition
 internal static class StarAnalysisValidator
 {
     private const int SupportedSchemaVersion = 1;
+    private static readonly StarAnalysisCornerPosition[] OrderedCorners =
+    [
+        StarAnalysisCornerPosition.TopLeft,
+        StarAnalysisCornerPosition.TopRight,
+        StarAnalysisCornerPosition.BottomLeft,
+        StarAnalysisCornerPosition.BottomRight,
+    ];
 
     internal static void Validate(StarAnalysisResult result)
     {
@@ -358,7 +365,7 @@ internal static class StarAnalysisValidator
             }
 
             countedStars += cell.StarCount;
-            ValidateOptionalNonnegative(cell.MedianHfr, $"cell {cell.Row},{cell.Col} median HFR");
+            ValidateOptionalPositive(cell.MedianHfr, $"cell {cell.Row},{cell.Col} median HFR");
             ValidateOptionalRange(
                 cell.MedianEccentricity,
                 0,
@@ -403,8 +410,8 @@ internal static class StarAnalysisValidator
 
     private static void ValidateTilt(StarAnalysisTilt tilt, StarAnalysisCell[] cells)
     {
-        ValidateOptionalNonnegative(tilt.CenterHfr, "center HFR");
-        ValidateOptionalNonnegative(tilt.MeanHfr, "mean HFR");
+        ValidateOptionalPositive(tilt.CenterHfr, "center HFR");
+        ValidateOptionalPositive(tilt.MeanHfr, "mean HFR");
         ValidateOptionalNonnegative(tilt.TiltPercent, "tilt percent");
         ValidateOptionalFinite(tilt.CurvaturePercent, "curvature percent");
 
@@ -421,7 +428,7 @@ internal static class StarAnalysisValidator
                 throw Invalid("the tilt summary must contain each corner exactly once");
             }
 
-            ValidateOptionalNonnegative(corner.Hfr, $"{corner.Corner} HFR");
+            ValidateOptionalPositive(corner.Hfr, $"{corner.Corner} HFR");
             (int row, int col) = CornerCell(corner.Corner);
             double? cellHfr = cells.Single(cell => cell.Row == row && cell.Col == col).MedianHfr;
             if (corner.Hfr != cellHfr)
@@ -458,10 +465,70 @@ internal static class StarAnalysisValidator
             throw Invalid("mean HFR availability does not match the grid");
         }
 
+        if (tilt.MeanHfr.HasValue)
+        {
+            double expectedMeanHfr = Median(
+                cells.Where(cell => cell.MedianHfr.HasValue)
+                    .Select(cell => cell.MedianHfr!.Value));
+            RequireApproximately(
+                tilt.MeanHfr.Value,
+                expectedMeanHfr,
+                "mean HFR does not match the grid median");
+        }
+
         bool canMeasureCurvature = allCornersMeasured && tilt.CenterHfr is > 0;
         if (tilt.CurvaturePercent.HasValue != canMeasureCurvature)
         {
             throw Invalid("curvature verdict availability does not match the grid");
+        }
+
+        if (hasTiltVerdict)
+        {
+            var cornerHfrs = tilt.Corners.ToDictionary(
+                corner => corner.Corner,
+                corner => corner.Hfr!.Value);
+            StarAnalysisCornerPosition expectedBest = OrderedCorners[0];
+            StarAnalysisCornerPosition expectedWorst = OrderedCorners[0];
+            for (int index = 1; index < OrderedCorners.Length; index++)
+            {
+                StarAnalysisCornerPosition corner = OrderedCorners[index];
+                if (cornerHfrs[corner] < cornerHfrs[expectedBest])
+                {
+                    expectedBest = corner;
+                }
+
+                // Seiza stable-sorts the canonical TL, TR, BL, BR order and
+                // takes the last corner as worst, so the last equal maximum
+                // wins while the first equal minimum remains best.
+                if (cornerHfrs[corner] >= cornerHfrs[expectedWorst])
+                {
+                    expectedWorst = corner;
+                }
+            }
+
+            if (tilt.BestCorner != expectedBest || tilt.WorstCorner != expectedWorst)
+            {
+                throw Invalid("tilt best/worst corners are inconsistent with their HFR values");
+            }
+
+            double expectedTiltPercent = 100.0 *
+                (cornerHfrs[expectedWorst] - cornerHfrs[expectedBest]) /
+                tilt.MeanHfr!.Value;
+            RequireApproximately(
+                tilt.TiltPercent!.Value,
+                expectedTiltPercent,
+                "tilt percent is inconsistent with the grid");
+        }
+
+        if (canMeasureCurvature)
+        {
+            double cornerMean = tilt.Corners.Average(corner => corner.Hfr!.Value);
+            double expectedCurvaturePercent =
+                100.0 * (cornerMean / tilt.CenterHfr!.Value - 1.0);
+            RequireApproximately(
+                tilt.CurvaturePercent!.Value,
+                expectedCurvaturePercent,
+                "curvature percent is inconsistent with the grid");
         }
     }
 
@@ -648,6 +715,15 @@ internal static class StarAnalysisValidator
     {
         double normalized = value % 360;
         return normalized < 0 ? normalized + 360 : normalized;
+    }
+
+    private static double Median(IEnumerable<double> source)
+    {
+        double[] values = source.Order().ToArray();
+        int midpoint = values.Length / 2;
+        return values.Length % 2 == 1
+            ? values[midpoint]
+            : (values[midpoint - 1] + values[midpoint]) / 2.0;
     }
 
     private static void RequireApproximately(double actual, double expected, string detail)

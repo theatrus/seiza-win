@@ -71,6 +71,20 @@ public sealed class StarAnalysisServiceTests
             Assert.Equal(725, root.GetProperty("triangleAngleDegrees").GetDouble());
             Assert.False(root.TryGetProperty("focalLengthMm", out _));
 
+            using JsonDocument focalOnly = JsonDocument.Parse(
+                new StarAnalysisOptions { FocalLengthMm = 749 }.ToJson());
+            Assert.Equal(
+                749,
+                focalOnly.RootElement.GetProperty("focalLengthMm").GetDouble());
+            Assert.False(focalOnly.RootElement.TryGetProperty("pixelSizeUm", out _));
+
+            using JsonDocument pixelOnly = JsonDocument.Parse(
+                new StarAnalysisOptions { PixelSizeUm = 3.76 }.ToJson());
+            Assert.Equal(
+                3.76,
+                pixelOnly.RootElement.GetProperty("pixelSizeUm").GetDouble());
+            Assert.False(pixelOnly.RootElement.TryGetProperty("focalLengthMm", out _));
+
             var ambiguous = new StarAnalysisOptions
             {
                 Preset = StarDetectionPreset.Standard,
@@ -79,6 +93,14 @@ public sealed class StarAnalysisServiceTests
             };
             await Assert.ThrowsAsync<ArgumentException>(
                 () => service.AnalyzeAsync(path, ambiguous));
+
+            var presetWithPixelOnly = new StarAnalysisOptions
+            {
+                Preset = StarDetectionPreset.Standard,
+                PixelSizeUm = 3.76,
+            };
+            await Assert.ThrowsAsync<ArgumentException>(
+                () => service.AnalyzeAsync(path, presetWithPixelOnly));
 
             var unknownPreset = new StarAnalysisOptions
             {
@@ -423,6 +445,82 @@ public sealed class StarAnalysisServiceTests
     }
 
     [Fact]
+    public async Task SameSizeTimestampPreservingReplacementIsRejectedByFileIdentity()
+    {
+        string path = CreateImagePath();
+        string replacement = Path.Combine(
+            Path.GetDirectoryName(path)!,
+            $"seiza-star-analysis-replacement-{Guid.NewGuid():N}.fits");
+        long originalLength = new FileInfo(path).Length;
+        long originalWriteTicks = File.GetLastWriteTimeUtc(path).Ticks;
+        string? originalIdentity = WindowsFileIdentity.TryGet(path);
+        try
+        {
+            Assert.NotNull(originalIdentity);
+            var native = new FakeNativeClient((nativePath, _) =>
+            {
+                File.WriteAllBytes(replacement, [7, 8, 9]);
+                File.SetLastWriteTimeUtc(
+                    replacement,
+                    new DateTime(originalWriteTicks, DateTimeKind.Utc));
+                File.Move(replacement, nativePath, overwrite: true);
+
+                var replaced = new FileInfo(nativePath);
+                Assert.Equal(originalLength, replaced.Length);
+                Assert.Equal(originalWriteTicks, replaced.LastWriteTimeUtc.Ticks);
+                Assert.NotEqual(originalIdentity, WindowsFileIdentity.TryGet(nativePath));
+                return ValidResultJson();
+            });
+            var service = CreateService(native);
+
+            await Assert.ThrowsAsync<StarAnalysisSourceChangedException>(
+                () => service.AnalyzeAsync(path));
+
+            Assert.Equal(1, native.CallCount);
+        }
+        finally
+        {
+            File.Delete(replacement);
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task CacheDoesNotCrossTimestampPreservingFileReplacement()
+    {
+        string path = CreateImagePath();
+        string replacement = Path.Combine(
+            Path.GetDirectoryName(path)!,
+            $"seiza-star-analysis-replacement-{Guid.NewGuid():N}.fits");
+        long originalWriteTicks = File.GetLastWriteTimeUtc(path).Ticks;
+        try
+        {
+            string? originalIdentity = WindowsFileIdentity.TryGet(path);
+            Assert.NotNull(originalIdentity);
+            var native = new FakeNativeClient((_, _) => ValidResultJson());
+            var service = CreateService(native);
+            StarAnalysisResult first = await service.AnalyzeAsync(path);
+
+            File.WriteAllBytes(replacement, [7, 8, 9]);
+            File.SetLastWriteTimeUtc(
+                replacement,
+                new DateTime(originalWriteTicks, DateTimeKind.Utc));
+            File.Move(replacement, path, overwrite: true);
+            Assert.NotEqual(originalIdentity, WindowsFileIdentity.TryGet(path));
+
+            StarAnalysisResult second = await service.AnalyzeAsync(path);
+
+            Assert.NotSame(first, second);
+            Assert.Equal(2, native.CallCount);
+        }
+        finally
+        {
+            File.Delete(replacement);
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
     public async Task CancellationAbandonsTheWaitButLetsNativeFinishAndCache()
     {
         string path = CreateImagePath();
@@ -575,6 +673,99 @@ public sealed class StarAnalysisServiceTests
         }
     }
 
+    [Theory]
+    [InlineData("mean", "mean HFR does not match")]
+    [InlineData("best-worst", "best/worst corners")]
+    [InlineData("tilt", "tilt percent is inconsistent")]
+    [InlineData("curvature", "curvature percent is inconsistent")]
+    [InlineData("zero-cell", "median HFR must be finite and positive")]
+    public async Task InconsistentParallelogramTiltContractIsRejected(
+        string defect,
+        string expectedMessage)
+    {
+        string path = CreateImagePath();
+        try
+        {
+            JsonObject root = JsonNode.Parse(ValidTiltResultJson())!.AsObject();
+            JsonObject tilt = root["tilt"]!.AsObject();
+            switch (defect)
+            {
+                case "mean":
+                    tilt["meanHfr"] = 4;
+                    break;
+                case "best-worst":
+                    tilt["bestCorner"] = "top-right";
+                    break;
+                case "tilt":
+                    tilt["tiltPercent"] = 159;
+                    break;
+                case "curvature":
+                    tilt["curvaturePercent"] = 1;
+                    break;
+                case "zero-cell":
+                    root["cells"]!.AsArray()[0]!.AsObject()["medianHfr"] = 0;
+                    break;
+                default:
+                    throw new InvalidOperationException($"Unknown defect {defect}.");
+            }
+
+            var native = new FakeNativeClient((_, _) => root.ToJsonString());
+            var service = CreateService(native);
+
+            InvalidDataException exception = await Assert.ThrowsAsync<InvalidDataException>(
+                () => service.AnalyzeAsync(path));
+            Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task SymmetricParallelogramUsesNativeStableCornerTieOrder()
+    {
+        string path = CreateImagePath();
+        try
+        {
+            var native = new FakeNativeClient(
+                (_, _) => ValidTiltResultJson(Enumerable.Repeat(5.0, 9).ToArray()));
+            var service = CreateService(native);
+
+            StarAnalysisResult result = await service.AnalyzeAsync(path);
+
+            Assert.Equal(StarAnalysisCornerPosition.TopLeft, result.Tilt.BestCorner);
+            Assert.Equal(StarAnalysisCornerPosition.BottomRight, result.Tilt.WorstCorner);
+            Assert.Equal(0, result.Tilt.TiltPercent);
+            Assert.Equal(0, result.Tilt.CurvaturePercent);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task ParallelogramWorstCornerUsesLastEqualMaximum()
+    {
+        string path = CreateImagePath();
+        try
+        {
+            var native = new FakeNativeClient(
+                (_, _) => ValidTiltResultJson([1, 2, 9, 4, 5, 6, 7, 8, 9]));
+            var service = CreateService(native);
+
+            StarAnalysisResult result = await service.AnalyzeAsync(path);
+
+            Assert.Equal(StarAnalysisCornerPosition.TopLeft, result.Tilt.BestCorner);
+            Assert.Equal(StarAnalysisCornerPosition.BottomRight, result.Tilt.WorstCorner);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
     [Fact]
     public async Task OutOfFrameStarCoordinateIsRejected()
     {
@@ -707,6 +898,103 @@ public sealed class StarAnalysisServiceTests
           }
         }
         """;
+
+    private static string ValidTiltResultJson(double[]? hfrValues = null)
+    {
+        hfrValues ??= [1, 2, 3, 4, 5, 6, 7, 8, 9];
+        if (hfrValues.Length != 9 || hfrValues.Any(hfr => hfr <= 0))
+        {
+            throw new ArgumentException("Exactly nine positive HFR values are required.");
+        }
+
+        StarAnalysisStar[] stars = Enumerable.Range(0, 9)
+            .Select(index => new StarAnalysisStar
+            {
+                X = 10 + (index % 3) * 40,
+                Y = 10 + (index / 3) * 30,
+                Hfr = hfrValues[index],
+                Fwhm = 3,
+                Brightness = 1000,
+                Background = 900,
+                Snr = 20,
+                Flux = 5000,
+                PixelCount = 12,
+                Saturated = false,
+                Eccentricity = null,
+                Theta = null,
+                RSquared = null,
+            })
+            .ToArray();
+        StarAnalysisCell[] cells = stars
+            .Select((star, index) => new StarAnalysisCell
+            {
+                Row = index / 3,
+                Col = index % 3,
+                StarCount = 1,
+                MedianHfr = star.Hfr,
+                MedianEccentricity = 0,
+                MeanTheta = null,
+                ThetaCoherence = 0,
+            })
+            .ToArray();
+        StarAnalysisCornerPosition[] orderedCorners =
+        [
+            StarAnalysisCornerPosition.TopLeft,
+            StarAnalysisCornerPosition.TopRight,
+            StarAnalysisCornerPosition.BottomLeft,
+            StarAnalysisCornerPosition.BottomRight,
+        ];
+        double[] cornerHfrs = [hfrValues[0], hfrValues[2], hfrValues[6], hfrValues[8]];
+        (StarAnalysisCornerPosition Corner, double Hfr)[] sortedCorners = orderedCorners
+            .Select((corner, index) => (Corner: corner, Hfr: cornerHfrs[index]))
+            .OrderBy(measurement => measurement.Hfr)
+            .ToArray();
+        StarAnalysisCornerPosition bestCorner = sortedCorners[0].Corner;
+        StarAnalysisCornerPosition worstCorner = sortedCorners[^1].Corner;
+        double meanHfr = TestMedian(hfrValues);
+        double cornerMean = cornerHfrs.Average();
+        var result = new StarAnalysisResult
+        {
+            SchemaVersion = 1,
+            Width = 100,
+            Height = 80,
+            MajorAxisOrientationsNormalized = true,
+            AverageHfr = hfrValues.Average(),
+            AverageFwhm = 3,
+            NoiseSigma = 12.5,
+            BackgroundMean = 900,
+            Stars = stars,
+            Cells = cells,
+            Tilt = new StarAnalysisTilt
+            {
+                CenterHfr = hfrValues[4],
+                Corners =
+                [
+                    new() { Corner = StarAnalysisCornerPosition.TopLeft, Hfr = cornerHfrs[0] },
+                    new() { Corner = StarAnalysisCornerPosition.TopRight, Hfr = cornerHfrs[1] },
+                    new() { Corner = StarAnalysisCornerPosition.BottomLeft, Hfr = cornerHfrs[2] },
+                    new() { Corner = StarAnalysisCornerPosition.BottomRight, Hfr = cornerHfrs[3] },
+                ],
+                MeanHfr = meanHfr,
+                TiltPercent = 100 * (cornerHfrs.Max() - cornerHfrs.Min()) / meanHfr,
+                CurvaturePercent = 100 * (cornerMean / hfrValues[4] - 1),
+                WorstCorner = worstCorner,
+                BestCorner = bestCorner,
+            },
+        };
+        return JsonSerializer.Serialize(
+            result,
+            SeizaJsonSerializerContext.Default.StarAnalysisResult);
+    }
+
+    private static double TestMedian(IEnumerable<double> source)
+    {
+        double[] values = source.Order().ToArray();
+        int midpoint = values.Length / 2;
+        return values.Length % 2 == 1
+            ? values[midpoint]
+            : (values[midpoint - 1] + values[midpoint]) / 2;
+    }
 
     private static string ValidTriangleResultJson(double angleDegrees = 0)
     {

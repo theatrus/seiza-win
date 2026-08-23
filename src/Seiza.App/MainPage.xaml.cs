@@ -949,12 +949,9 @@ public sealed partial class MainPage : Page, IDisposable
                 return;
             }
 
-            if (!request.IncludeVisibleOverlays)
-            {
-                await ImageExportService.Save8Async(committedBitmap, destination);
-                return;
-            }
-
+            // Snapshot the display pixels synchronously into an export-owned
+            // target. Navigation or a processing reload may dispose the page's
+            // committed bitmap while the asynchronous encoder is still saving.
             using CanvasRenderTarget renderTarget = new(
                 ImageCanvas,
                 sourceWidth,
@@ -964,12 +961,15 @@ public sealed partial class MainPage : Page, IDisposable
             {
                 drawingSession.Clear(Windows.UI.Color.FromArgb(255, 0, 0, 0));
                 drawingSession.DrawImage(committedBitmap);
-                overlayScene.Draw(
-                    drawingSession,
-                    overlayOptions,
-                    1,
-                    1,
-                    Vector2.Zero);
+                if (request.IncludeVisibleOverlays)
+                {
+                    overlayScene.Draw(
+                        drawingSession,
+                        overlayOptions,
+                        1,
+                        1,
+                        Vector2.Zero);
+                }
             }
             await ImageExportService.Save8Async(renderTarget, destination);
         }
@@ -1120,7 +1120,10 @@ public sealed partial class MainPage : Page, IDisposable
         FitsImageProcessingConfiguration? processingOverride = null)
     {
         bool isNewImage = !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase);
-        if (isNewImage)
+        bool resetStarAnalysis = StarAnalysisOverlayLifecycle.ShouldResetForLoad(
+            isNewImage,
+            preserveSolution);
+        if (resetStarAnalysis)
         {
             _documentGeneration++;
             EndSymmetryPointPicker(showEditor: false);

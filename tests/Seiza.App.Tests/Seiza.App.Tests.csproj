@@ -44,6 +44,7 @@
     <Compile Include="..\..\src\Seiza.App\Models\StackSnrPresentation.cs" Link="Models\StackSnrPresentation.cs" />
     <Compile Include="..\..\src\Seiza.App\Rendering\ImageSpaceTransform.cs" Link="Rendering\ImageSpaceTransform.cs" />
     <Compile Include="..\..\src\Seiza.App\Rendering\OverlayOptions.cs" Link="Rendering\OverlayOptions.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\StarAnalysisOverlayLifecycle.cs" Link="Rendering\StarAnalysisOverlayLifecycle.cs" />
     <Compile Include="..\..\src\Seiza.App\Rendering\StarAnalysisOverlayGeometry.cs" Link="Rendering\StarAnalysisOverlayGeometry.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\StarAnalysis.cs" Link="Models\StarAnalysis.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\StarAnalysisOptions.cs" Link="Models\StarAnalysisOptions.cs" />

@@ -21,9 +21,19 @@ public sealed record StarAnalysisOptions
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public StarDetectionPreset? Preset { get; init; }
 
+    /// <summary>
+    /// Optional caller override for the focal length used to classify the
+    /// detector. When omitted, the path API resolves it from image headers.
+    /// This value may be supplied independently of <see cref="PixelSizeUm"/>.
+    /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? FocalLengthMm { get; init; }
 
+    /// <summary>
+    /// Optional caller override for the pixel size used to classify the
+    /// detector. When omitted, the path API resolves it from image headers.
+    /// This value may be supplied independently of <see cref="FocalLengthMm"/>.
+    /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? PixelSizeUm { get; init; }
 
@@ -65,18 +75,11 @@ public sealed record StarAnalysisOptions
         RequireDefined(PsfType, nameof(PsfType));
         RequireDefined(StructureRemoval, nameof(StructureRemoval));
 
-        bool hasFocalLength = FocalLengthMm.HasValue;
-        bool hasPixelSize = PixelSizeUm.HasValue;
-        if (hasFocalLength != hasPixelSize)
+        if (Preset.HasValue &&
+            (FocalLengthMm.HasValue || PixelSizeUm.HasValue))
         {
             throw new ArgumentException(
-                "Focal length and pixel size must be provided together.");
-        }
-
-        if (Preset.HasValue && hasFocalLength)
-        {
-            throw new ArgumentException(
-                "Choose a detector preset or provide focal length and pixel size, not both.");
+                "Choose a detector preset or provide focal length and/or pixel size, not both.");
         }
 
         RequirePositiveFinite(FocalLengthMm, nameof(FocalLengthMm));

@@ -8,7 +8,7 @@ merely because its Rust implementation exists.
 ## Baseline
 
 - macOS reference: `main` at
-  [`d0b3e20`](https://github.com/theatrus/seiza-mac/commit/d0b3e2039e7676d1565d62b4e61ce713ca0da286)
+  [`73f2633`](https://github.com/theatrus/seiza-mac/commit/73f26337fde90f53e620b68b70d4804948bbcc96)
 - Seiza core reference: crates.io `seiza-cabi 0.18.7` from
   [`8e6af29`](https://github.com/theatrus/seiza/commit/8e6af29742972bf84cc0669af5f6fe5f5188db28),
   resolving `seiza-stars 0.1.2` and

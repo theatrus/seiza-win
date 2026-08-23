@@ -304,7 +304,7 @@
                 Click="Inspector_Click"
                 IsEnabled="{x:Bind ViewModel.HasImage, Mode=OneWay}"
                 Label="Inspector"
-                ToolTipService.ToolTip="Show image details, source headers, and plate-solve information">
+                ToolTipService.ToolTip="Show image details, star analysis, source headers, and plate-solve information">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE700;" />
                 </AppBarButton.Icon>
