@@ -52,7 +52,10 @@ without a Windows restart.
   reports every accepted input and every skipped input with its reason, and
   Windows verifies that provenance before publishing or caching a master.
   Windows then rechecks the written master so its preserved sensor and optics
-  metadata must still match every target light. Seiza names the readings
+  metadata must still match every target light. A selected frame that cannot
+  be inspected, or that is not a raw light — a master, or an already
+  calibrated file — is set aside from matching with a warning; the stack
+  still runs, and native per-frame admission decides that frame's fate. Seiza names the readings
   behind a refusal, accepts realistic rotator re-homing scatter with a
   2-degree default tolerance, and
   validates each future light against the active calibration epoch rather than

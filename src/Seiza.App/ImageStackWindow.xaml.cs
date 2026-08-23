@@ -576,14 +576,28 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                 ProgressCountsText.Text =
                     $"Preparing calibration {index + 1} of {_groups.Count}";
                 StackProgressBar.IsIndeterminate = true;
-                CalibrationFrameProbe[] targetLights = await ProbeTargetLightsAsync(
-                    group.Inputs,
-                    cancellationToken);
-                CalibrationFrameProbe reference = targetLights.First(probe =>
-                    string.Equals(
-                        Path.GetFullPath(probe.Path),
-                        Path.GetFullPath(referencePath),
-                        StringComparison.OrdinalIgnoreCase));
+                (CalibrationFrameProbe[] probes, string[] probeWarnings) =
+                    await ProbeTargetLightsAsync(group.Inputs, cancellationToken);
+                warnings.AddRange(
+                    probeWarnings.Select(warning => $"{group.Title}: {warning}"));
+                CalibrationTargetSelection.Partition partition =
+                    CalibrationTargetSelection.Split(probes);
+                warnings.AddRange(
+                    partition.Warnings.Select(warning => $"{group.Title}: {warning}"));
+                if (partition.Eligible.Count == 0)
+                {
+                    warnings.Add(
+                        $"{group.Title}: no raw light frame could be inspected; " +
+                        "the stack runs without automatic calibration.");
+                    calibrations[group.Id] = new ImageStackCalibration();
+                    continue;
+                }
+                CalibrationFrameProbe reference = partition.Eligible.FirstOrDefault(probe =>
+                        string.Equals(
+                            Path.GetFullPath(probe.Path),
+                            Path.GetFullPath(referencePath),
+                            StringComparison.OrdinalIgnoreCase))
+                    ?? partition.Eligible[0];
                 var progress = new Progress<CalibrationPreparationProgress>(update =>
                 {
                     if (_closed)
@@ -600,7 +614,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                     new CalibrationPreparationRequest
                     {
                         Reference = reference,
-                        TargetLights = targetLights,
+                        TargetLights = partition.Eligible,
                         SourcePaths = [libraryPath],
                         CacheDirectory = cacheDirectory,
                         ProtectedMasterPaths = protectedMasterPaths.ToArray(),
@@ -629,12 +643,20 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         return new BatchCalibrationPreparation(calibrations, warnings, results);
     }
 
-    private static async Task<CalibrationFrameProbe[]> ProbeTargetLightsAsync(
-        IReadOnlyList<string> paths,
-        CancellationToken cancellationToken)
+    /// <summary>
+    /// Probes a group's lights, tolerating unreadable files: an overnight
+    /// batch is not refused because one frame's header cannot be read. The
+    /// frame is still offered to the stacker, whose native admission decides
+    /// its fate.
+    /// </summary>
+    private static async Task<(CalibrationFrameProbe[] Probes, string[] Warnings)>
+        ProbeTargetLightsAsync(
+            IReadOnlyList<string> paths,
+            CancellationToken cancellationToken)
     {
         using var gate = new SemaphoreSlim(initialCount: 4, maxCount: 4);
-        Task<CalibrationFrameProbe>[] tasks = paths.Select(async path =>
+        Task<(CalibrationFrameProbe? Probe, string? Warning)>[] tasks =
+            paths.Select(async path =>
         {
             await gate.WaitAsync(cancellationToken);
             try
@@ -642,14 +664,30 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                 CalibrationFrameProbe probe = await CalibrationService.ProbeAsync(
                     path,
                     cancellationToken);
-                return probe with { Path = Path.GetFullPath(path) };
+                return ((CalibrationFrameProbe?)(probe with { Path = Path.GetFullPath(path) }),
+                    (string?)null);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (Exception exception)
+            {
+                return (null,
+                    $"Could not inspect {Path.GetFileName(path)}: {exception.Message}");
             }
             finally
             {
                 gate.Release();
             }
         }).ToArray();
-        return await Task.WhenAll(tasks);
+        (CalibrationFrameProbe? Probe, string? Warning)[] outcomes =
+            await Task.WhenAll(tasks);
+        return (
+            outcomes.Select(outcome => outcome.Probe)
+                .OfType<CalibrationFrameProbe>()
+                .ToArray(),
+            outcomes.Select(outcome => outcome.Warning).OfType<string>().ToArray());
     }
 
     private async Task<bool> ConfirmCalibrationWarningsAsync(IReadOnlyList<string> warnings)

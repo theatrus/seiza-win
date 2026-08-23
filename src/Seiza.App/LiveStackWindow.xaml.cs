@@ -560,7 +560,9 @@ public sealed partial class LiveStackWindow : Window, IDisposable
                 CalibrationFrameProbe probe = await CalibrationService.ProbeAsync(
                     path,
                     cancellationToken);
-                if (probe.Role == CalibrationFrameRoles.Light)
+                // A master or preprocessed frame in the capture folder is not
+                // a usable anchor; keep scanning for a raw light.
+                if (CalibrationLightEligibility.IsEligible(probe))
                 {
                     return probe;
                 }

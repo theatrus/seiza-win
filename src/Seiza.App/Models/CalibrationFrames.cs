@@ -58,6 +58,41 @@ internal sealed record CalibrationFrameProbe
 /// the native builder rereads their files and must see the same metadata that
 /// the planner used.
 /// </summary>
+/// <summary>
+/// Splits a group's probed lights into calibration-matching targets and
+/// set-aside frames. A frame that cannot serve as a target — a master, a
+/// non-light, a preprocessed light — is a warning, not a reason to refuse
+/// the whole batch: the native stacker's per-frame admission remains
+/// authoritative when the frame is pushed.
+/// </summary>
+internal static class CalibrationTargetSelection
+{
+    public sealed record Partition(
+        IReadOnlyList<CalibrationFrameProbe> Eligible,
+        IReadOnlyList<string> Warnings);
+
+    public static Partition Split(IReadOnlyList<CalibrationFrameProbe> probes)
+    {
+        ArgumentNullException.ThrowIfNull(probes);
+        var eligible = new List<CalibrationFrameProbe>(probes.Count);
+        var warnings = new List<string>();
+        foreach (CalibrationFrameProbe probe in probes)
+        {
+            string? reason = CalibrationLightEligibility.GetIneligibilityReason(probe);
+            if (reason is null)
+            {
+                eligible.Add(probe);
+            }
+            else
+            {
+                warnings.Add(
+                    $"Set aside {Path.GetFileName(probe.Path)} for calibration matching; {reason}.");
+            }
+        }
+        return new Partition(eligible, warnings);
+    }
+}
+
 internal static class CalibrationTargetMetadata
 {
     public static CalibrationFrameProbe Enrich(CalibrationFrameProbe probe)
