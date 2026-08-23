@@ -42,6 +42,12 @@
     <Compile Include="..\..\src\Seiza.App\Models\LiveStackSessionPersistence.cs" Link="Models\LiveStackSessionPersistence.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\LiveStackRun.cs" Link="Models\LiveStackRun.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\StackSnrPresentation.cs" Link="Models\StackSnrPresentation.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\ImageSpaceTransform.cs" Link="Rendering\ImageSpaceTransform.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\OverlayOptions.cs" Link="Rendering\OverlayOptions.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\StarAnalysisOverlayLifecycle.cs" Link="Rendering\StarAnalysisOverlayLifecycle.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\StarAnalysisOverlayGeometry.cs" Link="Rendering\StarAnalysisOverlayGeometry.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\StarAnalysis.cs" Link="Models\StarAnalysis.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\StarAnalysisOptions.cs" Link="Models\StarAnalysisOptions.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\SeizaJsonSerializerContext.cs" Link="Models\SeizaJsonSerializerContext.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\AtomicOutputFile.cs" Link="Services\AtomicOutputFile.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationPreparationService.cs" Link="Services\CalibrationPreparationService.cs" />
@@ -60,8 +66,10 @@
     <Compile Include="..\..\src\Seiza.App\Services\StackFolderMonitor.cs" Link="Services\StackFolderMonitor.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\UpdateInstallerNaming.cs" Link="Services\UpdateInstallerNaming.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\SeizaCoreException.cs" Link="Services\SeizaCoreException.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\StarAnalysisService.cs" Link="Services\StarAnalysisService.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.cs" Link="Interop\NativeMethods.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.CalibrationMatching.cs" Link="Interop\NativeMethods.CalibrationMatching.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.StarAnalysis.cs" Link="Interop\NativeMethods.StarAnalysis.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\NativeString.cs" Link="Interop\NativeString.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\SafeCancelSignalHandle.cs" Link="Interop\SafeCancelSignalHandle.cs" />
     <Compile Include="..\..\src\Seiza.App\Interop\SafeLiveStackerHandle.cs" Link="Interop\SafeLiveStackerHandle.cs" />

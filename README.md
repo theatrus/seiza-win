@@ -18,9 +18,30 @@ core.
 This work will ship in the next Windows release. The stable download above
 remains Seiza 0.6.1.
 
-- Upgrade the native processing core to Seiza 0.18.4 for resumable live-stack
+- Upgrade the native processing core to Seiza 0.18.7 for resumable live-stack
   checkpoints, calibration planning and master construction, native SNR
   measurements, and bounded preview and export support.
+- Add an explicit **Analyze stars** action for FITS and XISF images. This is
+  independent of plate solving and catalog downloads: the native core decodes
+  the source file directly, measures HFR/FWHM, and returns a nine-cell sensor
+  tilt summary. The Windows inspector and overlay menu keep these measured
+  stars distinct from plate-solve detections.
+
+The star-analysis work is an unreleased Windows development highlight, built
+against the published Seiza 0.18.7 C ABI. A registry-backed managed end-to-end
+test measured 71 stars in a real C925 FITS image and 468 in a real XISF image;
+both returned a ready native triangle result. The test preserved the exact
+native triangle data and formulas and confirmed that analysis did not modify
+either source. Measured-star circles, the sensor-tilt grid, and the optional
+**Parallelogram tilt diagram** and **Triangle tilt diagram** use the same
+image-space overlay scene for the live viewport and full-resolution 8- or
+16-bit composited export. The Triangle diagram consumes three native adjustment
+regions and becomes available only when their native readiness verdict is
+satisfied. Direction lines remain hidden unless the native response explicitly
+guarantees normalized major-axis orientations; sparse regions are withheld,
+and tilt should be confirmed across multiple frames rather than inferred from
+one exposure. Packaged viewport and 8- and 16-bit composited-export UI checks
+remain before this development feature is complete.
 
 ## Native Explorer previews and thumbnails
 

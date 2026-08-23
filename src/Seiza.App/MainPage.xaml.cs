@@ -24,16 +24,17 @@ public sealed partial class MainPage : Page, IDisposable
 
     private readonly List<string> _imagePaths = [];
     private readonly OverlayOptions _overlayOptions = new();
+    private readonly OverlayScene _overlayScene = new();
     private readonly FitsImageProcessingHistory _processingHistory = new();
 
     private CanvasBitmap? _bitmap;
     private CanvasBitmap? _committedBitmap;
     private CancellationTokenSource? _loadCancellation;
     private CancellationTokenSource? _solveCancellation;
+    private CancellationTokenSource? _starAnalysisCancellation;
     private CancellationTokenSource? _thumbnailCancellation;
     private ImageMetadata? _currentMetadata;
     private SolveResult? _solveResult;
-    private SolveOverlayRenderer? _overlayRenderer;
     private string? _currentPath;
     private Vector2 _offset;
     private Vector2 _dragStart;
@@ -43,12 +44,14 @@ public sealed partial class MainPage : Page, IDisposable
     private int _sourceHeight;
     private int _selectedIndex = -1;
     private int _loadGeneration;
+    private int _documentGeneration;
     private bool _isDragging;
     private bool _isFitToWindow = true;
     private bool _isInspectorOpen;
     private bool _isBrowserOpen;
     private bool _syncingBrowserSelection;
     private bool _isPickingSymmetryPoint;
+    private bool _isAnalyzingStars;
     private bool _didCheckForUpdates;
     private bool _disposed;
     private FitsStretchWindow? _stretchWindow;
@@ -76,6 +79,7 @@ public sealed partial class MainPage : Page, IDisposable
         ViewModel.PropertyChanged += (_, _) => UpdateVisualState();
         InspectorControl.SolveRequested += InspectorControl_SolveRequested;
         InspectorControl.ExportWcsRequested += InspectorControl_ExportWcsRequested;
+        InspectorControl.StarAnalysisRequested += InspectorControl_StarAnalysisRequested;
         Loaded += MainPage_Loaded;
         Unloaded += MainPage_Unloaded;
     }
@@ -485,11 +489,93 @@ public sealed partial class MainPage : Page, IDisposable
     private async void Solve_Click(object sender, RoutedEventArgs e) =>
         await SolveCurrentAsync();
 
+    private async void AnalyzeStars_Click(object sender, RoutedEventArgs e) =>
+        await AnalyzeCurrentStarsAsync();
+
     private async void InspectorControl_SolveRequested(object? sender, EventArgs e) =>
         await SolveCurrentAsync();
 
     private async void InspectorControl_ExportWcsRequested(object? sender, EventArgs e) =>
         await ExportWcsAsync();
+
+    private async void InspectorControl_StarAnalysisRequested(object? sender, EventArgs e) =>
+        await AnalyzeCurrentStarsAsync();
+
+    private async Task AnalyzeCurrentStarsAsync()
+    {
+        if (_bitmap is null ||
+            _currentPath is null ||
+            !ImageFileService.IsAstronomyImage(_currentPath) ||
+            _isAnalyzingStars)
+        {
+            return;
+        }
+
+        _starAnalysisCancellation?.Cancel();
+        CancellationTokenSource cancellation = new();
+        _starAnalysisCancellation = cancellation;
+        int documentGeneration = _documentGeneration;
+        string path = _currentPath;
+        _overlayScene.StarAnalysisOverlay = null;
+        _isAnalyzingStars = true;
+        _isInspectorOpen = true;
+        InspectorControl.BeginStarAnalysis();
+        ImageCanvas.Invalidate();
+        UpdateVisualState();
+
+        try
+        {
+            StarAnalysisResult result = await StarAnalysisService.Shared.AnalyzeAsync(
+                path,
+                StarAnalysisOptions.InteractiveDefault,
+                cancellationToken: cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            if (documentGeneration != _documentGeneration ||
+                !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                return;
+            }
+            if (result.Width != _sourceWidth || result.Height != _sourceHeight)
+            {
+                throw new InvalidOperationException(
+                    $"Star analysis returned {result.Width:N0} × {result.Height:N0} for a " +
+                    $"{_sourceWidth:N0} × {_sourceHeight:N0} source image.");
+            }
+
+            _overlayScene.StarAnalysisOverlay = new StarAnalysisOverlayRenderer(
+                result,
+                _sourceWidth,
+                _sourceHeight);
+            _overlayOptions.ShowMeasuredStars = true;
+            _overlayOptions.ShowSensorTilt = true;
+            InspectorControl.ShowStarAnalysisResult(result);
+            SyncOverlayControls();
+            ImageCanvas.Invalidate();
+        }
+        catch (OperationCanceledException)
+        {
+            // Image navigation or a newer analysis intentionally superseded this work.
+        }
+        catch (Exception exception)
+        {
+            if (!cancellation.IsCancellationRequested &&
+                documentGeneration == _documentGeneration &&
+                string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+            {
+                InspectorControl.ShowStarAnalysisFailure(DescribeException(exception));
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_starAnalysisCancellation, cancellation))
+            {
+                _starAnalysisCancellation = null;
+                _isAnalyzingStars = false;
+            }
+            cancellation.Dispose();
+            UpdateVisualState();
+        }
+    }
 
     private async Task SolveCurrentAsync()
     {
@@ -504,7 +590,7 @@ public sealed partial class MainPage : Page, IDisposable
         int generation = _loadGeneration;
         string path = _currentPath;
         _solveResult = null;
-        _overlayRenderer = null;
+        _overlayScene.SolveOverlay = null;
         _isInspectorOpen = true;
         ViewModel.BeginSolving();
         InspectorControl.BeginSolve();
@@ -524,7 +610,10 @@ public sealed partial class MainPage : Page, IDisposable
             }
 
             _solveResult = result;
-            _overlayRenderer = new SolveOverlayRenderer(result, _sourceWidth, _sourceHeight);
+            _overlayScene.SolveOverlay = new SolveOverlayRenderer(
+                result,
+                _sourceWidth,
+                _sourceHeight);
             ViewModel.CompleteSolve(result);
             InspectorControl.ShowSolveResult(result);
             ApplyOverlayAvailability(result);
@@ -632,6 +721,22 @@ public sealed partial class MainPage : Page, IDisposable
         else if (ReferenceEquals(sender, DetectedStarsOverlayItem))
         {
             _overlayOptions.ShowDetectedStars = DetectedStarsOverlayItem.IsChecked;
+        }
+        else if (ReferenceEquals(sender, MeasuredStarsOverlayItem))
+        {
+            _overlayOptions.ShowMeasuredStars = MeasuredStarsOverlayItem.IsChecked;
+        }
+        else if (ReferenceEquals(sender, SensorTiltOverlayItem))
+        {
+            _overlayOptions.ShowSensorTilt = SensorTiltOverlayItem.IsChecked;
+        }
+        else if (ReferenceEquals(sender, ParallelogramTiltOverlayItem))
+        {
+            _overlayOptions.ShowParallelogramTilt = ParallelogramTiltOverlayItem.IsChecked;
+        }
+        else if (ReferenceEquals(sender, TriangleTiltOverlayItem))
+        {
+            _overlayOptions.ShowTriangleTilt = TriangleTiltOverlayItem.IsChecked;
         }
 
         ImageCanvas.Invalidate();
@@ -781,17 +886,24 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async Task ExportAsync(bool includeOverlays)
     {
-        if (_bitmap is null || _currentPath is null || ViewModel.IsExporting ||
-            (includeOverlays && (_overlayRenderer is null || !_overlayOptions.HasVisibleOverlays)))
+        if (_committedBitmap is null || _currentPath is null || ViewModel.IsExporting ||
+            (includeOverlays && !_overlayScene.HasVisibleOverlays(_overlayOptions)))
         {
             return;
         }
 
-        bool overlaysAvailable = _overlayRenderer is not null &&
-            _overlayOptions.HasVisibleOverlays;
+        CanvasBitmap committedBitmap = _committedBitmap;
+        string sourcePath = _currentPath;
+        int sourceWidth = _sourceWidth;
+        int sourceHeight = _sourceHeight;
+        int documentGeneration = _documentGeneration;
+        FitsImageProcessingConfiguration processing = CurrentProcessing();
+        OverlayScene overlayScene = _overlayScene.Snapshot();
+        OverlayOptions overlayOptions = _overlayOptions.Snapshot();
+        bool overlaysAvailable = overlayScene.HasVisibleOverlays(overlayOptions);
         ImageExportRequest? request = await ImageExportService.PickOptionsAsync(
             XamlRoot,
-            ImageFileService.IsAstronomyImage(_currentPath),
+            ImageFileService.IsAstronomyImage(sourcePath),
             overlaysAvailable,
             includeOverlays);
         if (request is null)
@@ -801,9 +913,14 @@ public sealed partial class MainPage : Page, IDisposable
 
         ImageExportDestination? destination = await ImageExportService.PickDestinationAsync(
             OwnerWindowHandle,
-            _currentPath,
+            sourcePath,
             request);
         if (destination is null)
+        {
+            return;
+        }
+        if (documentGeneration != _documentGeneration ||
+            !ReferenceEquals(committedBitmap, _committedBitmap))
         {
             return;
         }
@@ -815,11 +932,15 @@ public sealed partial class MainPage : Page, IDisposable
             if (request.BitDepth == ImageExportBitDepth.Sixteen)
             {
                 RenderedImage16Data rendered = await ImageRenderService.Render16Async(
-                    _currentPath,
-                    CurrentProcessing());
+                    sourcePath,
+                    processing);
                 if (request.IncludeVisibleOverlays)
                 {
-                    byte[] overlay = RenderFullResolutionOverlay();
+                    byte[] overlay = RenderFullResolutionOverlay(
+                        overlayScene,
+                        overlayOptions,
+                        sourceWidth,
+                        sourceHeight);
                     Rgba16Compositor.CompositePremultipliedBgra8(
                         MemoryMarshal.Cast<byte, ushort>(rendered.RgbaBytes.AsSpan()),
                         overlay);
@@ -828,27 +949,27 @@ public sealed partial class MainPage : Page, IDisposable
                 return;
             }
 
-            if (!request.IncludeVisibleOverlays)
-            {
-                await ImageExportService.Save8Async(_bitmap, destination);
-                return;
-            }
-
+            // Snapshot the display pixels synchronously into an export-owned
+            // target. Navigation or a processing reload may dispose the page's
+            // committed bitmap while the asynchronous encoder is still saving.
             using CanvasRenderTarget renderTarget = new(
                 ImageCanvas,
-                _sourceWidth,
-                _sourceHeight,
+                sourceWidth,
+                sourceHeight,
                 96);
             using (CanvasDrawingSession drawingSession = renderTarget.CreateDrawingSession())
             {
                 drawingSession.Clear(Windows.UI.Color.FromArgb(255, 0, 0, 0));
-                drawingSession.DrawImage(_bitmap);
-                _overlayRenderer!.Draw(
-                    drawingSession,
-                    _overlayOptions,
-                    1,
-                    1,
-                    Vector2.Zero);
+                drawingSession.DrawImage(committedBitmap);
+                if (request.IncludeVisibleOverlays)
+                {
+                    overlayScene.Draw(
+                        drawingSession,
+                        overlayOptions,
+                        1,
+                        1,
+                        Vector2.Zero);
+                }
             }
             await ImageExportService.Save8Async(renderTarget, destination);
         }
@@ -862,26 +983,30 @@ public sealed partial class MainPage : Page, IDisposable
         }
     }
 
-    private byte[] RenderFullResolutionOverlay()
+    private byte[] RenderFullResolutionOverlay(
+        OverlayScene overlayScene,
+        OverlayOptions overlayOptions,
+        int sourceWidth,
+        int sourceHeight)
     {
-        if (_overlayRenderer is null || !_overlayOptions.HasVisibleOverlays)
+        if (!overlayScene.HasVisibleOverlays(overlayOptions))
         {
             throw new InvalidOperationException("No visible overlays are available to export.");
         }
 
         using CanvasRenderTarget overlay = new(
             ImageCanvas,
-            _sourceWidth,
-            _sourceHeight,
+            sourceWidth,
+            sourceHeight,
             96,
             DirectXPixelFormat.B8G8R8A8UIntNormalized,
             CanvasAlphaMode.Premultiplied);
         using (CanvasDrawingSession drawingSession = overlay.CreateDrawingSession())
         {
             drawingSession.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
-            _overlayRenderer.Draw(
+            overlayScene.Draw(
                 drawingSession,
-                _overlayOptions,
+                overlayOptions,
                 1,
                 1,
                 Vector2.Zero);
@@ -995,10 +1120,15 @@ public sealed partial class MainPage : Page, IDisposable
         FitsImageProcessingConfiguration? processingOverride = null)
     {
         bool isNewImage = !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase);
-        if (isNewImage)
+        bool resetStarAnalysis = StarAnalysisOverlayLifecycle.ShouldResetForLoad(
+            isNewImage,
+            preserveSolution);
+        if (resetStarAnalysis)
         {
+            _documentGeneration++;
             EndSymmetryPointPicker(showEditor: false);
             _stretchWindow?.Close();
+            ResetStarAnalysisForImageChange();
         }
         FitsImageProcessingConfiguration processing = processingOverride ??
             (isNewImage
@@ -1156,7 +1286,7 @@ public sealed partial class MainPage : Page, IDisposable
             _bitmap.Bounds,
             1.0f,
             interpolation);
-        _overlayRenderer?.Draw(args.DrawingSession, _overlayOptions, _scale, _scale, _offset);
+        _overlayScene.Draw(args.DrawingSession, _overlayOptions, _scale, _scale, _offset);
     }
 
     private void ImageCanvas_SizeChanged(object sender, SizeChangedEventArgs e)
@@ -1504,7 +1634,15 @@ public sealed partial class MainPage : Page, IDisposable
             _currentPath is not null &&
             !ViewModel.IsLoading &&
             !ViewModel.IsSolving;
-        OverlayButton.IsEnabled = ViewModel.HasSolution;
+        StarAnalysisButton.Label = _isAnalyzingStars ? "Analyzing…" : "Analyze stars";
+        StarAnalysisButton.IsEnabled =
+            _bitmap is not null &&
+            _currentPath is not null &&
+            ImageFileService.IsAstronomyImage(_currentPath) &&
+            !ViewModel.IsLoading &&
+            !_isAnalyzingStars;
+        UpdateOverlayMenuAvailability();
+        OverlayButton.IsEnabled = _overlayScene.HasAnyOverlay;
         ExportButton.Label = ViewModel.IsExporting ? "Exporting..." : "Export";
         ExportButton.IsEnabled =
             _bitmap is not null &&
@@ -1553,9 +1691,19 @@ public sealed partial class MainPage : Page, IDisposable
     {
         _solveCancellation?.Cancel();
         _solveResult = null;
-        _overlayRenderer = null;
+        _overlayScene.SolveOverlay = null;
         ViewModel.ResetSolve();
         InspectorControl.ResetSolve();
+        ImageCanvas.Invalidate();
+    }
+
+    private void ResetStarAnalysisForImageChange()
+    {
+        _starAnalysisCancellation?.Cancel();
+        _starAnalysisCancellation = null;
+        _overlayScene.StarAnalysisOverlay = null;
+        _isAnalyzingStars = false;
+        InspectorControl.ResetStarAnalysis();
         ImageCanvas.Invalidate();
     }
 
@@ -1572,6 +1720,10 @@ public sealed partial class MainPage : Page, IDisposable
         CoordinateGridOverlayItem.IsChecked = _overlayOptions.ShowCoordinateGrid;
         FieldCenterOverlayItem.IsChecked = _overlayOptions.ShowFieldCenter;
         DetectedStarsOverlayItem.IsChecked = _overlayOptions.ShowDetectedStars;
+        MeasuredStarsOverlayItem.IsChecked = _overlayOptions.ShowMeasuredStars;
+        SensorTiltOverlayItem.IsChecked = _overlayOptions.ShowSensorTilt;
+        ParallelogramTiltOverlayItem.IsChecked = _overlayOptions.ShowParallelogramTilt;
+        TriangleTiltOverlayItem.IsChecked = _overlayOptions.ShowTriangleTilt;
 
         MessierCatalogItem.IsChecked = !_overlayOptions.HiddenDeepSkyCatalogs.Contains(DeepSkyCatalog.Messier);
         NgcCatalogItem.IsChecked = !_overlayOptions.HiddenDeepSkyCatalogs.Contains(DeepSkyCatalog.Ngc);
@@ -1584,6 +1736,54 @@ public sealed partial class MainPage : Page, IDisposable
         UgcCatalogItem.IsChecked = !_overlayOptions.HiddenDeepSkyCatalogs.Contains(DeepSkyCatalog.Ugc);
         PgcCatalogItem.IsChecked = !_overlayOptions.HiddenDeepSkyCatalogs.Contains(DeepSkyCatalog.Pgc);
         OtherCatalogItem.IsChecked = !_overlayOptions.HiddenDeepSkyCatalogs.Contains(DeepSkyCatalog.Other);
+    }
+
+    private void UpdateOverlayMenuAvailability()
+    {
+        MeasuredStarsOverlayItem.IsEnabled = _overlayScene.HasStarAnalysisOverlay;
+        SensorTiltOverlayItem.IsEnabled = _overlayScene.HasStarAnalysisOverlay;
+        ParallelogramTiltOverlayItem.IsEnabled =
+            _overlayScene.HasParallelogramTiltOverlay;
+        TriangleTiltOverlayItem.IsEnabled = _overlayScene.HasTriangleTiltOverlay;
+
+        bool hasSolveOverlay = _overlayScene.HasSolveOverlay && _solveResult is not null;
+        if (hasSolveOverlay)
+        {
+            ApplyOverlayAvailability(_solveResult!);
+        }
+        else
+        {
+            DeepSkyOverlayItem.IsEnabled = false;
+            DeepSkyOverlayItem.Text = "Deep-sky objects";
+            NamedStarsOverlayItem.IsEnabled = false;
+            NamedStarsOverlayItem.Text = "Named stars";
+            TransientsOverlayItem.IsEnabled = false;
+            TransientsOverlayItem.Text = "Current transients";
+            HistoricalTransientsOverlayItem.IsEnabled = false;
+            HistoricalTransientsOverlayItem.Text = "Historical transients";
+            MinorBodiesOverlayItem.IsEnabled = false;
+            MinorBodiesOverlayItem.Text = "Solar-system bodies";
+        }
+
+        CatalogOutlinesOverlayItem.IsEnabled = hasSolveOverlay;
+        ObjectLabelsOverlayItem.IsEnabled = hasSolveOverlay;
+        FieldStarsOverlayItem.IsEnabled = hasSolveOverlay;
+        CoordinateGridOverlayItem.IsEnabled = hasSolveOverlay;
+        FieldCenterOverlayItem.IsEnabled = hasSolveOverlay;
+        DetectedStarsOverlayItem.IsEnabled = hasSolveOverlay;
+
+        bool hasDeepSkyOverlay = hasSolveOverlay && DeepSkyOverlayItem.IsEnabled;
+        MessierCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        NgcCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        IcCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        SharplessVdbCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        LbnCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        CederbladCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        DarkNebulaeCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        SupernovaRemnantsCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        UgcCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        PgcCatalogItem.IsEnabled = hasDeepSkyOverlay;
+        OtherCatalogItem.IsEnabled = hasDeepSkyOverlay;
     }
 
     private void ApplyOverlayAvailability(SolveResult result)
@@ -1682,6 +1882,8 @@ public sealed partial class MainPage : Page, IDisposable
         _disposed = true;
         _solveCancellation?.Cancel();
         _solveCancellation = null;
+        _starAnalysisCancellation?.Cancel();
+        _starAnalysisCancellation = null;
         _loadCancellation?.Cancel();
         _loadCancellation?.Dispose();
         _loadCancellation = null;

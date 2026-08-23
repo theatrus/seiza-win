@@ -18,6 +18,7 @@ Seiza.App (WinUI 3 / C#)
                                            |-- built from the crates.io seiza-cabi release
                                            |-- seiza-fits
                                            |-- seiza-xisf
+                                           |-- seiza-stars / sensor tilt
                                            |-- seiza-stacking live contexts / SNR
                                            |-- image
                                            `-- seiza
@@ -85,10 +86,28 @@ disable process isolation.
     Windows manifest. Publication advances an atomic generation pointer only
     after both files are durable, retains the preceding complete generation,
     and accepts a restore only when native identity and manifest agree.
+16. Measured-star analysis is independent of catalogs and plate solving. The
+    explicit **Analyze stars** command gives the FITS/XISF source path to Rust,
+    which owns decoding, luminance preparation, detection, PSF fitting, the
+    3x3 cell summary, and tilt math. Schema-1 JSON returns source dimensions,
+    stars, cells, tilt, and an explicit normalized-major-axis capability.
+17. Plate-solve detections and measured stars are separate overlay producers.
+    A composite scene draws either or both through the same image-pixel
+    transform in the viewport and in full-resolution 8- or 16-bit export. The
+    optional parallelogram tilt diagram reuses the four native corner-cell HFR
+    medians. The triangle tilt diagram consumes native three-sector analysis;
+    neither renderer decodes pixels or recomputes detector measurements.
 
 ## Performance rules
 
 - Never perform per-pixel work in C#.
+- Analyze stars from the original FITS/XISF path in the native core; never
+  derive detector input from the stretched BGRA viewport or construct a
+  full-frame luminance copy in C#.
+- Use two-pixel detection binning, a 30-sigma detection threshold, and
+  Moffat-4 fits for the interactive action. The native core still derives
+  wide-field, standard, or long-focal policy from source headers and reports
+  every coordinate and PSF size in source pixels.
 - Upload a rendered image once; pan, zoom, and overlay visibility changes must not rerender pixels.
 - Prioritize the visible image over adjacent thumbnails and cache maintenance.
 - Bound background concurrency and memory use.
@@ -151,6 +170,31 @@ disable process isolation.
 - Measure SNR from the accumulator at doubling frame depths and the final
   depth. Recompute comparisons with one common deepest-stack signal so noisy
   early-percentile estimates do not exaggerate improvement.
+- Key measured-star results by normalized absolute source path, file length,
+  last-write timestamp, Windows file identity when available, native-core
+  version, and serialized detector options.
+  Share identical in-flight requests, keep the cache bounded, and admit only
+  one native detector job at a time.
+- A canceled or superseded analysis may finish inside the synchronous native
+  call, but source identity and document generation must be checked before and
+  after it; navigation discards the stale result and never attaches its
+  overlays to the next image.
+- Draw at most the 1,000 sharpest usable measured-star markers and 100 HFR
+  labels so zooming and panning remain responsive. Treat a tilt cell with
+  fewer than three stars as a low sample, withhold arbitrary
+  best/worst emphasis when the reliable spread is negligible, and draw mean
+  elongation only when a cell has at least three stars, the response advertises
+  normalized major-axis angles, and directional coherence exceeds the
+  threshold. The UI must remind users to confirm tilt across multiple frames.
+- Draw the parallelogram HFR diagram only when all four corner cells meet that
+  same three-star reliability rule. Normalize its four radial vertices to the
+  softest measured corner and 40% of the source image's shorter dimension,
+  label values explicitly as HFR, and keep the layer off by default so it does
+  not obscure the sensor grid or star markers.
+- Draw the triangle HFR diagram only from the native three-sector result, with
+  all sectors meeting the core-reported minimum sample count. Preserve the
+  returned image-coordinate angle, sector medians, and readiness verdict; do
+  not substitute the unrelated four-corner tilt percentage.
 
 ## Porting sequence
 
@@ -181,7 +225,16 @@ The detailed status and acceptance criteria live in
     data has exercised preview rendering, SNR sampling, snapshot export, pause,
     relaunch, exact resume, continued ingestion, and completed-session
     retirement.
-11. **Next:** add cached previews during full-resolution loads.
+11. **Implemented, final UI/export validation pending:** expose an explicit,
+    solve-independent star-analysis action, inspector results, measured-star
+    overlay, nine-cell sensor-tilt grid, and parallelogram/triangle HFR diagrams
+    through one composited viewport and export scene. The published Seiza
+    0.18.7 path-analysis and triangle-sector C ABI is locked. Its registry-built
+    DLL passed the managed service path on a real C925 FITS image with 71 stars
+    and a real XISF image with 468; both triangles were ready, exact native
+    fields and formulas matched, and the sources remained unchanged. Only
+    packaged viewport plus 8- and 16-bit composited-export UI QA remains.
+12. **Next:** add cached previews during full-resolution loads.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.
