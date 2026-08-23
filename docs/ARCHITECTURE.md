@@ -170,8 +170,9 @@ disable process isolation.
 - Measure SNR from the accumulator at doubling frame depths and the final
   depth. Recompute comparisons with one common deepest-stack signal so noisy
   early-percentile estimates do not exaggerate improvement.
-- Key measured-star results by normalized absolute source path, file length and
-  last-write timestamp, native-core version, and serialized detector options.
+- Key measured-star results by normalized absolute source path, file length,
+  last-write timestamp, Windows file identity when available, native-core
+  version, and serialized detector options.
   Share identical in-flight requests, keep the cache bounded, and admit only
   one native detector job at a time.
 - A canceled or superseded analysis may finish inside the synchronous native

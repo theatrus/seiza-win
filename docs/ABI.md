@@ -59,8 +59,9 @@ contained in the service boundary and is never exposed to view models or
 controls.
 
 Star-analysis responses are cached only for an exact source identity (normalized
-absolute path, length, and last-write timestamp), native-core version, and serialized
-options. Identical in-flight requests share one worker and native detector jobs
+absolute path, length, last-write timestamp, and Windows file identity when
+available), native-core version, and serialized options. Identical in-flight
+requests share one worker and native detector jobs
 are globally serialized. Canceling or navigating away abandons only the UI
 wait; the synchronous native allocation is allowed to finish and free safely,
 and source-identity plus document-generation checks discard stale results.
