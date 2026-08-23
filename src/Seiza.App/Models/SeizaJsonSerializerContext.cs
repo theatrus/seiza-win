@@ -18,6 +18,8 @@ namespace Seiza.App.Models;
 [JsonSerializable(typeof(CalibrationPlanResult))]
 [JsonSerializable(typeof(CalibrationMasterBuildRequest))]
 [JsonSerializable(typeof(CalibrationMasterBuildResult))]
+[JsonSerializable(typeof(StarAnalysisOptions))]
+[JsonSerializable(typeof(StarAnalysisResult))]
 [JsonSerializable(typeof(string[]))]
 internal sealed partial class SeizaJsonSerializerContext : JsonSerializerContext
 {

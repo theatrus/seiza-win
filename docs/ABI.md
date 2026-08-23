@@ -14,6 +14,18 @@ Rules:
 - Every exported operation catches panics and returns a host-readable error.
 - High-volume pixels use a contiguous BGRA8 buffer suitable for direct Win2D upload; evolving records use JSON.
 - FITS and XISF processing use the shared `seiza_rendered_image_open_with_stretch_config` JSON contract so ordered stretch stages, color strategy, background correction, light deconvolution, render `sample_domain`, and interactive-preview intent stay platform-neutral.
+- Source-star analysis uses the additive
+  `seiza_stars_detect_path_json(path, options_json, error_out)` entry point.
+  Windows requests `detectionBinning=2`, `sensitivity=30`, and
+  `psfType=moffat4` for bounded interactive latency while leaving `preset`
+  absent so Seiza can classify the optical scale from FITS/XISF metadata.
+  Rust opens FITS or XISF by path, produces the detector's linear luminance
+  input, and returns the source dimensions with schema-1 JSON; C# never decodes
+  or walks the source pixels. The response carries individual HFR/FWHM and PSF
+  measurements, all nine row/column cells, and the aggregate tilt summary.
+  A capability field says whether theta values have been normalized to the
+  fitted PSF major axis in `[0, pi)`, so older cores cannot accidentally drive
+  directional overlays with incompatible angles.
 - Catalog status is returned as owned JSON; catalog setup runs synchronously on a worker thread and reports borrowed progress JSON through a callback.
 - Rust owns manifest resolution, download caching, full SHA-256 verification, and atomic catalog installation.
 - A live stacker handle owns registration, calibrated accumulation,
@@ -45,6 +57,18 @@ The Windows interop layer uses source-generated `LibraryImport` declarations,
 an unmanaged progress trampoline, and `SafeHandle` wrappers. Raw ownership is
 contained in the service boundary and is never exposed to view models or
 controls.
+
+Star-analysis responses are cached only for an exact source identity (normalized
+absolute path, length, and last-write timestamp), native-core version, and serialized
+options. Identical in-flight requests share one worker and native detector jobs
+are globally serialized. Canceling or navigating away abandons only the UI
+wait; the synchronous native allocation is allowed to finish and free safely,
+and source-identity plus document-generation checks discard stale results.
+
+The Windows implementation is intentionally gated on an upcoming published
+upstream `seiza-cabi` release that supplies this path API and capability field.
+Documentation of the contract here does not imply that the stable download or
+current Cargo lock already contains that release.
 
 Interactive edits are debounced in the WinUI shell and rendered at a maximum
 2,048-pixel dimension. Save submits the same processing stack at full

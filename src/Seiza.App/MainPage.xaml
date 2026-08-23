@@ -231,15 +231,28 @@
                 </AppBarButton.Icon>
             </AppBarButton>
             <AppBarButton
+                x:Name="StarAnalysisButton"
+                Click="AnalyzeStars_Click"
+                IsEnabled="False"
+                Label="Analyze stars"
+                ToolTipService.ToolTip="Measure stars, field tilt, and curvature in the source image">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE734;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+            <AppBarButton
                 x:Name="OverlayButton"
                 IsEnabled="False"
                 Label="Overlays"
-                ToolTipService.ToolTip="Choose visible plate-solve overlays">
+                ToolTipService.ToolTip="Choose visible image overlays">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE81E;" />
                 </AppBarButton.Icon>
                 <AppBarButton.Flyout>
                     <MenuFlyout>
+                        <ToggleMenuFlyoutItem x:Name="MeasuredStarsOverlayItem" Click="OverlayToggle_Click" Text="Measured stars" />
+                        <ToggleMenuFlyoutItem x:Name="SensorTiltOverlayItem" Click="OverlayToggle_Click" Text="Sensor tilt" />
+                        <MenuFlyoutSeparator />
                         <ToggleMenuFlyoutItem x:Name="DeepSkyOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Deep-sky objects" />
                         <ToggleMenuFlyoutItem x:Name="NamedStarsOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Named stars" />
                         <ToggleMenuFlyoutItem x:Name="TransientsOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Current transients" />
@@ -265,7 +278,7 @@
                         <ToggleMenuFlyoutItem x:Name="FieldStarsOverlayItem" Click="OverlayToggle_Click" Text="Field stars" />
                         <ToggleMenuFlyoutItem x:Name="CoordinateGridOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="RA / Dec grid" />
                         <ToggleMenuFlyoutItem x:Name="FieldCenterOverlayItem" Click="OverlayToggle_Click" IsChecked="True" Text="Field center" />
-                        <ToggleMenuFlyoutItem x:Name="DetectedStarsOverlayItem" Click="OverlayToggle_Click" Text="Detected stars" />
+                        <ToggleMenuFlyoutItem x:Name="DetectedStarsOverlayItem" Click="OverlayToggle_Click" Text="Plate-solve detections" />
                         <MenuFlyoutSeparator />
                         <MenuFlyoutItem Click="HideAllOverlays_Click" Text="Hide all overlays" />
                     </MenuFlyout>

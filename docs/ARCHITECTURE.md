@@ -18,6 +18,7 @@ Seiza.App (WinUI 3 / C#)
                                            |-- built from the crates.io seiza-cabi release
                                            |-- seiza-fits
                                            |-- seiza-xisf
+                                           |-- seiza-stars / sensor tilt
                                            |-- seiza-stacking live contexts / SNR
                                            |-- image
                                            `-- seiza
@@ -85,10 +86,25 @@ disable process isolation.
     Windows manifest. Publication advances an atomic generation pointer only
     after both files are durable, retains the preceding complete generation,
     and accepts a restore only when native identity and manifest agree.
+16. Measured-star analysis is independent of catalogs and plate solving. The
+    explicit **Analyze stars** command gives the FITS/XISF source path to Rust,
+    which owns decoding, luminance preparation, detection, PSF fitting, the
+    3x3 cell summary, and tilt math. Schema-1 JSON returns source dimensions,
+    stars, cells, tilt, and an explicit normalized-major-axis capability.
+17. Plate-solve detections and measured stars are separate overlay producers.
+    A composite scene draws either or both through the same image-pixel
+    transform in the viewport and in full-resolution 8- or 16-bit export.
 
 ## Performance rules
 
 - Never perform per-pixel work in C#.
+- Analyze stars from the original FITS/XISF path in the native core; never
+  derive detector input from the stretched BGRA viewport or construct a
+  full-frame luminance copy in C#.
+- Use two-pixel detection binning, a 30-sigma detection threshold, and
+  Moffat-4 fits for the interactive action. The native core still derives
+  wide-field, standard, or long-focal policy from source headers and reports
+  every coordinate and PSF size in source pixels.
 - Upload a rendered image once; pan, zoom, and overlay visibility changes must not rerender pixels.
 - Prioritize the visible image over adjacent thumbnails and cache maintenance.
 - Bound background concurrency and memory use.
@@ -151,6 +167,21 @@ disable process isolation.
 - Measure SNR from the accumulator at doubling frame depths and the final
   depth. Recompute comparisons with one common deepest-stack signal so noisy
   early-percentile estimates do not exaggerate improvement.
+- Key measured-star results by normalized absolute source path, file length and
+  last-write timestamp, native-core version, and serialized detector options.
+  Share identical in-flight requests, keep the cache bounded, and admit only
+  one native detector job at a time.
+- A canceled or superseded analysis may finish inside the synchronous native
+  call, but source identity and document generation must be checked before and
+  after it; navigation discards the stale result and never attaches its
+  overlays to the next image.
+- Draw at most the 1,000 sharpest usable measured-star markers and 100 HFR
+  labels so zooming and panning remain responsive. Treat a tilt cell with
+  fewer than three stars as a low sample, withhold arbitrary
+  best/worst emphasis when the reliable spread is negligible, and draw mean
+  elongation only when a cell has at least three stars, the response advertises
+  normalized major-axis angles, and directional coherence exceeds the
+  threshold. The UI must remind users to confirm tilt across multiple frames.
 
 ## Porting sequence
 
@@ -181,7 +212,12 @@ The detailed status and acceptance criteria live in
     data has exercised preview rendering, SNR sampling, snapshot export, pause,
     relaunch, exact resume, continued ingestion, and completed-session
     retirement.
-11. **Next:** add cached previews during full-resolution loads.
+11. **Implemented, native runtime validation pending:** expose an explicit,
+    solve-independent star-analysis action, inspector results, measured-star
+    overlay, and nine-cell sensor-tilt overlay through one composited viewport
+    and export scene. Completion requires the corresponding upstream C ABI
+    release to be published and locked, then exercised on real FITS/XISF data.
+12. **Next:** add cached previews during full-resolution loads.
 
 Overlay geometry and WCS calculations currently implemented in the macOS view
 should move into shared Rust rather than be independently reimplemented in C#.

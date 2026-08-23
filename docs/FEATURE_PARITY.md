@@ -99,6 +99,26 @@ The shared upstream C ABI includes `seiza_catalog_status_json`,
 `seiza_catalog_setup`, the three preset values, and the progress callback
 contract while retaining Windows BGRA render output.
 
+## Image-quality analysis
+
+Measured-star analysis is a separate workflow from plate solving. It requires
+neither a catalog install nor a WCS solution: the user explicitly chooses
+**Analyze stars** from the toolbar or inspector, and the native core measures
+the original linear FITS/XISF source. This is implemented and locally
+runtime-tested on real FITS and XISF data, but remains **Partial** until its
+merged upstream C ABI dependency is published and Cargo-locked and both export
+paths complete their packaged-runtime checks.
+
+| Capability | macOS current | Windows | Windows gap / acceptance criterion |
+| --- | --- | --- | --- |
+| Explicit, solve-independent Analyze stars action | Not yet exposed | **Partial** | Toolbar and inspector actions invoke the native FITS/XISF path decoder without catalog access, solving, a stretched-viewport round trip, or C# per-pixel work. Locally exercised on real FITS and XISF sources; complete after the published release is locked. |
+| Schema-1 measurement model | Not yet exposed | **Partial** | Source-generated models validate source dimensions, individual star HFR/FWHM and optional PSF fields, exactly nine row/column cells, and the aggregate tilt/curvature summary before presentation. Real FITS and XISF responses passed the full validator; repeat against the registry-built runtime before completion. |
+| Measured-star overlay | Not yet exposed | **Partial** | Yellow HFR circles are explicitly labeled **Measured stars**, distinct from the solver's **Plate-solve detections**. The renderer selects at most the 1,000 sharpest usable measurements and caps HFR labels at 100 when screen space permits so pan and zoom remain responsive. |
+| 3x3 sensor-tilt overlay and inspector | Not yet exposed | **Partial** | Cells show median HFR and star count, compare reliable cells with restrained good/warning/poor coloring, mark fewer than three measurements as a low sample, and suppress best/worst emphasis when the reliable spread is negligible. The guidance says to confirm tilt across multiple frames. |
+| Major-axis direction safety | Not yet exposed | **Partial** | Mean elongation is drawn only when a cell has at least three stars, the native response advertises normalized PSF major-axis angles, and coherence exceeds the threshold; missing capability safely disables direction lines. Validate against the published native runtime before completion. |
+| Freshness, cache, and bounded execution | Windows-specific | **Partial** | The bounded cache key combines normalized absolute source path, length, timestamp, core version, and serialized options; identical requests share work and only one native detector job runs at a time. Source identity, source dimensions, path, and document generation prevent a result from attaching after navigation. |
+| Viewport and composited export parity | Not yet exposed | **Partial** | Measured stars and tilt join solve layers in one image-space scene, so the same geometry is used for zoom-stable viewing and full-resolution 8- or 16-bit export. Runtime-test both export paths before completion. |
+
 ## Plate solving
 
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |
@@ -131,7 +151,7 @@ one Win2D drawing path between the live viewport and full-resolution export.
 | Independent object labels and outlines | Available | **Partial** | Separate toggles are complete; add label-collision avoidance for dense fields. |
 | Current and historical transients | Available | **Complete** | Independent visibility using acquisition-time classification. |
 | Comets and asteroids | Available | **Complete** | Acquisition-time positions, distinct markers, motion direction, and arrows. |
-| Detected-star diagnostics | Available | **Complete** | Diagnostic split-cross layer is off by default. |
+| Plate-solve detected-star diagnostics | Available | **Complete** | The diagnostic split-cross layer is labeled **Plate-solve detections**, is off by default, and is distinct from the independently measured HFR/FWHM stars above. |
 | RA/Dec coordinate grid and labels | Available | **Complete** | Derived from the solved 0-based WCS, including forward/inverse SIP distortion, and cached per solution. |
 | Field-center marker | Available | **Complete** | Drawn in the common solved-image coordinate space. |
 | Hide all overlays | Available | **Complete** | One accessible action without losing catalog filter preferences. |
@@ -158,7 +178,6 @@ These remain tracked beyond the current macOS parity surface:
 
 - transfer-curve visualization and direct curve editing;
 - pixel loupe and WCS-aware cursor sampling;
-- star-detection overlays with HFR/FWHM measurements;
 - compass, scale bar, and WCS cursor readout;
 - optional source-FITS WCS injection with explicit provenance;
 - sequence comparison, blink/difference views, and registration;
@@ -184,3 +203,9 @@ These remain tracked beyond the current macOS parity surface:
    activation, true 16-bit PNG/TIFF export, the all-users self-contained WiX
    MSI, Authenticode signing, and installer CI and tag-driven releases are
    complete.
+6. **Implemented, runtime validation pending: Image-quality analysis** — the
+   explicit catalog-free action, schema-1 models, measured-star and nine-cell
+   tilt overlays, inspector, bounded cache, stale-result protection, and shared
+   viewport/export scene are present. Mark complete only after the matching
+   upstream C ABI release is published and Cargo-locked, then real FITS/XISF
+   analysis plus 8- and 16-bit composited export are exercised end to end.
