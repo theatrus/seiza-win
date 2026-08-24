@@ -1,11 +1,13 @@
-<Project Sdk="WixToolset.Sdk/4.0.6">
+<Project Sdk="WixToolset.Sdk/4.0.6" TreatAsLocalProperty="ExpectedPublishDirectory;ResolvedPublishDirectory">
   <PropertyGroup>
     <OutputType>Package</OutputType>
     <InstallerPlatform>x64</InstallerPlatform>
     <RepoRoot Condition="'$(RepoRoot)' == ''">$(MSBuildThisFileDirectory)..\..\</RepoRoot>
     <AppProject>$(RepoRoot)src\Seiza.App\Seiza.App.csproj</AppProject>
     <PublishDirectory>$(RepoRoot)artifacts\publish\win-x64\</PublishDirectory>
-    <SeizaVersion Condition="'$(SeizaVersion)' == ''">0.7.0</SeizaVersion>
+    <ExpectedPublishDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\artifacts\publish\win-x64\'))</ExpectedPublishDirectory>
+    <ResolvedPublishDirectory>$([System.IO.Path]::GetFullPath('$(PublishDirectory)'))</ResolvedPublishDirectory>
+    <SeizaVersion Condition="'$(SeizaVersion)' == ''">0.7.1</SeizaVersion>
     <OutputName>seiza-$(SeizaVersion)-windows-x86_64</OutputName>
     <OutputPath>$(RepoRoot)dist\</OutputPath>
     <IntermediateOutputPath>$(RepoRoot)artifacts\wix\</IntermediateOutputPath>
@@ -44,6 +46,13 @@
        second time and overwrite the signed files, because the SDK's copy
        compares size and timestamp and a signature changes both. -->
   <Target Name="PublishSeizaApp" BeforeTargets="GetHarvestDirectoryContent" Condition="'$(SeizaSkipPublish)' != 'true'">
+    <!-- dotnet publish does not remove files that disappeared from the project.
+         Start from an empty, dedicated output so Heat cannot package a stale
+         binary left by local QA or an earlier application version. -->
+    <Error
+        Condition="'$(ResolvedPublishDirectory)' != '$(ExpectedPublishDirectory)'"
+        Text="Refusing to clean unexpected publish directory $(ResolvedPublishDirectory). Expected $(ExpectedPublishDirectory)." />
+    <RemoveDir Directories="$(ExpectedPublishDirectory)" />
     <MSBuild
         Projects="$(AppProject)"
         Targets="Publish"

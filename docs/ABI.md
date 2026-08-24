@@ -16,9 +16,13 @@ Rules:
 - FITS and XISF processing use the shared `seiza_rendered_image_open_with_stretch_config` JSON contract so ordered stretch stages, color strategy, background correction, light deconvolution, render `sample_domain`, and interactive-preview intent stay platform-neutral.
 - Source-star analysis uses the additive
   `seiza_stars_detect_path_json(path, options_json, error_out)` entry point.
-  Windows requests `detectionBinning=2`, `sensitivity=30`, and
-  `psfType=moffat4` for bounded interactive latency while leaving `preset`
-  absent so Seiza can classify the optical scale from FITS/XISF metadata.
+  Windows requests `detectionBinning=2`, `sensitivity=30`,
+  `psfType=moffat4`, and `targetStarCount=200` while leaving `preset` absent
+  so Seiza can classify the optical scale from FITS/XISF metadata. The first
+  pass remains bounded; when it measures fewer than 200 stars, Seiza retries
+  with a relaxed SNR gate and, if still below target, native-resolution
+  unblurred detection. It returns the best complete pass without merging
+  measurement scales.
   Rust opens FITS or XISF by path, produces the detector's linear luminance
   input, and returns the source dimensions with schema-1 JSON; C# never decodes
   or walks the source pixels. The response carries individual HFR/FWHM and PSF
@@ -42,7 +46,7 @@ Rules:
   that accepted and skipped paths are a disjoint, exact partition, that every
   skip has a reason, and that enough accepted frames remain. An ambiguous
   legacy partial report is discarded rather than guessed or cached. Bundled
-  Seiza 0.18.7 emits the complete schema-2 partition.
+  Seiza 0.18.8 emits the complete schema-2 partition.
 - Calibration preparation calls the native signature matchers for sensor
   settings, flat optics, and dark exposure/temperature using Seiza's exported
   default tolerances. Native mismatch descriptions name the differing readings
@@ -66,14 +70,14 @@ are globally serialized. Canceling or navigating away abandons only the UI
 wait; the synchronous native allocation is allowed to finish and free safely,
 and source-identity plus document-generation checks discard stale results.
 
-The Windows implementation is locked to the published Seiza 0.18.7 C ABI,
+The Windows implementation is locked to the published Seiza 0.18.8 C ABI,
 which supplies the path API and normalized-major-axis capability field. Seiza
-for Windows 0.7.0 ships this ABI and analysis workflow.
+for Windows 0.7.1 ships this ABI and analysis workflow.
 
 Windows explicitly requests the additive triangle contract with
 `"triangleAngleDegrees": 0` in its interactive star-detection options. Zero
 degrees points up in image coordinates and positive values rotate clockwise.
-Seiza 0.18.7 returns `triangleTilt` with the normalized angle, inner and outer
+Seiza 0.18.8 returns `triangleTilt` with the normalized angle, inner and outer
 radii, the core-owned minimum sample count, center statistics, three ordered
 120-degree sectors, their HFR medians, the annular overall median, and a
 readiness-gated tilt/best/worst verdict. The field remains absent when the
@@ -82,12 +86,14 @@ it does not re-bin stars or substitute the four-corner tilt summary. The
 Triangle menu item is enabled only for a validated, ready native result, so a
 sparse response remains safely unavailable.
 
-The registry-built Seiza 0.18.7 DLL passed the managed
-`StarAnalysisService` real-file path end to end: a C925 FITS source returned 71
-stars and a ready triangle, while an XISF source returned 468 stars and a ready
-triangle. Validation preserved the exact native triangle fields and rechecked
-its radii, axes, readiness, best/worst sectors, and tilt formula. Both source
-files remained unchanged by analysis.
+The registry-built Seiza 0.18.8 DLL passed the managed
+`StarAnalysisService` real-file path end to end: a C925 FITS source increased
+from 71 strict-pass stars to a 146-star adaptive pass with all nine cells
+reliable, while an XISF source stayed bit-for-bit identical at 468 stars
+because its first pass met the target. Both returned ready triangles.
+Validation preserved the exact native triangle fields and rechecked its radii,
+axes, readiness, best/worst sectors, and tilt formula. Both source files
+remained unchanged by analysis.
 
 Interactive edits are debounced in the WinUI shell and rendered at a maximum
 2,048-pixel dimension. Save submits the same processing stack at full

@@ -23,7 +23,7 @@ Build the installer from the repository root:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.0
+  -p:SeizaVersion=0.7.1
 ```
 
 The MSI is written to `dist`. The version must be a valid three-part MSI
@@ -38,19 +38,21 @@ work in two:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.0 `
+  -p:SeizaVersion=0.7.1 `
   -t:PublishSeizaApp
 # sign artifacts\publish\win-x64 here
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.0 `
+  -p:SeizaVersion=0.7.1 `
   -p:SeizaSkipPublish=true
 ```
 
 `SeizaSkipPublish` matters: without it the second command would publish again
 and overwrite the signed files, since the SDK's copy decides a file is unchanged
 by size and timestamp and a signature changes both. The build fails rather than
-harvesting an empty directory if nothing has been published.
+harvesting an empty directory if nothing has been published. A normal publish
+first removes its dedicated output directory so a deleted or local QA binary
+cannot survive from an earlier build and be harvested into the MSI.
 
 The interactive installer's selected-by-default **Launch Seiza** option uses
 WiX's unelevated shell action so an all-users install opens Seiza in the
@@ -66,7 +68,7 @@ validation:
 
 ```powershell
 .\.github\scripts\test-windows-installer.ps1 `
-  -Msi .\dist\seiza-0.7.0-windows-x86_64.msi
+  -Msi .\dist\seiza-0.7.1-windows-x86_64.msi
 ```
 
 Tagged releases use `.github/workflows/release.yml` to build and smoke-test

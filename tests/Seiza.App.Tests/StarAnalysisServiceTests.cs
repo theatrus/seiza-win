@@ -55,6 +55,7 @@ public sealed class StarAnalysisServiceTests
                 NoiseReductionRadius = 3,
                 Sensitivity = 8.5,
                 TriangleAngleDegrees = 725,
+                TargetStarCount = 250,
             };
 
             await service.AnalyzeAsync(path, options);
@@ -69,7 +70,12 @@ public sealed class StarAnalysisServiceTests
             Assert.Equal(3, root.GetProperty("noiseReductionRadius").GetInt32());
             Assert.Equal(8.5, root.GetProperty("sensitivity").GetDouble());
             Assert.Equal(725, root.GetProperty("triangleAngleDegrees").GetDouble());
+            Assert.Equal(250, root.GetProperty("targetStarCount").GetInt32());
             Assert.False(root.TryGetProperty("focalLengthMm", out _));
+
+            using JsonDocument defaults = JsonDocument.Parse(
+                new StarAnalysisOptions().ToJson());
+            Assert.False(defaults.RootElement.TryGetProperty("targetStarCount", out _));
 
             using JsonDocument focalOnly = JsonDocument.Parse(
                 new StarAnalysisOptions { FocalLengthMm = 749 }.ToJson());
@@ -115,6 +121,16 @@ public sealed class StarAnalysisServiceTests
             };
             await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
                 () => service.AnalyzeAsync(path, nonfiniteTriangleAngle));
+
+            foreach (int invalidTarget in new[] { 0, -1 })
+            {
+                var invalidTargetStarCount = new StarAnalysisOptions
+                {
+                    TargetStarCount = invalidTarget,
+                };
+                await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+                    () => service.AnalyzeAsync(path, invalidTargetStarCount));
+            }
             Assert.Equal(1, native.CallCount);
         }
         finally
@@ -137,6 +153,7 @@ public sealed class StarAnalysisServiceTests
         Assert.False(root.TryGetProperty("focalLengthMm", out _));
         Assert.False(root.TryGetProperty("pixelSizeUm", out _));
         Assert.Equal(0, root.GetProperty("triangleAngleDegrees").GetDouble());
+        Assert.Equal(200, root.GetProperty("targetStarCount").GetInt32());
     }
 
     [Fact]
@@ -319,6 +336,34 @@ public sealed class StarAnalysisServiceTests
             await service.AnalyzeAsync(
                 path,
                 new StarAnalysisOptions { TriangleAngleDegrees = 120 });
+
+            Assert.Equal(3, native.CallCount);
+        }
+        finally
+        {
+            File.Delete(path);
+        }
+    }
+
+    [Fact]
+    public async Task CacheKeyIncludesAdaptiveTargetStarCount()
+    {
+        string path = CreateImagePath();
+        try
+        {
+            var native = new FakeNativeClient((_, _) => ValidResultJson());
+            var service = CreateService(native);
+
+            await service.AnalyzeAsync(path);
+            await service.AnalyzeAsync(
+                path,
+                new StarAnalysisOptions { TargetStarCount = 200 });
+            await service.AnalyzeAsync(
+                path,
+                new StarAnalysisOptions { TargetStarCount = 200 });
+            await service.AnalyzeAsync(
+                path,
+                new StarAnalysisOptions { TargetStarCount = 400 });
 
             Assert.Equal(3, native.CallCount);
         }
