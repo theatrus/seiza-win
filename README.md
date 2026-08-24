@@ -5,7 +5,7 @@ It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
 core.
 
-[Download Seiza 0.7.0 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.0/seiza-0.7.0-windows-x86_64.msi)
+[Download Seiza 0.7.1 for Windows (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.1/seiza-0.7.1-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -13,26 +13,34 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza for Windows 0.7.0
+## Seiza for Windows 0.7.1
 
-This release adds calibrated, resumable live stacking, native SNR depth
-analysis, and solve-independent star and sensor-tilt measurements.
+This point release improves solve-independent star and sensor-tilt analysis on
+undersampled fields while retaining the calibrated, resumable live stacking
+and native SNR depth analysis introduced in 0.7.0.
 
-- Upgrade the native processing core to Seiza 0.18.7 for resumable live-stack
-  checkpoints, calibration planning and master construction, native SNR
-  measurements, and bounded preview and export support.
+- Bundle the Seiza 0.18.8 native processing C ABI with `seiza-stars 0.1.3`.
+  It adds adaptive measured-star detection while retaining the resumable
+  live-stack checkpoints, calibration planning and master construction, native
+  SNR measurements, and bounded preview and export support from 0.7.0.
 - Add an explicit **Analyze stars** action for FITS and XISF images. This is
   independent of plate solving and catalog downloads: the native core decodes
   the source file directly, measures HFR/FWHM, and returns a nine-cell sensor
   tilt summary. The Windows inspector and overlay menu keep these measured
-  stars distinct from plate-solve detections.
+  stars distinct from plate-solve detections. Interactive analysis first runs
+  the bounded binning-2, sensitivity-30 pass; if it measures fewer than 200
+  stars, the core retries with a relaxed SNR gate and, if still below target,
+  native-resolution unblurred detection. It returns one complete pass rather
+  than merging measurements from different scales.
 
-The star-analysis workflow is built against the published Seiza 0.18.7 C ABI.
+The star-analysis workflow is built against the published Seiza 0.18.8 C ABI.
 A registry-backed managed end-to-end
-test measured 71 stars in a real C925 FITS image and 468 in a real XISF image;
-both returned a ready native triangle result. The test preserved the exact
-native triangle data and formulas and confirmed that analysis did not modify
-either source. Measured-star circles, the sensor-tilt grid, and the optional
+test increased a real C925 FITS image from 71 strict-pass stars to a 146-star
+adaptive pass with all nine cells reliable. A dense real XISF image stayed
+bit-for-bit identical at 468 stars because its first pass met the target;
+both returned a ready native triangle. The test preserved the exact native
+triangle data and formulas and confirmed that analysis did not modify either
+source. Measured-star circles, the sensor-tilt grid, and the optional
 **Parallelogram tilt diagram** and **Triangle tilt diagram** use the same
 image-space overlay scene for the live viewport and full-resolution 8- or
 16-bit composited export. The Triangle diagram consumes three native adjustment
@@ -217,8 +225,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza 0.7.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.0/seiza-0.7.0-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.0/SHA256SUMS.txt)
+Download the [Seiza 0.7.1 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.1/seiza-0.7.1-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.1/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -255,7 +263,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.0
+  -p:SeizaVersion=0.7.1
 ```
 
 The installer is written to `dist`. See the

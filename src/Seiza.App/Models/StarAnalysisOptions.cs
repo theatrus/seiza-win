@@ -8,7 +8,9 @@ public sealed record StarAnalysisOptions
     /// <summary>
     /// Interactive default chosen to keep large, dense astronomy frames responsive while
     /// preserving source-pixel measurements and enough fitted stars for the nine-cell tilt grid.
-    /// The native core still derives the telescope preset from image headers.
+    /// The native core still derives the telescope preset from image headers. When the strict
+    /// first pass measures fewer than the requested target, the core retries with its bounded
+    /// adaptive ladder and returns one internally consistent pass.
     /// </summary>
     internal static StarAnalysisOptions InteractiveDefault { get; } = new()
     {
@@ -16,6 +18,7 @@ public sealed record StarAnalysisOptions
         Sensitivity = 30,
         PsfType = StarPsfType.Moffat4,
         TriangleAngleDegrees = 0,
+        TargetStarCount = 200,
     };
 
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
@@ -62,6 +65,14 @@ public sealed record StarAnalysisOptions
     /// </summary>
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public double? TriangleAngleDegrees { get; init; }
+
+    /// <summary>
+    /// When positive, asks the native detector to retry with progressively more permissive
+    /// settings until it measures at least this many stars, returning the best complete pass
+    /// otherwise. Omit this value to preserve single-pass detection.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? TargetStarCount { get; init; }
 
     internal string ToJson()
     {
@@ -113,6 +124,13 @@ public sealed record StarAnalysisOptions
             throw new ArgumentOutOfRangeException(
                 nameof(TriangleAngleDegrees),
                 "The triangle angle must be finite.");
+        }
+
+        if (TargetStarCount is <= 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(TargetStarCount),
+                "The target star count must be positive.");
         }
     }
 

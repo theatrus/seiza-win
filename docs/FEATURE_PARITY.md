@@ -8,13 +8,13 @@ merely because its Rust implementation exists.
 ## Baseline
 
 - macOS reference: `main` at
-  [`9d1ec73`](https://github.com/theatrus/seiza-mac/commit/9d1ec73bac5d21d3475ae85b5f574acab83453e0)
-- Seiza core reference: crates.io `seiza-cabi 0.18.7` from
-  [`8e6af29`](https://github.com/theatrus/seiza/commit/8e6af29742972bf84cc0669af5f6fe5f5188db28),
-  resolving `seiza-stars 0.1.2` and
+  [`c8e4f07`](https://github.com/theatrus/seiza-mac/commit/c8e4f07bd77963a92c39ac7e1bc65c87df93225a)
+- Seiza core reference: crates.io `seiza-cabi 0.18.8` from
+  [`cfd4293`](https://github.com/theatrus/seiza/commit/cfd4293c81c61e420b1b23bfaf8dc9b284918fda),
+  resolving `seiza-stars 0.1.3` and
   [`seiza-stacking 0.11.4`](https://github.com/theatrus/seiza/commit/d17fad906d83f91920489e3af9e87f7f344a014e)
-- Windows reference: live-stack implementation at
-  [`10ee0a6`](https://github.com/theatrus/seiza-win/commit/10ee0a6b5035e3034867546cb99b03a7f45a44dd)
+- Windows reference: `v0.7.0` at
+  [`ccecf1e`](https://github.com/theatrus/seiza-win/commit/ccecf1e1c3e740855376cccb52934163f4b3afb7)
 - Last audited: 2026-08-23
 
 Update this baseline and the affected rows whenever the macOS app gains a
@@ -106,10 +106,15 @@ Measured-star analysis is a separate workflow from plate solving. It requires
 neither a catalog install nor a WCS solution: the user explicitly chooses
 **Analyze stars** from the toolbar or inspector, and the native core measures
 FITS/XISF source samples before display stretch. This is implemented against the
-published, Cargo-locked Seiza 0.18.7 C ABI. A registry-backed managed service
-test measured 71 stars and a ready triangle in a real C925 FITS image, plus 468
-stars and a ready triangle in a real XISF image. It verified exact native
-triangle data and formulas and left both sources unchanged. An isolated
+published, Cargo-locked Seiza 0.18.8 C ABI. Interactive analysis targets 200
+measured stars: an under-filled strict pass can retry through the core-owned
+relaxed-SNR and, only if still below target, native-resolution unblurred rungs,
+returning one complete pass rather than mixing scales. A registry-backed
+managed service test increased a real C925 FITS image from 71 strict-pass stars
+to a 146-star adaptive pass with all nine cells reliable. A real XISF image
+remained bit-for-bit identical at 468 stars because its first pass met the
+target. Both returned ready triangles; the test verified exact native triangle
+data and formulas and left both sources unchanged. An isolated
 Release-built x64 app then completed viewport analysis and three
 full-resolution composited-export checks on the 3,840 x 2,160 C925 source: a
 32-bpp Bgra32 measured-stars/grid PNG, a 64-bpp Rgba64 parallelogram-only PNG,
@@ -119,7 +124,8 @@ labels, smooth gradients, and no chrome, corruption, seams, or rescaling.
 
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |
 | --- | --- | --- | --- |
-| Explicit, solve-independent Analyze stars action | Available | **Complete** | Toolbar and inspector actions invoke the native FITS/XISF path decoder without catalog access, solving, a stretched-viewport round trip, or C# per-pixel work. The registry-built 0.18.7 runtime returned 71 stars from a real C925 FITS image and 468 from a real XISF image without modifying either source. |
+| Explicit, solve-independent Analyze stars action | Available | **Complete** | Toolbar and inspector actions invoke the native FITS/XISF path decoder without catalog access, solving, a stretched-viewport round trip, or C# per-pixel work. The registry-built 0.18.8 runtime increased the real C925 result from 71 strict-pass stars to 146 adaptive stars and left a 468-star XISF result unchanged, without modifying either source. |
+| Adaptive star-detection retry | Available | **Complete** | Interactive options request `targetStarCount=200`. The native detector keeps the strict binning-2/sensitivity-30 pass when it is sufficient; otherwise it retries with a relaxed SNR gate and, if still below target, native-resolution unblurred detection, returning the best whole pass rather than merging scales. Serialized options participate in the bounded cache key. |
 | Schema-1 measurement model | Available | **Complete** | Source-generated models validate source dimensions, individual star HFR/FWHM and optional PSF fields, exactly nine row/column cells, aggregate tilt/curvature, and optional native triangle provenance before presentation. Both real-file responses passed the full validator with exact native triangle fields and formulas. |
 | Measured-star overlay | Available | **Complete** | Yellow HFR circles are explicitly labeled **Measured stars**, distinct from the solver's **Plate-solve detections**. The renderer selects at most the 1,000 sharpest usable measurements and caps HFR labels at 100 when screen space permits so pan and zoom remain responsive. |
 | 3x3 sensor-tilt overlay and inspector | Available | **Complete** | Cells show median HFR and star count, compare reliable cells with restrained good/warning/poor coloring, mark fewer than three measurements as a low sample, and suppress best/worst emphasis when the reliable spread is negligible. The guidance says to confirm tilt across multiple frames. |
@@ -217,8 +223,11 @@ These remain tracked beyond the current macOS parity surface:
    the explicit catalog-free action, schema-1 models, measured-star, nine-cell
    tilt-grid, and parallelogram overlay, inspector, bounded cache,
    stale-result protection, and shared viewport/export scene are present. The
-   published Seiza 0.18.7 C ABI and native triangle sectors are Cargo-locked,
+   published Seiza 0.18.8 C ABI, adaptive detector, and native triangle sectors
+   are Cargo-locked,
    and registry-backed managed analysis is complete on real C925 FITS and XISF
-   sources with ready triangles, exact native data/formulas, and immutable
-   inputs. Release-built viewport analysis and full-resolution 8- and 16-bit
+   sources: 71 strict stars increased to 146 adaptive stars on the C925 image,
+   the 468-star XISF result was unchanged, and both had ready triangles, exact
+   native data/formulas, and immutable inputs. Release-built viewport analysis
+   and full-resolution 8- and 16-bit
    composited-export checks are complete on the real C925 FITS source.

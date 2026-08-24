@@ -104,10 +104,14 @@ disable process isolation.
 - Analyze stars from the original FITS/XISF path in the native core; never
   derive detector input from the stretched BGRA viewport or construct a
   full-frame luminance copy in C#.
-- Use two-pixel detection binning, a 30-sigma detection threshold, and
-  Moffat-4 fits for the interactive action. The native core still derives
-  wide-field, standard, or long-focal policy from source headers and reports
-  every coordinate and PSF size in source pixels.
+- Start the interactive action with two-pixel detection binning, sensitivity
+  30, and Moffat-4 fits. Request a target of 200 measured stars so the native
+  core can retry a pass below that total with its bounded adaptive ladder: first
+  a relaxed SNR gate, then, only if still below target, native-resolution
+  unblurred detection. Consume one complete returned pass; never merge
+  measurements from different rungs. The
+  core still derives wide-field, standard, or long-focal policy from source
+  headers and reports every coordinate and PSF size in source pixels.
 - Upload a rendered image once; pan, zoom, and overlay visibility changes must not rerender pixels.
 - Prioritize the visible image over adjacent thumbnails and cache maintenance.
 - Bound background concurrency and memory use.
@@ -229,10 +233,12 @@ The detailed status and acceptance criteria live in
     solve-independent star-analysis action, inspector results, measured-star
     overlay, nine-cell sensor-tilt grid, and parallelogram/triangle HFR diagrams
     through one composited viewport and export scene. The published Seiza
-    0.18.7 path-analysis and triangle-sector C ABI is locked. Its registry-built
-    DLL passed the managed service path on a real C925 FITS image with 71 stars
-    and a real XISF image with 468; both triangles were ready, exact native
-    fields and formulas matched, and the sources remained unchanged. An isolated
+    0.18.8 path-analysis, adaptive-detection, and triangle-sector C ABI is
+    locked. Its registry-built DLL increased a real C925 FITS image from 71
+    strict-pass stars to a 146-star adaptive pass with all nine cells reliable;
+    a real XISF image remained bit-for-bit identical at 468 because its first
+    pass met the target. Both triangles were ready, exact native fields and
+    formulas matched, and the sources remained unchanged. An isolated
     Release-built x64 app then exercised viewport analysis and three
     full-resolution composited exports of the 3,840 x 2,160 C925 source: a
     32-bpp Bgra32 measured-stars/grid PNG, a 64-bpp Rgba64 parallelogram-only
