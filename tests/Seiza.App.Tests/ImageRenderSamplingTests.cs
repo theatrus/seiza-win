@@ -1,5 +1,6 @@
 using System.Buffers.Binary;
 using System.Text;
+using Seiza.App.Models;
 using Seiza.App.Services;
 using Xunit;
 
@@ -34,8 +35,12 @@ public sealed class ImageRenderSamplingTests
                 BinaryPrimitives.WriteInt16BigEndian(fits.AsSpan(2880 + index * 2, 2), value);
             }
             File.WriteAllBytes(path, fits);
-            var full = SeizaCore.Render(path);
-            var reduced = SeizaCore.Render(path, maxDimension: 2);
+            // Keep this sampling test independent of auto-stretch statistics.
+            var processing = new FitsImageProcessingConfiguration(
+                new FitsStretchStack([new FitsStretchConfiguration { Type = FitsStretchType.Identity }]),
+                backgroundConfiguration: null);
+            var full = SeizaCore.Render(path, processing: processing);
+            var reduced = SeizaCore.Render(path, maxDimension: 2, processing: processing);
             Assert.Equal(2, reduced.Width);
             Assert.Equal(2, reduced.Height);
             Assert.NotEqual(full.Bgra[0], full.Bgra[4]);
