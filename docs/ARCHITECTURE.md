@@ -62,11 +62,10 @@ Windows CI.
 
 ### Scaling audit follow-ups
 
-- Update the locked crates.io core after
-  [seiza#177](https://github.com/theatrus/seiza/pull/177) ships. That change fixes
-  C ABI reductions for file renders, interactive linear samples, and live
-  stacks. The Explorer reducer does not use the C ABI and already has its own
-  fix here.
+- The locked crates.io `seiza-cabi` 0.18.14 includes
+  [seiza#177](https://github.com/theatrus/seiza/pull/177), which fixes C ABI
+  reductions for file renders, interactive linear samples, and live stacks.
+  The Explorer reducer does not use the C ABI and has its own area filter.
 - Replace the fixed 2048-pixel stretch-preview limit with a zoom- and DPI-aware
   render plan, then follow a bounded preview with a full-size render after edits
   settle. Filtering cannot recover detail absent from a small preview. Keep

@@ -70,9 +70,9 @@ are globally serialized. Canceling or navigating away abandons only the UI
 wait; the synchronous native allocation is allowed to finish and free safely,
 and source-identity plus document-generation checks discard stale results.
 
-The Windows implementation is locked to the published Seiza 0.18.8 C ABI,
-which supplies the path API and normalized-major-axis capability field. Seiza
-for Windows 0.7.1 ships this ABI and analysis workflow.
+The Windows implementation is locked to the published Seiza 0.18.14 C ABI.
+It retains the path API and normalized-major-axis capability field introduced
+before Seiza for Windows 0.7.1, and adds area-filtered bounded image renders.
 
 Windows explicitly requests the additive triangle contract with
 `"triangleAngleDegrees": 0` in its interactive star-detection options. Zero
