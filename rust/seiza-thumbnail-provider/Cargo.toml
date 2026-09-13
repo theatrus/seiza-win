@@ -12,6 +12,8 @@ crate-type = ["cdylib", "rlib"]
 quick-xml = "0.41.0"
 seiza-fits = "0.2.1"
 seiza-xisf = "0.2.0"
+
+[target.'cfg(windows)'.dependencies]
 windows = { version = "0.62.2", features = [
     "Win32_Foundation",
     "Win32_Graphics_Gdi",

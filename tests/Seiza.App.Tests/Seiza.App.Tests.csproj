@@ -28,6 +28,7 @@
 
   <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Models\FitsBackground.cs" Link="Models\FitsBackground.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ImageSampling.cs" Link="Models\ImageSampling.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\FitsStretch.cs" Link="Models\FitsStretch.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageStacking.cs" Link="Models\ImageStacking.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageStackSession.cs" Link="Models\ImageStackSession.cs" />

@@ -42,6 +42,40 @@ solving. Windows loads thumbnails through an isolated `dllhost.exe` and previews
 through the x64 low-integrity `prevhost.exe`; the MSI intentionally does not
 disable process isolation.
 
+## Display scaling
+
+The main viewer uses `HighQualityCubic` when reducing a bitmap and
+`NearestNeighbor` for source-resolution pixel inspection at 1:1 or larger.
+The choice uses actual bitmap dimensions and physical screen pixels, including
+the canvas DPI. Reduced stretch previews stay filtered even when enlarged.
+The live-stack pane also uses `HighQualityCubic`.
+
+Explorer thumbnails and the Preview Pane share an area-averaging reducer in
+the native provider. Every covered source pixel contributes, with weights for
+partial edges. It averages stretched display values without changing source
+data. Windows owns the thumbnail cache; existing cached icons may remain until
+Explorer requests a new thumbnail.
+
+The provider's Rust render tests run on macOS or Linux too. Only its COM and
+window code depend on Windows. WinUI builds and managed tests still run in
+Windows CI.
+
+### Scaling audit follow-ups
+
+- Update the locked crates.io core after
+  [seiza#177](https://github.com/theatrus/seiza/pull/177) ships. That change fixes
+  C ABI reductions for file renders, interactive linear samples, and live
+  stacks. The Explorer reducer does not use the C ABI and already has its own
+  fix here.
+- Replace the fixed 2048-pixel stretch-preview limit with a zoom- and DPI-aware
+  render plan, then follow a bounded preview with a full-size render after edits
+  settle. Filtering cannot recover detail absent from a small preview. Keep
+  cancellation and stale-result checks for both passes.
+- Check a real noise-rich FITS/XISF field at fit-to-window, 1:1, and high zoom
+  on 100%, 150%, and 200% displays. Move the window between displays and compare
+  live previews with committed renders. Automated tests cover sampling math,
+  but do not replace this GPU and monitor check.
+
 ## Locked decisions
 
 1. The supported first release is Windows 11 x64. ARM64 follows after parity.

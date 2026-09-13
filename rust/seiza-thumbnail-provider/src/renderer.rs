@@ -25,6 +25,7 @@ pub fn render_thumbnail(bytes: &[u8], max_dimension: u32) -> Result<RenderedThum
     render_image(&image, max_dimension, max_dimension)
 }
 
+#[cfg(any(windows, test))]
 pub(crate) fn render_preview(
     bytes: &[u8],
     max_width: u32,
@@ -140,12 +141,32 @@ fn sample_bgra(
     pixel: impl Fn(usize) -> [u8; 4],
 ) -> RenderedThumbnail {
     let mut bgra = Vec::with_capacity(output_width as usize * output_height as usize * 4);
+    let scale_x = f64::from(source_width) / f64::from(output_width);
+    let scale_y = f64::from(source_height) / f64::from(output_height);
     for y in 0..output_height {
-        let source_y = u64::from(y) * u64::from(source_height) / u64::from(output_height);
+        let top = f64::from(y) * scale_y;
+        let bottom = (f64::from(y + 1) * scale_y).min(f64::from(source_height));
         for x in 0..output_width {
-            let source_x = u64::from(x) * u64::from(source_width) / u64::from(output_width);
-            let source_index = (source_y * u64::from(source_width) + source_x) as usize;
-            bgra.extend_from_slice(&pixel(source_index));
+            let left = f64::from(x) * scale_x;
+            let right = (f64::from(x + 1) * scale_x).min(f64::from(source_width));
+            let mut sum = [0.0; 3];
+            // Average the whole footprint, including partial edge pixels.
+            // Point sampling loses stars and leaves noise at full strength.
+            for source_y in top.floor() as u32..bottom.ceil() as u32 {
+                let wy = bottom.min(f64::from(source_y + 1)) - top.max(f64::from(source_y));
+                for source_x in left.floor() as u32..right.ceil() as u32 {
+                    let wx = right.min(f64::from(source_x + 1)) - left.max(f64::from(source_x));
+                    let source_index =
+                        source_y as usize * source_width as usize + source_x as usize;
+                    let sample = pixel(source_index);
+                    for channel in 0..3 {
+                        sum[channel] += f64::from(sample[channel]) * wx * wy;
+                    }
+                }
+            }
+            let area = (right - left) * (bottom - top);
+            bgra.extend(sum.map(|value| (value / area).round() as u8));
+            bgra.push(u8::MAX);
         }
     }
 
@@ -158,7 +179,7 @@ fn sample_bgra(
 
 #[cfg(test)]
 mod tests {
-    use super::{fitted_dimensions, render_preview, render_thumbnail};
+    use super::{fitted_dimensions, render_preview, render_thumbnail, sample_bgra};
     use crate::{test_fits, test_xisf};
 
     #[test]
@@ -198,5 +219,38 @@ mod tests {
     fn preview_fits_rectangular_bounds() {
         let preview = render_preview(&test_fits(400, 200), 160, 120).expect("render preview");
         assert_eq!((preview.width, preview.height), (160, 80));
+    }
+
+    #[test]
+    fn reduced_checkerboard_has_no_point_sampling_alias() {
+        let thumbnail = sample_bgra(8, 8, 2, 2, |index| {
+            let value = if (index / 8 + index % 8) % 2 == 0 {
+                0
+            } else {
+                255
+            };
+            [value, value, value, 255]
+        });
+        assert_eq!(thumbnail.bgra, [128, 128, 128, 255].repeat(4));
+    }
+
+    #[test]
+    fn fractional_reduction_preserves_channels_and_edge_contributions() {
+        let thumbnail = sample_bgra(5, 1, 2, 1, |index| {
+            [
+                if index == 0 { 100 } else { 0 },
+                50,
+                if index == 2 { 200 } else { 0 },
+                255,
+            ]
+        });
+        assert_eq!(thumbnail.bgra, [40, 50, 40, 255, 0, 50, 40, 255]);
+    }
+
+    #[test]
+    fn native_size_keeps_exact_samples() {
+        let thumbnail = sample_bgra(3, 2, 3, 2, |index| [index as u8, 37, 99, 255]);
+        let expected: Vec<_> = (0..6).flat_map(|index| [index, 37, 99, 255]).collect();
+        assert_eq!(thumbnail.bgra, expected);
     }
 }

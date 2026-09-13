@@ -1277,7 +1277,10 @@ public sealed partial class MainPage : Page, IDisposable
             _offset.Y,
             _sourceWidth * _scale,
             _sourceHeight * _scale);
-        CanvasImageInterpolation interpolation = _scale < 1.0f
+        CanvasImageInterpolation interpolation = ImageSampling.NeedsFiltering(
+            _bitmap.SizeInPixels.Width, _bitmap.SizeInPixels.Height,
+            _sourceWidth, _sourceHeight,
+            destination.Width, destination.Height, sender.Dpi / 96.0)
             ? CanvasImageInterpolation.HighQualityCubic
             : CanvasImageInterpolation.NearestNeighbor;
         args.DrawingSession.DrawImage(
