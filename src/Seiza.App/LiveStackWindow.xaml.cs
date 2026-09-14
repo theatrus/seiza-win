@@ -847,7 +847,10 @@ public sealed partial class LiveStackWindow : Window, IDisposable
         float y = ((float)sender.ActualHeight - height) / 2;
         args.DrawingSession.DrawImage(
             _previewBitmap,
-            new Windows.Foundation.Rect(x, y, width, height));
+            new Windows.Foundation.Rect(x, y, width, height),
+            _previewBitmap.Bounds,
+            1.0f,
+            CanvasImageInterpolation.HighQualityCubic);
     }
 
     private async void Pause_Click(object sender, RoutedEventArgs e)

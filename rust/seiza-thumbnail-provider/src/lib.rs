@@ -3,6 +3,7 @@
 #[cfg(windows)]
 mod com_server;
 mod limits;
+#[cfg(windows)]
 mod preview;
 mod renderer;
 
