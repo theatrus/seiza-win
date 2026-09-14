@@ -7,7 +7,7 @@
     <PublishDirectory>$(RepoRoot)artifacts\publish\win-x64\</PublishDirectory>
     <ExpectedPublishDirectory>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\artifacts\publish\win-x64\'))</ExpectedPublishDirectory>
     <ResolvedPublishDirectory>$([System.IO.Path]::GetFullPath('$(PublishDirectory)'))</ResolvedPublishDirectory>
-    <SeizaVersion Condition="'$(SeizaVersion)' == ''">0.7.1</SeizaVersion>
+    <SeizaVersion Condition="'$(SeizaVersion)' == ''">0.7.2</SeizaVersion>
     <OutputName>seiza-$(SeizaVersion)-windows-x86_64</OutputName>
     <OutputPath>$(RepoRoot)dist\</OutputPath>
     <IntermediateOutputPath>$(RepoRoot)artifacts\wix\</IntermediateOutputPath>
