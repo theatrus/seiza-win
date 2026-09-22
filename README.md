@@ -9,7 +9,8 @@ core.
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
-[Seiza for Mac](https://github.com/theatrus/seiza-mac)
+[Seiza for Mac](https://github.com/theatrus/seiza-mac) ·
+[FITS and XISF for Photoshop](https://github.com/theatrus/xisf-photoshop)
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
@@ -246,6 +247,27 @@ System requirements are Windows 11 24H2 or newer on an x64 computer. The MSI
 and bundled first-party binaries are Authenticode signed by StackFoundry LLC.
 The in-app updater also uses independent Ed25519 signatures to verify its feed
 and MSI download.
+
+## Open FITS and XISF in Photoshop
+
+The separate [FITS and XISF Photoshop plugins](https://github.com/theatrus/xisf-photoshop)
+let you open and save astronomy images directly in Photoshop using Seiza's codecs.
+Import as Float32 or rescaled 16-bit integer, optionally debayer Bayer mosaics to
+RGB, and save at the document's 16- or 32-bit depth by default.
+
+Download the **Windows x64 installer** from the
+[latest release](https://github.com/theatrus/xisf-photoshop/releases/latest).
+Close Photoshop, run setup, approve the administrator prompt, and restart
+Photoshop. Setup installs both formats in Adobe's shared plugin folder, handles
+updates and detected older manual copies, and supports uninstall through Windows
+Settings while preserving preferences. The installer is currently unsigned;
+Windows may show an unknown-publisher or SmartScreen prompt. A plugin ZIP is
+also available for manual installation.
+
+Configure defaults under **Help → About Plug-In → FITS/XISF**. Keep your original
+FITS/XISF files: 16-bit import rescales the image and loses absolute scale and
+precision, and plugin saves flatten pixels and omit source metadata. Use PSD/PSB
+to retain Photoshop layers.
 
 ## Build and test
 
