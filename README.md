@@ -260,14 +260,17 @@ Download the **Windows x64 installer** from the
 Close Photoshop, run setup, approve the administrator prompt, and restart
 Photoshop. Setup installs both formats in Adobe's shared plugin folder, handles
 updates and detected older manual copies, and supports uninstall through Windows
-Settings while preserving preferences. The installer is currently unsigned;
-Windows may show an unknown-publisher or SmartScreen prompt. A plugin ZIP is
-also available for manual installation.
+Settings while preserving preferences. Starting with 0.5.0, the installer and
+plugins are Authenticode signed by StackFoundry LLC. A plugin ZIP is also
+available for manual installation.
 
-Configure defaults under **Help → About Plug-In → FITS/XISF**. Keep your original
+Configure defaults under **Help → About Plug-In → FITS/XISF**. Starting with
+plugin 0.5.0, same-format saves retain source headers and metadata; switching
+formats copies compatible FITS keywords on a best-effort basis. Keep your original
 FITS/XISF files: 16-bit import rescales the image and loses absolute scale and
-precision, and plugin saves flatten pixels and omit source metadata. Use PSD/PSB
-to retain Photoshop layers.
+precision. Re-solve astrometry after geometric edits, and use PSD/PSB to retain
+Photoshop layers. See the
+[metadata retention limits](https://github.com/theatrus/xisf-photoshop#metadata-retention).
 
 ## Build and test
 
