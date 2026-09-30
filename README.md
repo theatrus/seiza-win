@@ -5,7 +5,7 @@ It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
 core.
 
-[Download Seiza for Windows 0.7.2 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.2/seiza-0.7.2-windows-x86_64.msi)
+[Download Seiza for Windows 0.7.3 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.3/seiza-0.7.3-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -14,16 +14,30 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza for Windows 0.7.2
+## Seiza for Windows 0.7.3
 
-This point release reduces graininess when you view images at a small size.
+This point release opens more XISF files, in the app and in Explorer. It moves
+to the published Seiza 0.18.16 core, whose XISF reader follows the XISF 1.0
+Revision 1 specification.
+
+- Open XISF images whose pixels PixInsight stores inside the file header, as
+  it does for small images, and images stored pixel by pixel.
+- Open compressed XISF data split into subblocks, including subblocks
+  PixInsight stores uncompressed.
+- Show CIELab XISF images in color, converted to RGB.
+- Open a file's main image even when another image in it uses a format Seiza
+  cannot read.
+- Explorer thumbnails and Preview Pane images use the same reader.
+
+## Smoother image previews
+
+Seiza for Windows 0.7.2 reduced graininess when you view images at a small size.
 
 - Average source pixels when building smaller previews, including Explorer
   thumbnails and Preview Pane images, instead of picking isolated pixels.
 - Filter scaled images in the viewer and live-stack window. The viewer accounts
   for display DPI and the preview bitmap's size, and keeps nearest-neighbor
   sampling for native-resolution pixels at 1:1 and above.
-- Bundle the published Seiza 0.18.14 core, matching Seiza for Mac 0.7.2.
 
 These changes affect display sampling, not the source image or stretch settings.
 
@@ -230,8 +244,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.7.2 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.2/seiza-0.7.2-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.2/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.7.3 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.3/seiza-0.7.3-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.3/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -292,7 +306,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.2
+  -p:SeizaVersion=0.7.3
 ```
 
 The installer is written to `dist`. See the
