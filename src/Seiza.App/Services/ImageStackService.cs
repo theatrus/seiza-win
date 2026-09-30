@@ -154,29 +154,114 @@ internal static class ImageStackService
             cancellationToken).ConfigureAwait(false);
         snrWarning ??= finalMeasurementWarning;
 
-        progress?.Invoke(new ImageStackProgress(
-            ImageStackProgressPhase.Writing,
-            $"Writing {Path.GetFileName(request.OutputPath)}…",
-            request.Inputs.Count,
-            request.Inputs.Count,
-            counts.AcceptedFrames,
-            counts.RejectedFrames + failedFrames));
+        int rejectedFrames = counts.RejectedFrames + failedFrames;
+        ImageStackSnapshot? cleaned = null;
+        try
+        {
+            string? transientNote = null;
+            if (request.Options.RemoveTransients)
+            {
+                (cleaned, transientNote) = await TryRemoveTransientsAsync(
+                    session,
+                    request,
+                    progress,
+                    counts.AcceptedFrames,
+                    rejectedFrames,
+                    cancellationToken).ConfigureAwait(false);
+            }
 
-        await using ImageStackSnapshot snapshot = await session.FinishAsync(cancellationToken)
-            .ConfigureAwait(false);
-        await snapshot.WriteFitsAsync(request.OutputPath, cancellationToken).ConfigureAwait(false);
+            progress?.Invoke(new ImageStackProgress(
+                ImageStackProgressPhase.Writing,
+                $"Writing {Path.GetFileName(request.OutputPath)}…",
+                request.Inputs.Count,
+                request.Inputs.Count,
+                counts.AcceptedFrames,
+                rejectedFrames));
 
-        return new ImageStackResult(
-            request.OutputPath,
-            snapshot.AcceptedFrames,
-            snapshot.RejectedFrames + failedFrames,
-            dispositions,
-            StackSnrAnalyzer.Analyze(snrSamples.Select(sample => new StackSnrMeasurement(
-                sample.Frames,
-                sample.Noise,
-                sample.Background,
-                sample.Signal))),
-            snrWarning);
+            // With a cleaned snapshot the live stacker is no longer needed;
+            // disposing the session frees it without finalizing.
+            ImageStackSnapshot? finished = cleaned is null
+                ? await session.FinishAsync(cancellationToken).ConfigureAwait(false)
+                : null;
+            await using (finished)
+            {
+                ImageStackSnapshot output = cleaned ?? finished!;
+                await output.WriteFitsAsync(request.OutputPath, cancellationToken)
+                    .ConfigureAwait(false);
+
+                return new ImageStackResult(
+                    request.OutputPath,
+                    output.AcceptedFrames,
+                    output.RejectedFrames + failedFrames,
+                    dispositions,
+                    StackSnrAnalyzer.Analyze(snrSamples.Select(sample => new StackSnrMeasurement(
+                        sample.Frames,
+                        sample.Noise,
+                        sample.Background,
+                        sample.Signal))),
+                    snrWarning,
+                    transientNote);
+            }
+        }
+        finally
+        {
+            if (cleaned is not null)
+            {
+                await cleaned.DisposeAsync().ConfigureAwait(false);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Integrates the accepted frames again with leave-one-out rejection.
+    /// Returns the cleaned snapshot, or a note saying why the step did not
+    /// run. Cancellation propagates; any other failure becomes a note so the
+    /// ordinary stack is still written.
+    /// </summary>
+    private static async Task<(ImageStackSnapshot? Snapshot, string? Note)> TryRemoveTransientsAsync(
+        ImageStackSession session,
+        ImageStackRequest request,
+        Action<ImageStackProgress>? progress,
+        int acceptedFrames,
+        int rejectedFrames,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            LiveStackNativeState state = await session.GetStateAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (state.ReintegrationUnavailable is string reason)
+            {
+                return (null, ImageStackTransientRemoval.NotRemovedNote(reason));
+            }
+
+            void Report(ImageStackReintegrationProgress update) =>
+                progress?.Invoke(new ImageStackProgress(
+                    ImageStackProgressPhase.RemovingTransients,
+                    ImageStackTransientRemoval.Message(update),
+                    request.Inputs.Count,
+                    request.Inputs.Count,
+                    acceptedFrames,
+                    rejectedFrames,
+                    ImageStackTransientRemoval.Fraction(update)));
+
+            Report(new ImageStackReintegrationProgress(0, 0, acceptedFrames));
+            ImageStackSnapshot snapshot = await session.ReintegrateAsync(
+                request.Options.TransientLowSigma,
+                request.Options.TransientHighSigma,
+                new InlineProgress<ImageStackReintegrationProgress>(Report),
+                cancellationToken).ConfigureAwait(false);
+            return (snapshot, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return (null, ImageStackTransientRemoval.NotRemovedNote(exception.Message));
+        }
     }
 
     private static async Task<string?> TryMeasureSnrAsync(

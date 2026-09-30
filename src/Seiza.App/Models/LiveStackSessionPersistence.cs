@@ -175,6 +175,12 @@ internal sealed record LiveStackNativeState
     /// Null only for contexts written before this additive live-state field.
     /// </summary>
     public CalibrationFrameProbe? ReferenceFrame { get; init; }
+    /// <summary>
+    /// Why the native core cannot integrate this stack again to remove
+    /// transients, or null when it can. Advisory only: it takes no part in
+    /// checkpoint identity or validation.
+    /// </summary>
+    public string? ReintegrationUnavailable { get; init; }
 
     public bool DescribesSameCheckpoint(LiveStackNativeState other)
     {

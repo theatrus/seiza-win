@@ -59,6 +59,7 @@
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackExportSnapshot.cs" Link="Services\ImageStackExportSnapshot.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackSession.cs" Link="Services\ImageStackSession.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackSnapshot.cs" Link="Services\ImageStackSnapshot.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\InlineProgress.cs" Link="Services\InlineProgress.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\LiveStackCoordinator.cs" Link="Services\LiveStackCoordinator.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\LiveStackSessionStore.cs" Link="Services\LiveStackSessionStore.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\LiveStackSessionPaths.cs" Link="Services\LiveStackSessionPaths.cs" />

@@ -287,6 +287,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
         MaximumDriftPixels = FiniteValue(DriftPixelsBox, 256),
         MaximumDriftFraction = FiniteValue(DriftFractionBox, 0.15),
         MinimumOverlap = FiniteValue(MinimumOverlapBox, 0.60),
+        RemoveTransients = RemoveTransientsToggle.IsOn,
     };
 
     private ImageStackCalibration CreateSelectedCalibration()
@@ -958,6 +959,10 @@ public sealed partial class LiveStackWindow : Window, IDisposable
             LiveStackExportResult result = await _coordinator.FinishAsync(output.Path);
             wroteOutput = true;
             await StopCoordinatorAsync(save: false);
+            if (result.TransientRemovalNote is not null && !_closed)
+            {
+                await ShowTransientRemovalNoteAsync(result.TransientRemovalNote);
+            }
             _completion.TrySetResult(result.OutputPath);
             _allowClose = true;
             Close();
@@ -972,6 +977,34 @@ public sealed partial class LiveStackWindow : Window, IDisposable
             if (!wroteOutput)
             {
                 CleanupPlaceholderOutput(output);
+            }
+        }
+    }
+
+    private async Task ShowTransientRemovalNoteAsync(string note)
+    {
+        var dialog = new ContentDialog
+        {
+            XamlRoot = Content.XamlRoot,
+            Title = "Stack saved",
+            Content = new TextBlock
+            {
+                Text = note,
+                TextWrapping = TextWrapping.Wrap,
+            },
+            CloseButtonText = "OK",
+            DefaultButton = ContentDialogButton.Close,
+        };
+        _activeDialog = dialog;
+        try
+        {
+            await dialog.ShowAsync();
+        }
+        finally
+        {
+            if (ReferenceEquals(_activeDialog, dialog))
+            {
+                _activeDialog = null;
             }
         }
     }

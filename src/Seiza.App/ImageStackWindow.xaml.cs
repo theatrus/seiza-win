@@ -300,6 +300,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         MaximumDriftPixels = DriftPixelsBox.Value,
         MaximumDriftFraction = DriftFractionBox.Value,
         MinimumOverlap = MinimumOverlapBox.Value,
+        RemoveTransients = RemoveTransientsToggle.IsOn,
     };
 
     private static string? SelectedTag(ComboBox picker) =>

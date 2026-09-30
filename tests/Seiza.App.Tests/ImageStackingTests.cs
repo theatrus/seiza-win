@@ -277,4 +277,86 @@ public sealed class ImageStackingTests
         Directory.CreateDirectory(path);
         return path;
     }
+
+    [Fact]
+    public void TransientRemovalStaysOutOfTheNativeOptions()
+    {
+        var enabled = new ImageStackOptions { RemoveTransients = true };
+        var disabled = new ImageStackOptions { RemoveTransients = false };
+
+        string json = enabled.ToJson();
+
+        Assert.Equal(json, disabled.ToJson());
+        Assert.DoesNotContain("transient", json, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("reintegrat", json, StringComparison.OrdinalIgnoreCase);
+        Assert.True(new ImageStackOptions().RemoveTransients);
+    }
+
+    [Fact]
+    public void TransientRemovalUsesDeltaSigmaThresholdsOrTheNativeDefault()
+    {
+        var deltaSigma = new ImageStackOptions
+        {
+            Rejection = StackRejectionMode.DeltaSigma,
+            SigmaLow = 2.5,
+            SigmaHigh = 4,
+        };
+        var none = new ImageStackOptions
+        {
+            Rejection = StackRejectionMode.None,
+            SigmaLow = 2.5,
+            SigmaHigh = 4,
+        };
+
+        Assert.Equal(2.5f, deltaSigma.TransientLowSigma);
+        Assert.Equal(4f, deltaSigma.TransientHighSigma);
+        Assert.Equal(0f, none.TransientLowSigma);
+        Assert.Equal(0f, none.TransientHighSigma);
+    }
+
+    [Theory]
+    [InlineData(0, 0, 40, "Removing transients: pass 1 of 2, frame 1 of 40", 0.0)]
+    [InlineData(0, 20, 40, "Removing transients: pass 1 of 2, frame 21 of 40", 0.25)]
+    [InlineData(1, 2, 40, "Removing transients: pass 2 of 2, frame 3 of 40", 0.525)]
+    [InlineData(1, 39, 40, "Removing transients: pass 2 of 2, frame 40 of 40", 0.9875)]
+    [InlineData(0, 0, 0, "Removing transients: pass 1 of 2", 0.0)]
+    public void TransientRemovalProgressDescribesPassAndFrame(
+        int pass,
+        int index,
+        int count,
+        string message,
+        double fraction)
+    {
+        var progress = new ImageStackReintegrationProgress(pass, index, count);
+
+        Assert.Equal(message, ImageStackTransientRemoval.Message(progress));
+        Assert.Equal(fraction, ImageStackTransientRemoval.Fraction(progress), 6);
+    }
+
+    [Fact]
+    public void PhaseFractionOverridesFrameCountsInProgress()
+    {
+        var stacking = new ImageStackProgress(
+            ImageStackProgressPhase.Stacking, "frame", 5, 10, 5, 0);
+        ImageStackProgress removing = stacking with
+        {
+            Phase = ImageStackProgressPhase.RemovingTransients,
+            CompletedFrames = 10,
+            PhaseFraction = 0.25,
+        };
+
+        Assert.Equal(0.5, stacking.FractionCompleted, 6);
+        Assert.Equal(0.25, removing.FractionCompleted, 6);
+        Assert.Equal(0.0, (removing with { PhaseFraction = double.NaN }).FractionCompleted);
+    }
+
+    [Fact]
+    public void TransientRemovalNoteKeepsTheNativeReason()
+    {
+        string note = ImageStackTransientRemoval.NotRemovedNote(
+            " the checkpoint was saved by an older Seiza ");
+
+        Assert.StartsWith("Transients were not removed", note, StringComparison.Ordinal);
+        Assert.EndsWith("the checkpoint was saved by an older Seiza", note, StringComparison.Ordinal);
+    }
 }
