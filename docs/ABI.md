@@ -70,7 +70,7 @@ are globally serialized. Canceling or navigating away abandons only the UI
 wait; the synchronous native allocation is allowed to finish and free safely,
 and source-identity plus document-generation checks discard stale results.
 
-The Windows implementation is locked to the published Seiza 0.18.15 C ABI.
+The Windows implementation is locked to the published Seiza 0.18.16 C ABI.
 It retains the path API and normalized-major-axis capability field introduced
 before Seiza for Windows 0.7.1, and adds area-filtered bounded image renders.
 

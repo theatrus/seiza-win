@@ -62,7 +62,7 @@ Windows CI.
 
 ### Scaling audit follow-ups
 
-- The locked crates.io `seiza-cabi` 0.18.15 includes
+- The locked crates.io `seiza-cabi` 0.18.16 includes
   [seiza#177](https://github.com/theatrus/seiza/pull/177), which fixes C ABI
   reductions for file renders, interactive linear samples, and live stacks.
   The Explorer reducer does not use the C ABI and has its own area filter.

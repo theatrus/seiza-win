@@ -10,7 +10,7 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 quick-xml = "0.41.0"
-seiza-fits = "0.2.1"
+seiza-fits = "0.2.2"
 seiza-xisf = "0.3.0"
 
 [target.'cfg(windows)'.dependencies]
