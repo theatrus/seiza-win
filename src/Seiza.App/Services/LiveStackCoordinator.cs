@@ -10,6 +10,7 @@ namespace Seiza.App.Services;
 internal sealed class LiveStackCoordinator : IAsyncDisposable
 {
     private const int MaximumAttentionItems = 50;
+    private static readonly TimeSpan TransientProgressInterval = TimeSpan.FromMilliseconds(500);
     private readonly LiveStackRunConfiguration _configuration;
     private readonly string _optionsJson;
     private readonly TimeProvider _timeProvider;
@@ -522,6 +523,7 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
 
             await StopIngestionCoreAsync().ConfigureAwait(false);
             await _operationGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+            ImageStackSnapshot? cleaned = null;
             try
             {
                 ImageStackSession session = RequireSession();
@@ -546,6 +548,17 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
                 }
 
                 cancellationToken.ThrowIfCancellationRequested();
+                string? transientNote = null;
+                if (_configuration.Options.RemoveTransients)
+                {
+                    // The live handle must still exist: reintegration reads
+                    // the stacker, and finalizing below consumes it.
+                    (cleaned, transientNote) = await TryRemoveTransientsAsync(
+                        session,
+                        cancellationToken).ConfigureAwait(false);
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
                 SetState(LiveStackRunState.Finishing, "Finalizing the live stack…");
                 ImageStackSnapshot snapshot;
                 try
@@ -565,7 +578,8 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
 
                 await using (snapshot)
                 {
-                    await snapshot.WriteFitsAsync(fullOutputPath, cancellationToken)
+                    ImageStackSnapshot output = cleaned ?? snapshot;
+                    await output.WriteFitsAsync(fullOutputPath, cancellationToken)
                         .ConfigureAwait(false);
                     _monitor.SeedProcessedPaths([fullOutputPath]);
                     lock (_stateSync)
@@ -579,11 +593,14 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
                         .ConfigureAwait(false);
                     var result = new LiveStackExportResult(
                         fullOutputPath,
-                        snapshot.AcceptedFrames,
-                        _rejectedFrames);
+                        output.AcceptedFrames,
+                        _rejectedFrames,
+                        transientNote);
+                    string saved =
+                        $"Saved the completed stack to {Path.GetFileName(fullOutputPath)}.";
                     SetState(
                         LiveStackRunState.Completed,
-                        $"Saved the completed stack to {Path.GetFileName(fullOutputPath)}.");
+                        transientNote is null ? saved : $"{saved} {transientNote}");
                     return result;
                 }
             }
@@ -611,12 +628,73 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
             }
             finally
             {
+                if (cleaned is not null)
+                {
+                    await cleaned.DisposeAsync().ConfigureAwait(false);
+                }
                 _operationGate.Release();
             }
         }
         finally
         {
             _lifecycleGate.Release();
+        }
+    }
+
+    /// <summary>
+    /// Integrates the accepted frames again with leave-one-out rejection
+    /// while the live handle still exists. Returns the cleaned snapshot, or a
+    /// note saying why the step did not run. Cancellation propagates; any
+    /// other failure becomes a note so the ordinary stack is still saved.
+    /// </summary>
+    private async Task<(ImageStackSnapshot? Snapshot, string? Note)> TryRemoveTransientsAsync(
+        ImageStackSession session,
+        CancellationToken cancellationToken)
+    {
+        try
+        {
+            LiveStackNativeState state = await session.GetStateAsync(cancellationToken)
+                .ConfigureAwait(false);
+            if (state.ReintegrationUnavailable is string reason)
+            {
+                return (null, ImageStackTransientRemoval.NotRemovedNote(reason));
+            }
+
+            SetState(LiveStackRunState.Finishing, "Removing transients…");
+            int lastPass = -1;
+            long lastReport = 0;
+            var progress = new InlineProgress<ImageStackReintegrationProgress>(update =>
+            {
+                // Called on the native worker thread before every frame read.
+                long now = _timeProvider.GetTimestamp();
+                if (update.Pass == lastPass &&
+                    _timeProvider.GetElapsedTime(lastReport, now) < TransientProgressInterval)
+                {
+                    return;
+                }
+                lastPass = update.Pass;
+                lastReport = now;
+                SetState(
+                    LiveStackRunState.Finishing,
+                    $"{ImageStackTransientRemoval.Message(update)}…");
+            });
+            ImageStackSnapshot snapshot = await session.ReintegrateAsync(
+                _configuration.Options.TransientLowSigma,
+                _configuration.Options.TransientHighSigma,
+                progress,
+                cancellationToken).ConfigureAwait(false);
+            return (snapshot, null);
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            string note = ImageStackTransientRemoval.NotRemovedNote(exception.Message);
+            AddAttention(note);
+            return (null, note);
         }
     }
 
@@ -2010,6 +2088,7 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
         MaximumDriftPixels = source.MaximumDriftPixels,
         MaximumDriftFraction = source.MaximumDriftFraction,
         MinimumOverlap = source.MinimumOverlap,
+        RemoveTransients = source.RemoveTransients,
     };
 
     private static ImageStackCalibration CloneCalibration(ImageStackCalibration source) => new()

@@ -228,6 +228,16 @@ internal static partial class NativeMethods
         uint maxDimension,
         out nint error);
 
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_reintegrate")]
+    internal static unsafe partial nint ReintegrateLiveStacker(
+        nint stacker,
+        float lowSigma,
+        float highSigma,
+        nint cancelSignal,
+        delegate* unmanaged[Cdecl]<uint, nuint, nuint, nint, void> progress,
+        nint context,
+        out nint error);
+
     [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_finish")]
     internal static partial nint FinishLiveStacker(ref nint stacker, out nint error);
 

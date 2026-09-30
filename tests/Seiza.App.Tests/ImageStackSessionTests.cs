@@ -133,4 +133,76 @@ public sealed class ImageStackSessionTests
         Assert.Equal(3, state.AcceptedFrames);
         Assert.Equal(1, state.RejectedFrames);
     }
+
+    [Fact]
+    public void NativeStateReportsWhyReintegrationIsUnavailable()
+    {
+        const string json = """
+            {
+              "schemaVersion": 1,
+              "coreVersion": "0.18.18",
+              "configurationFingerprint": "0123456789abcdef",
+              "width": 6248,
+              "height": 4176,
+              "channels": 1,
+              "acceptedFrames": 3,
+              "rejectedFrames": 0,
+              "inputMode": "calibrate-and-prepare",
+              "inputPaths": ["reference.fits", "second.fits", "third.fits"],
+              "reintegrationUnavailable": "the checkpoint was saved by an older Seiza"
+            }
+            """;
+
+        LiveStackNativeState state = JsonSerializer.Deserialize(
+            json,
+            SeizaJsonSerializerContext.Default.LiveStackNativeState)!;
+
+        Assert.Equal(
+            "the checkpoint was saved by an older Seiza",
+            state.ReintegrationUnavailable);
+    }
+
+    [Fact]
+    public void NativeStateTreatsMissingOrNullReintegrationReasonAsReplayable()
+    {
+        const string withNull = """
+            {"schemaVersion": 1, "acceptedFrames": 2, "reintegrationUnavailable": null}
+            """;
+        const string without = """
+            {"schemaVersion": 1, "acceptedFrames": 2}
+            """;
+
+        LiveStackNativeState explicitNull = JsonSerializer.Deserialize(
+            withNull,
+            SeizaJsonSerializerContext.Default.LiveStackNativeState)!;
+        LiveStackNativeState missing = JsonSerializer.Deserialize(
+            without,
+            SeizaJsonSerializerContext.Default.LiveStackNativeState)!;
+
+        Assert.Null(explicitNull.ReintegrationUnavailable);
+        Assert.Null(missing.ReintegrationUnavailable);
+    }
+
+    [Fact]
+    public void ReintegrationReasonDoesNotChangeCheckpointIdentity()
+    {
+        var replayable = new LiveStackNativeState
+        {
+            CoreVersion = "0.18.18",
+            Width = 100,
+            Height = 80,
+            Channels = 1,
+            AcceptedFrames = 4,
+            InputMode = "calibrate-and-prepare",
+            ConfigurationFingerprint = new string('a', 64),
+            InputPaths = ["a.fits", "b.fits", "c.fits", "d.fits"],
+        };
+        LiveStackNativeState unavailable = replayable with
+        {
+            ReintegrationUnavailable = "frames were supplied as pixels",
+        };
+
+        Assert.True(replayable.DescribesSameCheckpoint(unavailable));
+        Assert.True(unavailable.DescribesSameCheckpoint(replayable));
+    }
 }

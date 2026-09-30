@@ -30,6 +30,25 @@ internal sealed class ImageStackOptions
     public double MaximumDriftFraction { get; set; } = 0.15;
     public double MinimumOverlap { get; set; } = 0.60;
 
+    /// <summary>
+    /// Integrate every accepted frame again after stacking, with
+    /// leave-one-out rejection, to remove trails that live rejection kept.
+    /// This is an app-side step: it is deliberately left out of
+    /// <see cref="ToJson"/>, so it never changes the native options or the
+    /// checkpoint compatibility that compares them.
+    /// </summary>
+    public bool RemoveTransients { get; set; } = true;
+
+    /// <summary>The low sigma for transient removal; zero selects the native default.</summary>
+    public float TransientLowSigma => Rejection == StackRejectionMode.DeltaSigma
+        ? (float)SigmaLow
+        : 0f;
+
+    /// <summary>The high sigma for transient removal; zero selects the native default.</summary>
+    public float TransientHighSigma => Rejection == StackRejectionMode.DeltaSigma
+        ? (float)SigmaHigh
+        : 0f;
+
     public string? ValidationMessage
     {
         get
@@ -416,29 +435,89 @@ internal enum ImageStackProgressPhase
 {
     Preparing,
     Stacking,
+    RemovingTransients,
     Writing,
 }
 
+/// <summary>
+/// One stacking progress report. <c>PhaseFraction</c> is progress through the
+/// current phase when it is not measured in stacked frames, such as transient
+/// removal; null uses the frame counts.
+/// </summary>
 internal sealed record ImageStackProgress(
     ImageStackProgressPhase Phase,
     string Message,
     int CompletedFrames,
     int TotalFrames,
     int AcceptedFrames,
-    int RejectedFrames)
+    int RejectedFrames,
+    double? PhaseFraction = null)
 {
-    public double FractionCompleted => TotalFrames <= 0
-        ? 0
-        : Math.Clamp((double)CompletedFrames / TotalFrames, 0, 1);
+    public double FractionCompleted => PhaseFraction is double fraction
+        ? double.IsFinite(fraction) ? Math.Clamp(fraction, 0, 1) : 0
+        : TotalFrames <= 0
+            ? 0
+            : Math.Clamp((double)CompletedFrames / TotalFrames, 0, 1);
 }
 
+/// <summary>
+/// One native transient-removal progress report: the pass (0 while
+/// estimating, 1 while integrating), the zero-based frame about to be read,
+/// and the number of accepted frames.
+/// </summary>
+internal readonly record struct ImageStackReintegrationProgress(
+    int Pass,
+    int Index,
+    int Count);
+
+internal static class ImageStackTransientRemoval
+{
+    public const int PassCount = 2;
+
+    public static string Message(ImageStackReintegrationProgress progress)
+    {
+        int pass = Math.Clamp(progress.Pass, 0, PassCount - 1) + 1;
+        if (progress.Count <= 0)
+        {
+            return $"Removing transients: pass {pass} of {PassCount}";
+        }
+        int frame = Math.Clamp(progress.Index, 0, progress.Count - 1) + 1;
+        return $"Removing transients: pass {pass} of {PassCount}, " +
+            $"frame {frame} of {progress.Count}";
+    }
+
+    public static double Fraction(ImageStackReintegrationProgress progress)
+    {
+        if (progress.Count <= 0)
+        {
+            return 0;
+        }
+        int pass = Math.Clamp(progress.Pass, 0, PassCount - 1);
+        int index = Math.Clamp(progress.Index, 0, progress.Count);
+        return Math.Clamp(
+            ((double)pass * progress.Count + index) / ((double)PassCount * progress.Count),
+            0,
+            1);
+    }
+
+    public static string NotRemovedNote(string reason) =>
+        string.IsNullOrWhiteSpace(reason)
+            ? "Transients were not removed; the stack was saved without that step."
+            : $"Transients were not removed; the stack was saved without that step. {reason.Trim()}";
+}
+
+/// <summary>
+/// One written stack. <c>TransientRemovalNote</c> says why the optional
+/// transient-removal step did not run, or is null when it ran or was off.
+/// </summary>
 internal sealed record ImageStackResult(
     string OutputPath,
     int AcceptedFrames,
     int RejectedFrames,
     IReadOnlyList<ImageStackDisposition> Dispositions,
     StackSnrAnalysis SnrAnalysis,
-    string? SnrWarning);
+    string? SnrWarning,
+    string? TransientRemovalNote = null);
 
 internal sealed record ImageStackBatchResult(IReadOnlyList<ImageStackResult> Results)
 {

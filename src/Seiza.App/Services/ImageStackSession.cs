@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using Seiza.App.Interop;
@@ -249,6 +250,57 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
     public Task<ImageStackExportSnapshot> ExportSnapshotAsync(
         CancellationToken cancellationToken = default) =>
         RunAsync(CreateExportSnapshot, cancellationToken);
+
+    /// <summary>
+    /// Integrates every accepted frame again from its source file with
+    /// leave-one-out rejection and returns the result as a new snapshot.
+    /// The live stacker is unchanged, so this must run before
+    /// <see cref="FinishAsync"/>. A sigma of zero selects the native default.
+    /// </summary>
+    /// <remarks>
+    /// <paramref name="progress"/> is reported synchronously on the worker
+    /// thread before each frame is read.
+    /// </remarks>
+    public async Task<ImageStackSnapshot> ReintegrateAsync(
+        float lowSigma,
+        float highSigma,
+        IProgress<ImageStackReintegrationProgress>? progress,
+        CancellationToken cancellationToken = default)
+    {
+        if (!float.IsFinite(lowSigma) || lowSigma < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(lowSigma),
+                "The low sigma must be finite and non-negative.");
+        }
+        if (!float.IsFinite(highSigma) || highSigma < 0)
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(highSigma),
+                "The high sigma must be finite and non-negative.");
+        }
+
+        nint rawSignal = NativeMethods.CreateCancelSignal();
+        if (rawSignal == 0)
+        {
+            throw new SeizaCoreException(
+                "The Seiza core could not create a cancellation signal.");
+        }
+        using var signal = new SafeCancelSignalHandle(rawSignal);
+        using CancellationTokenRegistration registration = cancellationToken.Register(
+            static state => ((SafeCancelSignalHandle)state!).Cancel(),
+            signal);
+
+        return await RunAsync(
+            handle => Reintegrate(
+                handle,
+                lowSigma,
+                highSigma,
+                signal,
+                progress,
+                cancellationToken),
+            cancellationToken).ConfigureAwait(false);
+    }
 
     public async Task<ImageStackSnapshot> FinishAsync(
         CancellationToken cancellationToken = default)
@@ -611,6 +663,79 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
 
         FreeUnexpectedError(error);
         return CreateOwnedSnapshot(rawSnapshot);
+    }
+
+    private static unsafe ImageStackSnapshot Reintegrate(
+        SafeLiveStackerHandle handle,
+        float lowSigma,
+        float highSigma,
+        SafeCancelSignalHandle signal,
+        IProgress<ImageStackReintegrationProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        GCHandle callbackState = progress is null ? default : GCHandle.Alloc(progress);
+        nint error = 0;
+        nint rawSnapshot;
+        try
+        {
+            rawSnapshot = NativeMethods.ReintegrateLiveStacker(
+                handle.DangerousGetHandle(),
+                lowSigma,
+                highSigma,
+                signal.DangerousGetHandle(),
+                &ReintegrateProgressCallback,
+                callbackState.IsAllocated ? GCHandle.ToIntPtr(callbackState) : 0,
+                out error);
+        }
+        finally
+        {
+            if (callbackState.IsAllocated)
+            {
+                callbackState.Free();
+            }
+        }
+
+        if (rawSnapshot == 0)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                FreeUnexpectedError(error);
+                throw new OperationCanceledException(cancellationToken);
+            }
+            throw NativeString.TakeError(
+                error,
+                "The Seiza core could not remove transients from the stack.");
+        }
+        FreeUnexpectedError(error);
+        return CreateOwnedSnapshot(rawSnapshot);
+    }
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void ReintegrateProgressCallback(
+        uint pass,
+        nuint index,
+        nuint count,
+        nint context)
+    {
+        try
+        {
+            if (context == 0)
+            {
+                return;
+            }
+            GCHandle callbackState = GCHandle.FromIntPtr(context);
+            if (callbackState.Target is IProgress<ImageStackReintegrationProgress> progress)
+            {
+                progress.Report(new ImageStackReintegrationProgress(
+                    checked((int)pass),
+                    checked((int)index),
+                    checked((int)count)));
+            }
+        }
+        catch
+        {
+            // Managed exceptions must never cross the native callback boundary.
+        }
     }
 
     private static ImageStackExportSnapshot CreateExportSnapshot(

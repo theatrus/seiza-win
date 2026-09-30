@@ -115,6 +115,10 @@ without a Windows restart.
   counts, cancellation between frames, and automatic opening of the result.
   Measurements at progressively deeper checkpoints show SNR and achieved
   noise reduction without copying the accumulator.
+- **Remove transients after stacking**, on by default, reads every accepted
+  frame twice more and rejects satellite and aircraft trails that rejection
+  kept in the first frames. If the stack cannot be read again, Seiza saves
+  the ordinary stack and says why.
 
 Open a folder containing FITS or XISF light frames, then choose **Stack** from
 the toolbar. Select the exposures to include and a reference frame, then tune
@@ -146,7 +150,9 @@ The live window provides a bounded autostretched preview, accepted/rejected
 counts, calibration epochs, checkpoint health, and an SNR chart with measured
 noise, background, and cumulative exposure when the headers provide it. You
 can save a non-destructive FITS snapshot at any time or finish the accumulator
-to publish the final 32-bit floating-point FITS stack.
+to publish the final 32-bit floating-point FITS stack. When **Remove transients
+after stacking** is on, finishing first reads every accepted frame again to
+reject trails, so it takes longer; snapshots skip this step.
 
 Live sessions checkpoint the exact registration, normalization, rejection,
 calibration, and source-ledger state. **Pause and save** makes the session

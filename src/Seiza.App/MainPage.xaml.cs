@@ -145,7 +145,9 @@ public sealed partial class MainPage : Page, IDisposable
             if (result.Results.Count > 1 ||
                 result.RejectedFrames > 0 ||
                 result.Results.Any(item =>
-                    item.SnrAnalysis.Points.Count > 1 || item.SnrWarning is not null))
+                    item.SnrAnalysis.Points.Count > 1 ||
+                    item.SnrWarning is not null ||
+                    item.TransientRemovalNote is not null))
             {
                 string outputs = string.Join(
                     Environment.NewLine,
@@ -187,6 +189,20 @@ public sealed partial class MainPage : Page, IDisposable
                         Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                             "TextFillColorSecondaryBrush"],
                         Text = string.Join(Environment.NewLine, analysisWarnings),
+                        TextWrapping = TextWrapping.Wrap,
+                    });
+                }
+                string[] transientNotes = result.Results
+                    .Where(item => item.TransientRemovalNote is not null)
+                    .Select(item => result.Results.Count == 1
+                        ? item.TransientRemovalNote!
+                        : $"{Path.GetFileName(item.OutputPath)}: {item.TransientRemovalNote}")
+                    .ToArray();
+                if (transientNotes.Length > 0)
+                {
+                    content.Children.Add(new TextBlock
+                    {
+                        Text = string.Join(Environment.NewLine, transientNotes),
                         TextWrapping = TextWrapping.Wrap,
                     });
                 }

@@ -139,6 +139,14 @@
                                 <NumberBox x:Name="SigmaHighBox" Grid.Column="1" Header="High sigma" Minimum="0.1" Maximum="20" SmallChange="0.1" Value="3" ValueChanged="Options_ValueChanged" />
                                 <NumberBox x:Name="WarmupBox" Grid.Column="2" Header="Warmup frames" Minimum="2" Maximum="100" SmallChange="1" Value="5" ValueChanged="Options_ValueChanged" />
                             </Grid>
+                            <ToggleSwitch
+                                x:Name="RemoveTransientsToggle"
+                                Header="Remove transients after stacking"
+                                IsOn="True" />
+                            <TextBlock
+                                Foreground="{ThemeResource TextFillColorSecondaryBrush}"
+                                Text="Reads every accepted frame twice more to reject satellite trails that live rejection kept in the first frames."
+                                TextWrapping="Wrap" />
                         </StackPanel>
                     </Border>
 

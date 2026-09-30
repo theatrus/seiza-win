@@ -336,7 +336,8 @@ internal sealed class LiveStackRunChangedEventArgs(LiveStackRunSnapshot snapshot
 internal sealed record LiveStackExportResult(
     string OutputPath,
     int AcceptedFrames,
-    int RejectedFrames);
+    int RejectedFrames,
+    string? TransientRemovalNote = null);
 
 internal static class LiveStackRunMath
 {
