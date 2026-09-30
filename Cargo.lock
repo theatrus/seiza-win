@@ -410,7 +410,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "39cab71617ae0d63f51a36d69f866391735b51691dbda63cf6f96d042b63efeb"
 dependencies = [
  "libc",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -902,6 +902,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "keccak"
+version = "0.2.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d8f198d1db720e4940b5a493201d199d9f24f568f8f746bd13706243a2f71598"
+dependencies = [
+ "cfg-if",
+ "cpufeatures",
+]
+
+[[package]]
 name = "libc"
 version = "0.2.188"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1264,7 +1274,7 @@ dependencies = [
  "once_cell",
  "socket2",
  "tracing",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1425,7 +1435,7 @@ dependencies = [
  "errno",
  "libc",
  "linux-raw-sys",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
@@ -1492,9 +1502,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "seiza"
-version = "0.18.14"
+version = "0.18.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3856459c2e9ec6fd01530d16f84adca341af5f18c26128befd1ce865794dd575"
+checksum = "0b15342b3f976d8dc907eece65078e2a105251d318603da149ee6810d9f6109c"
 dependencies = [
  "directories",
  "image",
@@ -1515,9 +1525,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-background"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7de02ad32155f0110b8643ee35e3c2b8259a37c6492230f0a9a10873c902b87a"
+checksum = "a0cf14463327e60f0a05ec0a1d1b615c75770eaf99c1e8b203d459c887b5cf76"
 dependencies = [
  "rayon",
  "seiza-stats",
@@ -1527,9 +1537,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.18.14"
+version = "0.18.16"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e531158b001af8266fcfd28e35c965b44c9e461463f98e1e047ad134315a7756"
+checksum = "19f4ff7ae2badf5243c45adef737304f6aa43db4baa2cee0d5606a81e8104f78"
 dependencies = [
  "cbindgen",
  "image",
@@ -1618,9 +1628,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-stacking"
-version = "0.14.0"
+version = "0.15.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b2ab78a25efc9d538cd8a5d7274f2860ce00cd87aea57ac0e0ec2127c28f3403"
+checksum = "8fc775ed639b13281977bfdd9d00848187fe93997138ee42f12ad6a13b9fd684"
 dependencies = [
  "rayon",
  "seiza",
@@ -1681,9 +1691,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-xisf"
-version = "0.2.1"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8bc46f350b99abb68c689aa947c6b805e22675fb69fe799572aa5e6d00b4eb0"
+checksum = "0c6d0eb3750a4d3c7e77cc482988b6ee27d2b6b7bc8ecf88650a89100ddc2fbb"
 dependencies = [
  "flate2",
  "lz4_flex",
@@ -1691,6 +1701,7 @@ dependencies = [
  "seiza-fits",
  "sha1",
  "sha2",
+ "sha3",
  "tempfile",
  "thiserror",
  "zstd",
@@ -1786,6 +1797,16 @@ dependencies = [
  "cfg-if",
  "cpufeatures",
  "digest",
+]
+
+[[package]]
+name = "sha3"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "be176f1a57ce4e3d31c1a166222d9768de5954f811601fb7ca06fc8203905ce1"
+dependencies = [
+ "digest",
+ "keccak",
 ]
 
 [[package]]
@@ -1932,7 +1953,7 @@ dependencies = [
  "getrandom 0.4.3",
  "once_cell",
  "rustix",
- "windows-sys 0.61.2",
+ "windows-sys 0.52.0",
 ]
 
 [[package]]
