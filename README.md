@@ -5,7 +5,7 @@ It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
 core.
 
-[Download Seiza for Windows 0.7.3 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.3/seiza-0.7.3-windows-x86_64.msi)
+[Download Seiza for Windows 0.7.4 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.4/seiza-0.7.4-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -14,10 +14,26 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza for Windows 0.7.3
+## Seiza for Windows 0.7.4
 
-This point release opens more XISF files, in the app and in Explorer. It moves
-to the published Seiza 0.18.16 core, whose XISF reader follows the XISF 1.0
+This point release removes satellite and aircraft trails that stacking used to
+keep. It moves to the published Seiza 0.18.18 core.
+
+- Stacking rejects outliers as frames arrive, so the first frame and the first
+  few after it went in before there was anything to compare them with. A trail
+  in one of them stayed in the result. **Remove transients after stacking**,
+  on by default in both stacking windows, reads every accepted frame twice
+  more when the stack is done and rejects any sample that stands out from the
+  other frames, the first frames included.
+- Progress shows each pass and frame, and Cancel stops a directory stack during
+  this step. Star detection and registration do not run again.
+- When a stack cannot be replayed, for example a live session resumed from a
+  checkpoint saved by an older Seiza, the normal stack is written and Seiza
+  says why.
+
+## XISF files
+
+Seiza for Windows 0.7.3 moved to a core whose XISF reader follows the XISF 1.0
 Revision 1 specification.
 
 - Open XISF images whose pixels PixInsight stores inside the file header, as
@@ -250,8 +266,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.7.3 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.3/seiza-0.7.3-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.3/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.7.4 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.4/seiza-0.7.4-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.4/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -312,7 +328,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.3
+  -p:SeizaVersion=0.7.4
 ```
 
 The installer is written to `dist`. See the
