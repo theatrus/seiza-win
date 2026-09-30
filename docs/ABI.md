@@ -70,9 +70,13 @@ are globally serialized. Canceling or navigating away abandons only the UI
 wait; the synchronous native allocation is allowed to finish and free safely,
 and source-identity plus document-generation checks discard stale results.
 
-The Windows implementation is locked to the published Seiza 0.18.16 C ABI.
+The Windows implementation is locked to the published Seiza 0.18.18 C ABI.
 It retains the path API and normalized-major-axis capability field introduced
-before Seiza for Windows 0.7.1, and adds area-filtered bounded image renders.
+before Seiza for Windows 0.7.1, and adds area-filtered bounded image renders. Both stacking windows call `seiza_live_stacker_reintegrate` before finishing when
+"Remove transients after stacking" is on. It rereads every accepted frame with
+leave-one-out rejection, reports both passes through an unmanaged progress
+callback, and takes a native cancel signal; `reintegrationUnavailable` in the
+state JSON decides whether to try it.
 
 Windows explicitly requests the additive triangle contract with
 `"triangleAngleDegrees": 0` in its interactive star-detection options. Zero
