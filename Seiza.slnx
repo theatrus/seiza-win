@@ -4,5 +4,6 @@
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/Seiza.App.Tests/Seiza.App.Tests.csproj" />
+    <Project Path="tests/Seiza.App.Windows.Tests/Seiza.App.Windows.Tests.csproj" />
   </Folder>
 </Solution>

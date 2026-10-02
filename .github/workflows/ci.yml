@@ -44,6 +44,9 @@ jobs:
       - name: Test managed stacking services
         run: dotnet test tests\Seiza.App.Tests\Seiza.App.Tests.csproj -c Release --no-build --no-restore
 
+      - name: Test Windows thumbnail stream lifetime
+        run: dotnet test tests\Seiza.App.Windows.Tests\Seiza.App.Windows.Tests.csproj -c Release --no-build --no-restore
+
       # Deliberately unsigned. Pull requests from forks cannot mint an OIDC token
       # for this repository, and the federated credential is bound to the
       # `release` environment, so CI could not authenticate even on `main`
@@ -52,10 +55,10 @@ jobs:
       # which is the budget releases depend on. Authenticode is applied by
       # release.yml alone.
       - name: Build all-users MSI
-        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.7.5
+        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.7.6
 
       - name: Verify installer Finish launch action
-        run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi .\dist\seiza-0.7.5-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi .\dist\seiza-0.7.6-windows-x86_64.msi
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7
@@ -65,4 +68,4 @@ jobs:
           if-no-files-found: error
 
       - name: Smoke-test Windows installer
-        run: .\.github\scripts\test-windows-installer.ps1 -Msi .\dist\seiza-0.7.5-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-installer.ps1 -Msi .\dist\seiza-0.7.6-windows-x86_64.msi
