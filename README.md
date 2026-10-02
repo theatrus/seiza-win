@@ -5,7 +5,7 @@ It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
 core.
 
-[Download Seiza for Windows 0.7.5 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.5/seiza-0.7.5-windows-x86_64.msi)
+[Download Seiza for Windows 0.7.6 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.6/seiza-0.7.6-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -14,9 +14,22 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza for Windows 0.7.5
+## Seiza for Windows 0.7.6
 
-This point release exposes the new stacking controls in the published Seiza
+This point release fixes missing image thumbnails in the directory sidebar.
+The existing Auto MTF PNG previews now decode and display correctly instead
+of silently failing when their stream closes too early.
+
+Existing cached thumbnails work after updating; you do not need to clear the
+cache. Source images, thumbnail stretch settings, processing defaults, and
+stacking behavior are unchanged. This release retains Seiza 0.19.0 and stacking
+0.20.0.
+
+![Image thumbnails displayed in the directory sidebar](docs/images/directory-thumbnails.jpg)
+
+## Stacking controls introduced in 0.7.5
+
+Version 0.7.5 exposed the new stacking controls in the published Seiza
 0.19.0 core and stacking 0.20.0, in both directory and live stacking.
 
 - Choose similarity, affine, or quadratic registration. Polynomial models
@@ -275,8 +288,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.7.5 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.5/seiza-0.7.5-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.5/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.7.6 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.6/seiza-0.7.6-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.6/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -337,7 +350,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.5
+  -p:SeizaVersion=0.7.6
 ```
 
 The installer is written to `dist`. See the

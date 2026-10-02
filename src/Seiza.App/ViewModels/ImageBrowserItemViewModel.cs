@@ -1,7 +1,6 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using Microsoft.UI.Xaml.Media.Imaging;
 using Seiza.App.Services;
-using Windows.Storage.Streams;
 
 namespace Seiza.App.ViewModels;
 
@@ -39,16 +38,12 @@ public partial class ImageBrowserItemViewModel(string path) : ObservableObject
                 return;
             }
 
-            using var stream = new InMemoryRandomAccessStream();
-            using (Stream destination = stream.AsStreamForWrite())
+            await ThumbnailPngReader.WithStreamAsync(png, async stream =>
             {
-                await destination.WriteAsync(png, cancellationToken);
-                await destination.FlushAsync(cancellationToken);
-            }
-            stream.Seek(0);
-            var image = new BitmapImage();
-            await image.SetSourceAsync(stream);
-            Thumbnail = image;
+                var image = new BitmapImage();
+                await image.SetSourceAsync(stream);
+                Thumbnail = image;
+            }, cancellationToken);
         }
         catch (OperationCanceledException)
         {
