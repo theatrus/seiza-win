@@ -84,8 +84,9 @@
                             <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Reference frames" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="Each stack is registered to its reference frame. Choose a sharp, representative exposure."
+                                Text="Each stack is registered to its reference frame. Automatic selection scores the selected raw lights and chooses a sharp frame with a flat sky, independently for each filter."
                                 TextWrapping="Wrap" />
+                            <ToggleSwitch x:Name="AutomaticReferenceToggle" Header="Choose reference frames automatically" IsOn="False" Toggled="Options_Changed" />
                             <StackPanel x:Name="ReferencePanel" Spacing="8" />
                         </StackPanel>
                     </Border>
@@ -103,11 +104,24 @@
                                     <ColumnDefinition Width="160" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
+                                <TextBlock Text="Registration model" VerticalAlignment="Center" />
+                                <ComboBox x:Name="RegistrationModelPicker" Grid.Column="1" AutomationProperties.Name="Registration model" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed" ToolTipService.ToolTip="Similarity fits shift, rotation, and scale. Affine adds shear; quadratic follows field distortion. Sparse matches fall back to similarity.">
+                                    <ComboBoxItem Content="Similarity" Tag="Similarity" IsSelected="True" />
+                                    <ComboBoxItem Content="Affine" Tag="Affine" />
+                                    <ComboBoxItem Content="Quadratic" Tag="Quadratic" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
                                 <TextBlock Text="Normalization" VerticalAlignment="Center" />
-                                <ComboBox x:Name="NormalizationPicker" Grid.Column="1" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed">
+                                <ComboBox x:Name="NormalizationPicker" Grid.Column="1" AutomationProperties.Name="Normalization" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed" ToolTipService.ToolTip="Local background matches sky gradients while retaining one gain per channel; Local also fits gains per tile.">
                                     <ComboBoxItem Content="None" Tag="None" />
                                     <ComboBoxItem Content="Global" Tag="Global" IsSelected="True" />
                                     <ComboBoxItem Content="Local" Tag="Local" />
+                                    <ComboBoxItem Content="Local background" Tag="LocalBackground" />
                                 </ComboBox>
                             </Grid>
                             <Grid x:Name="LocalTileRow" ColumnSpacing="12" Visibility="Collapsed">
@@ -117,6 +131,25 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Local tile size" VerticalAlignment="Center" />
                                 <NumberBox x:Name="LocalTileSizeBox" Grid.Column="1" Minimum="16" Maximum="4096" SmallChange="16" Value="256" ValueChanged="Options_ValueChanged" />
+                            </Grid>
+                            <Grid ColumnSpacing="12">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="160" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="Frame weighting" VerticalAlignment="Center" />
+                                <ComboBox x:Name="WeightingPicker" Grid.Column="1" AutomationProperties.Name="Frame weighting" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed" ToolTipService.ToolTip="Inverse noise variance gives cleaner calibrated frames more weight, relative to the reference frame, within the chosen bounds.">
+                                    <ComboBoxItem Content="Equal" Tag="Equal" IsSelected="True" />
+                                    <ComboBoxItem Content="Inverse noise variance" Tag="InverseNoiseVariance" />
+                                </ComboBox>
+                            </Grid>
+                            <Grid x:Name="WeightingOptionsPanel" ColumnSpacing="12" Visibility="Collapsed">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <NumberBox x:Name="MinimumWeightBox" Header="Minimum frame weight" Minimum="0.001" Maximum="1" SmallChange="0.01" Value="0.05" ValueChanged="Options_ValueChanged" />
+                                <NumberBox x:Name="MaximumWeightBox" Grid.Column="1" Header="Maximum frame weight" Minimum="1" Maximum="1000" SmallChange="1" Value="20" ValueChanged="Options_ValueChanged" />
                             </Grid>
                             <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
@@ -145,8 +178,55 @@
                                 IsOn="True" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="Reads every accepted frame twice more to reject satellite trails that live rejection kept in the first frames."
+                                Text="Reintegrates accepted frames in three passes to reject trails left in early frames. Local background normalization uses an integrated reference."
                                 TextWrapping="Wrap" />
+                            <Expander Header="Resampling and sensor pixels" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                <StackPanel Margin="0,12,0,0" Spacing="10">
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="160" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Interpolation" VerticalAlignment="Center" />
+                                        <ComboBox x:Name="InterpolationPicker" Grid.Column="1" AutomationProperties.Name="Interpolation" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed" ToolTipService.ToolTip="Bilinear is faster and smoother. Lanczos-3 preserves sharper stars at a higher resampling cost.">
+                                            <ComboBoxItem Content="Bilinear" Tag="Bilinear" IsSelected="True" />
+                                            <ComboBoxItem Content="Lanczos-3" Tag="Lanczos3" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="160" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Bayer demosaic" VerticalAlignment="Center" />
+                                        <ComboBox x:Name="DemosaicPicker" Grid.Column="1" AutomationProperties.Name="Bayer demosaic" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed" ToolTipService.ToolTip="VNG preserves star colors. MHC is sharper but can ring around small stars. Bilinear is fastest and softest. Only Bayer inputs are affected.">
+                                            <ComboBoxItem Content="VNG" Tag="Vng" IsSelected="True" />
+                                            <ComboBoxItem Content="MHC" Tag="Mhc" />
+                                            <ComboBoxItem Content="Bilinear" Tag="Bilinear" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <Grid ColumnSpacing="12">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="160" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="Bayer integration" VerticalAlignment="Center" />
+                                        <ComboBox x:Name="CfaIntegrationPicker" Grid.Column="1" AutomationProperties.Name="Bayer integration" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed" ToolTipService.ToolTip="Bayer drizzle integrates individual photosites without interpolation. It needs well-dithered Bayer frames to fill every color; mono and RGB frames are unchanged.">
+                                            <ComboBoxItem Content="Demosaic" Tag="Demosaic" IsSelected="True" />
+                                            <ComboBoxItem Content="Bayer drizzle" Tag="BayerDrizzle" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <ToggleSwitch x:Name="SuppressHotPixelsToggle" Header="Suppress hot and dead pixels" IsOn="False" Toggled="Options_Changed" ToolTipService.ToolTip="Replace isolated impulse pixels after calibration and before demosaicing. Conservative defaults preserve star structure." />
+                                    <Grid x:Name="CosmeticOptionsPanel" ColumnSpacing="12" Visibility="Collapsed">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <NumberBox x:Name="CosmeticLowSigmaBox" Header="Dead-pixel sigma" Minimum="0.1" Maximum="1000" SmallChange="1" Value="16" ValueChanged="Options_ValueChanged" />
+                                        <NumberBox x:Name="CosmeticHighSigmaBox" Grid.Column="1" Header="Hot-pixel sigma" Minimum="0.1" Maximum="1000" SmallChange="1" Value="16" ValueChanged="Options_ValueChanged" />
+                                    </Grid>
+                                </StackPanel>
+                            </Expander>
                         </StackPanel>
                     </Border>
 

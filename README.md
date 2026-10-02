@@ -5,7 +5,7 @@ It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
 core.
 
-[Download Seiza for Windows 0.7.4 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.4/seiza-0.7.4-windows-x86_64.msi)
+[Download Seiza for Windows 0.7.5 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.5/seiza-0.7.5-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -14,22 +14,31 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## Seiza for Windows 0.7.4
+## Seiza for Windows 0.7.5
 
-This point release removes satellite and aircraft trails that stacking used to
-keep. It moves to the published Seiza 0.18.18 core.
+This point release exposes the new stacking controls in the published Seiza
+0.19.0 core and stacking 0.20.0, in both directory and live stacking.
 
-- Stacking rejects outliers as frames arrive, so the first frame and the first
-  few after it went in before there was anything to compare them with. A trail
-  in one of them stayed in the result. **Remove transients after stacking**,
-  on by default in both stacking windows, reads every accepted frame twice
-  more when the stack is done and rejects any sample that stands out from the
-  other frames, the first frames included.
-- Progress shows each pass and frame, and Cancel stops a directory stack during
-  this step. Star detection and registration do not run again.
-- When a stack cannot be replayed, for example a live session resumed from a
-  checkpoint saved by an older Seiza, the normal stack is written and Seiza
-  says why.
+- Choose similarity, affine, or quadratic registration. Polynomial models
+  correct distortion after star matching and retain similarity when there are
+  too few matched stars to fit the requested model.
+- Choose the reference automatically from selected raw lights, independently
+  for each directory filter group. Live stacking can score compatible existing
+  lights at startup; empty folders start with the first stable light, and
+  resumed sessions retain their saved reference.
+- Match local backgrounds without applying independent tile gains, and weight
+  frames by inverse noise variance with adjustable bounds.
+- Choose bilinear or sharper Lanczos-3 resampling, VNG/MHC/bilinear Bayer
+  demosaicing, or Bayer drizzle for sufficiently dithered capture sequences.
+- Optionally suppress hot/dead pixels before demosaicing. Existing stacking
+  defaults remain unchanged, and new nondefault choices are part of saved
+  session identity.
+- Transient removal now reports all three native passes. Local background
+  normalization uses an integrated reference; source images remain untouched.
+
+| Reference and registration | Resampling and sensor pixels |
+| --- | --- |
+| ![Automatic reference selection and the registration, normalization, and frame-weighting controls](docs/images/stacking-reference-options.png) | ![Lanczos-3 and Bayer drizzle selections with adjustable hot/dead-pixel suppression thresholds](docs/images/stacking-sensor-options.png) |
 
 ## XISF files
 
@@ -132,7 +141,7 @@ without a Windows restart.
   Measurements at progressively deeper checkpoints show SNR and achieved
   noise reduction without copying the accumulator.
 - **Remove transients after stacking**, on by default, reads every accepted
-  frame twice more and rejects satellite and aircraft trails that rejection
+  frame in three passes and rejects satellite and aircraft trails that rejection
   kept in the first frames. If the stack cannot be read again, Seiza saves
   the ordinary stack and says why.
 
@@ -266,8 +275,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.7.4 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.4/seiza-0.7.4-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.4/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.7.5 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.5/seiza-0.7.5-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.5/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -328,7 +337,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.4
+  -p:SeizaVersion=0.7.5
 ```
 
 The installer is written to `dist`. See the

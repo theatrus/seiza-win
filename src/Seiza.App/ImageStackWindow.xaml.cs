@@ -30,6 +30,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     internal ImageStackWindow(IReadOnlyList<string> paths)
     {
         InitializeComponent();
+        MinimumWeightBox.Value = new ImageStackOptions().MinimumWeight;
         _frames = paths
             .Where(ImageFileService.IsStackableImage)
             .Distinct(StringComparer.OrdinalIgnoreCase)
@@ -218,15 +219,17 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private void UpdateOptionsAndValidation()
     {
-        StackNormalizationMode normalization = SelectedTag(NormalizationPicker) == "Local"
-            ? StackNormalizationMode.Local
-            : SelectedTag(NormalizationPicker) == "None"
-                ? StackNormalizationMode.None
-                : StackNormalizationMode.Global;
+        ReferencePanel.Visibility = AutomaticReferenceToggle.IsOn ? Visibility.Collapsed : Visibility.Visible;
         StackRejectionMode rejection = SelectedTag(RejectionPicker) == "None"
             ? StackRejectionMode.None
             : StackRejectionMode.DeltaSigma;
-        LocalTileRow.Visibility = normalization == StackNormalizationMode.Local
+        LocalTileRow.Visibility = SelectedTag(NormalizationPicker) is "Local" or "LocalBackground"
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        WeightingOptionsPanel.Visibility = SelectedTag(WeightingPicker) == "InverseNoiseVariance"
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CosmeticOptionsPanel.Visibility = SuppressHotPixelsToggle.IsOn
             ? Visibility.Visible
             : Visibility.Collapsed;
         RejectionOptionsPanel.Visibility = rejection == StackRejectionMode.DeltaSigma
@@ -283,13 +286,40 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private ImageStackOptions CreateOptions() => new()
     {
+        RegistrationModel = SelectedTag(RegistrationModelPicker) switch
+        {
+            "Affine" => StackRegistrationModel.Affine,
+            "Quadratic" => StackRegistrationModel.Quadratic,
+            _ => StackRegistrationModel.Similarity,
+        },
         Normalization = SelectedTag(NormalizationPicker) switch
         {
             "None" => StackNormalizationMode.None,
             "Local" => StackNormalizationMode.Local,
+            "LocalBackground" => StackNormalizationMode.LocalBackground,
             _ => StackNormalizationMode.Global,
         },
         LocalTileSize = CheckedInt(LocalTileSizeBox.Value),
+        Weighting = SelectedTag(WeightingPicker) == "InverseNoiseVariance"
+            ? StackWeightingMode.InverseNoiseVariance
+            : StackWeightingMode.Equal,
+        MinimumWeight = MinimumWeightBox.Value,
+        MaximumWeight = MaximumWeightBox.Value,
+        Interpolation = SelectedTag(InterpolationPicker) == "Lanczos3"
+            ? StackInterpolation.Lanczos3
+            : StackInterpolation.Bilinear,
+        Demosaic = SelectedTag(DemosaicPicker) switch
+        {
+            "Mhc" => StackDemosaic.Mhc,
+            "Bilinear" => StackDemosaic.Bilinear,
+            _ => StackDemosaic.Vng,
+        },
+        CfaIntegration = SelectedTag(CfaIntegrationPicker) == "BayerDrizzle"
+            ? StackCfaIntegration.BayerDrizzle
+            : StackCfaIntegration.Demosaic,
+        SuppressHotPixels = SuppressHotPixelsToggle.IsOn,
+        CosmeticLowSigma = CosmeticLowSigmaBox.Value,
+        CosmeticHighSigma = CosmeticHighSigmaBox.Value,
         Rejection = SelectedTag(RejectionPicker) == "None"
             ? StackRejectionMode.None
             : StackRejectionMode.DeltaSigma,
@@ -458,6 +488,20 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
         try
         {
+            if (AutomaticReferenceToggle.IsOn)
+            {
+                foreach (ImageStackGroup group in _groups)
+                {
+                    ProgressMessageText.Text = $"{group.Title}: choosing the best reference…";
+                    ProgressCountsText.Text = "Scoring sharpness and sky background";
+                    StackProgressBar.IsIndeterminate = true;
+                    (CalibrationFrameProbe[] probes, _) = await ProbeTargetLightsAsync(group.Inputs, cancellation.Token);
+                    string[] candidates = CalibrationTargetSelection.Split(probes).Eligible
+                        .Select(probe => probe.Path).ToArray();
+                    StackReferenceSelection selected = await StackReferenceService.ChooseAsync(candidates, cancellation.Token);
+                    _referencePaths[group.Id] = selected.ReferencePath;
+                }
+            }
             using BatchCalibrationPreparation prepared = await PrepareCalibrationsAsync(
                 cancellation.Token);
             if (prepared.Warnings.Count > 0 &&
@@ -810,6 +854,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         }
         _closeWhenIdle = false;
         _running = false;
+        BuildReferenceControls();
         ConfigurationPanel.Visibility = Visibility.Visible;
         ProgressPanel.Visibility = Visibility.Collapsed;
         StartButton.Visibility = Visibility.Visible;

@@ -9,7 +9,14 @@ internal enum StackNormalizationMode
     None,
     Global,
     Local,
+    LocalBackground,
 }
+
+internal enum StackRegistrationModel { Similarity, Affine, Quadratic }
+internal enum StackWeightingMode { Equal, InverseNoiseVariance }
+internal enum StackInterpolation { Bilinear, Lanczos3 }
+internal enum StackDemosaic { Vng, Mhc, Bilinear }
+internal enum StackCfaIntegration { Demosaic, BayerDrizzle }
 
 internal enum StackRejectionMode
 {
@@ -29,6 +36,19 @@ internal sealed class ImageStackOptions
     public double MaximumDriftPixels { get; set; } = 256.0;
     public double MaximumDriftFraction { get; set; } = 0.15;
     public double MinimumOverlap { get; set; } = 0.60;
+    public StackRegistrationModel RegistrationModel { get; set; } = StackRegistrationModel.Similarity;
+    public StackWeightingMode Weighting { get; set; } = StackWeightingMode.Equal;
+    public double MinimumWeight { get; set; } = 0.05;
+    public double MaximumWeight { get; set; } = 20;
+    public StackInterpolation Interpolation { get; set; } = StackInterpolation.Bilinear;
+    public StackDemosaic Demosaic { get; set; } = StackDemosaic.Vng;
+    public StackCfaIntegration CfaIntegration { get; set; } = StackCfaIntegration.Demosaic;
+    public bool SuppressHotPixels { get; set; }
+    public double CosmeticLowSigma { get; set; } = 16;
+    public double CosmeticHighSigma { get; set; } = 16;
+
+    // All option values are scalars. Keep snapshots complete as new choices are added.
+    public ImageStackOptions Copy() => (ImageStackOptions)MemberwiseClone();
 
     /// <summary>
     /// Integrate every accepted frame again after stacking, with
@@ -53,13 +73,20 @@ internal sealed class ImageStackOptions
     {
         get
         {
-            if (Normalization == StackNormalizationMode.Local && LocalTileSize < 16)
+            if (!Enum.IsDefined(Normalization) || !Enum.IsDefined(Rejection) ||
+                !Enum.IsDefined(RegistrationModel) || !Enum.IsDefined(Weighting) ||
+                !Enum.IsDefined(Interpolation) || !Enum.IsDefined(Demosaic) ||
+                !Enum.IsDefined(CfaIntegration))
+            {
+                return "Choose a supported stacking option.";
+            }
+            if (Normalization is StackNormalizationMode.Local or StackNormalizationMode.LocalBackground &&
+                LocalTileSize < 16)
             {
                 return "Local normalization tiles must be at least 16 pixels wide.";
             }
             if (Rejection == StackRejectionMode.DeltaSigma &&
-                (!double.IsFinite(SigmaLow) || SigmaLow <= 0 ||
-                 !double.IsFinite(SigmaHigh) || SigmaHigh <= 0))
+                (!IsPositiveNativeFloat(SigmaLow) || !IsPositiveNativeFloat(SigmaHigh)))
             {
                 return "Sigma thresholds must be positive numbers.";
             }
@@ -84,22 +111,44 @@ internal sealed class ImageStackOptions
             {
                 return "Minimum overlap must be between 0 and 1.";
             }
+            if (Weighting == StackWeightingMode.InverseNoiseVariance &&
+                (!IsPositiveNativeFloat(MinimumWeight) || MinimumWeight > 1 ||
+                 !IsPositiveNativeFloat(MaximumWeight) || MaximumWeight < 1))
+            {
+                return "Frame weights must be finite with 0 < minimum ≤ 1 ≤ maximum.";
+            }
+            if (SuppressHotPixels &&
+                (!IsPositiveNativeFloat(CosmeticLowSigma) || !IsPositiveNativeFloat(CosmeticHighSigma)))
+            {
+                return "Hot/dead pixel thresholds must be positive finite numbers.";
+            }
             return null;
         }
     }
 
     public string ToJson()
     {
+        if (ValidationMessage is string message)
+        {
+            throw new ArgumentException(message);
+        }
         var payload = new StackOptionsPayload(
-            new StackRegistrationPayload(MaximumDriftPixels, MaximumDriftFraction),
+            new StackRegistrationPayload(MaximumDriftPixels, MaximumDriftFraction,
+                RegistrationModel switch
+                {
+                    StackRegistrationModel.Affine => "affine",
+                    StackRegistrationModel.Quadratic => "quadratic",
+                    _ => null,
+                }),
             new StackNormalizationPayload(
                 Normalization switch
                 {
                     StackNormalizationMode.None => "none",
                     StackNormalizationMode.Local => "local",
+                    StackNormalizationMode.LocalBackground => "local-background",
                     _ => "global",
                 },
-                Normalization == StackNormalizationMode.Local
+                Normalization is StackNormalizationMode.Local or StackNormalizationMode.LocalBackground
                     ? new StackLocalNormalizationPayload(LocalTileSize)
                     : null),
             new StackRejectionPayload(
@@ -111,11 +160,26 @@ internal sealed class ImageStackOptions
                         RejectionWarmup,
                         1.0e-6)
                     : null),
-            new StackAcceptancePayload(MaximumRegistrationRms, MinimumOverlap));
+            new StackAcceptancePayload(MaximumRegistrationRms, MinimumOverlap),
+            SuppressHotPixels ? new StackCosmeticPayload(CosmeticLowSigma, CosmeticHighSigma) : null,
+            Weighting == StackWeightingMode.InverseNoiseVariance
+                ? new StackWeightingPayload("inverse-noise-variance", MinimumWeight, MaximumWeight) : null,
+            CfaIntegration == StackCfaIntegration.BayerDrizzle ? "bayer_drizzle" : null,
+            Interpolation == StackInterpolation.Lanczos3 ? "lanczos3" : null,
+            Demosaic switch
+            {
+                StackDemosaic.Mhc => "mhc",
+                StackDemosaic.Bilinear => "bilinear",
+                _ => null,
+            });
         return JsonSerializer.Serialize(
             payload,
             SeizaJsonSerializerContext.Default.StackOptionsPayload);
     }
+
+    // The native contract stores these thresholds as f32, not C# doubles.
+    private static bool IsPositiveNativeFloat(double value) =>
+        double.IsFinite(value) && float.IsFinite((float)value) && (float)value > 0;
 }
 
 internal sealed class ImageStackCalibration
@@ -472,7 +536,7 @@ internal readonly record struct ImageStackReintegrationProgress(
 
 internal static class ImageStackTransientRemoval
 {
-    public const int PassCount = 2;
+    public const int PassCount = 3;
 
     public static string Message(ImageStackReintegrationProgress progress)
     {
@@ -566,11 +630,26 @@ internal sealed record StackOptionsPayload(
     [property: JsonPropertyName("registration")] StackRegistrationPayload Registration,
     [property: JsonPropertyName("normalization")] StackNormalizationPayload Normalization,
     [property: JsonPropertyName("rejection")] StackRejectionPayload Rejection,
-    [property: JsonPropertyName("acceptance")] StackAcceptancePayload Acceptance);
+    [property: JsonPropertyName("acceptance")] StackAcceptancePayload Acceptance,
+    [property: JsonPropertyName("cosmetic"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] StackCosmeticPayload? Cosmetic,
+    [property: JsonPropertyName("weighting"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] StackWeightingPayload? Weighting,
+    [property: JsonPropertyName("cfa_integration"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? CfaIntegration,
+    [property: JsonPropertyName("interpolation"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Interpolation,
+    [property: JsonPropertyName("demosaic"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Demosaic);
+
+internal sealed record StackCosmeticPayload(
+    [property: JsonPropertyName("low_sigma")] double LowSigma,
+    [property: JsonPropertyName("high_sigma")] double HighSigma);
+
+internal sealed record StackWeightingPayload(
+    [property: JsonPropertyName("mode")] string Mode,
+    [property: JsonPropertyName("minimum_weight")] double MinimumWeight,
+    [property: JsonPropertyName("maximum_weight")] double MaximumWeight);
 
 internal sealed record StackRegistrationPayload(
     [property: JsonPropertyName("maximum_drift_pixels")] double MaximumDriftPixels,
-    [property: JsonPropertyName("maximum_drift_fraction")] double MaximumDriftFraction);
+    [property: JsonPropertyName("maximum_drift_fraction")] double MaximumDriftFraction,
+    [property: JsonPropertyName("model"), JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)] string? Model);
 
 internal sealed record StackNormalizationPayload(
     [property: JsonPropertyName("mode")] string Mode,

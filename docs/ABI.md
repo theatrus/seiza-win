@@ -70,11 +70,24 @@ are globally serialized. Canceling or navigating away abandons only the UI
 wait; the synchronous native allocation is allowed to finish and free safely,
 and source-identity plus document-generation checks discard stale results.
 
-The Windows implementation is locked to the published Seiza 0.18.18 C ABI.
+The Windows implementation is locked to the published Seiza 0.19.0 C ABI
+and stacking 0.20.0. Both stacking windows expose the native `registration.model`
+(`similarity`, `affine`, `quadratic`), `local-background` normalization,
+`inverse-noise-variance` weighting and bounds, `lanczos3` interpolation,
+`vng`/`mhc`/`bilinear` demosaic, `bayer_drizzle` CFA integration, and optional
+`cosmetic` impulse filtering. Additive default fields are omitted from the
+host's options JSON to preserve existing saved-session comparisons; nondefault
+choices change the native configuration fingerprint.
+Automatic reference selection calls `seiza_stack_choose_reference_json` on a
+worker with one scoring reader. Windows validates schema, ordered score-array
+length, selected index, unchanged selected path, and finite score measurements.
+The core owns the ranking algorithm; the UI's reference toggle does not alter
+native options or replace a restored checkpoint's saved reference. The call is
+synchronous; cancellation stops subsequent work after its owned response is freed.
 It retains the path API and normalized-major-axis capability field introduced
 before Seiza for Windows 0.7.1, and adds area-filtered bounded image renders. Both stacking windows call `seiza_live_stacker_reintegrate` before finishing when
 "Remove transients after stacking" is on. It rereads every accepted frame with
-leave-one-out rejection, reports both passes through an unmanaged progress
+leave-one-out rejection, reports all three passes through an unmanaged progress
 callback, and takes a native cancel signal; `reintegrationUnavailable` in the
 state JSON decides whether to try it.
 
