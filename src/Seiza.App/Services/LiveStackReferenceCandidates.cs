@@ -19,6 +19,52 @@ internal sealed class LiveStackReferenceCandidates
 
     public bool HasPendingCandidates => _tracker.PendingPaths.Count > 0;
 
+    public async Task<IReadOnlyList<StackFileReadyCandidate>> ObserveStableExistingAsync(
+        TimeProvider timeProvider,
+        CancellationToken cancellationToken)
+    {
+        _ = await Task.Run(() => ObserveExisting(timeProvider.GetUtcNow()), cancellationToken)
+            .ConfigureAwait(false);
+        cancellationToken.ThrowIfCancellationRequested();
+        if (!HasPendingCandidates)
+        {
+            return [];
+        }
+
+        // Timer completion is only a wakeup, not proof that the tracker's UTC
+        // stability interval elapsed. Windows timers can fire just before the
+        // requested boundary; recheck instead of silently dropping every frame.
+        // Wait after enumeration finishes, not after its pre-scan timestamp:
+        // a large capture folder can itself take the full interval to scan.
+        DateTimeOffset now = timeProvider.GetUtcNow();
+        DateTimeOffset stableAfter = now + _options.MinimumStableDuration;
+        long waitStarted = timeProvider.GetTimestamp();
+        TimeSpan maximumWait = _options.MinimumStableDuration + _options.ObservationInterval;
+        while (now < stableAfter)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            TimeSpan remainingBudget = maximumWait - timeProvider.GetElapsedTime(waitStarted);
+            if (remainingBudget <= TimeSpan.Zero)
+            {
+                // A backward wall-clock adjustment must not hold startup open
+                // indefinitely. The watcher will establish a fresh window.
+                return [];
+            }
+            TimeSpan remaining = stableAfter - now;
+            if (remaining > remainingBudget)
+            {
+                remaining = remainingBudget;
+            }
+            await Task.Delay(remaining < TimeSpan.FromMilliseconds(1)
+                    ? TimeSpan.FromMilliseconds(1)
+                    : remaining,
+                timeProvider, cancellationToken).ConfigureAwait(false);
+            now = timeProvider.GetUtcNow();
+        }
+        cancellationToken.ThrowIfCancellationRequested();
+        return ObserveExisting(now);
+    }
+
     public IReadOnlyList<StackFileReadyCandidate> ObserveExisting(DateTimeOffset now)
     {
         var ready = new List<StackFileReadyCandidate>();

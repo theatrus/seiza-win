@@ -864,15 +864,12 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
         {
             SetState(LiveStackRunState.Restoring, "Observing existing lights for a stable reference…");
             var observations = new LiveStackReferenceCandidates(_monitorOptions);
-            _ = await Task.Run(() => observations.ObserveExisting(_timeProvider.GetUtcNow()), cancellationToken)
-                .ConfigureAwait(false);
-            if (!observations.HasPendingCandidates)
+            IReadOnlyList<StackFileReadyCandidate> stable = await observations
+                .ObserveStableExistingAsync(_timeProvider, cancellationToken).ConfigureAwait(false);
+            if (stable.Count == 0 && !observations.HasPendingCandidates)
             {
                 return;
             }
-            await Task.Delay(_monitorOptions.MinimumStableDuration, _timeProvider, cancellationToken)
-                .ConfigureAwait(false);
-            IReadOnlyList<StackFileReadyCandidate> stable = observations.ObserveExisting(_timeProvider.GetUtcNow());
             var eligible = new List<StackFileReadyCandidate>();
             CalibrationFrameProbe? firstProbe = null;
             foreach (StackFileReadyCandidate candidate in stable)
