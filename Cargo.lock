@@ -1502,9 +1502,9 @@ checksum = "94143f37725109f92c262ed2cf5e59bce7498c01bcc1502d7b9afe439a4e9f49"
 
 [[package]]
 name = "seiza"
-version = "0.18.18"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e84898cf0c153575dec02097b7b6ee3250dc67136448fec2bd85b7dc1a8579ba"
+checksum = "f6b26f89320cc52b05611cec45f03923ad3f3927d63f839b08db3d8042a481cb"
 dependencies = [
  "directories",
  "image",
@@ -1537,9 +1537,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.18.18"
+version = "0.19.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "51a19bfb7ec9b40c50ad5e51f76346c471ce6b80e7109455fde7c4d28885ee90"
+checksum = "44816128b37e7c47a4e8920eac5492729659a676983d8c191c321a6a9365e4dd"
 dependencies = [
  "cbindgen",
  "image",
@@ -1608,9 +1608,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-fits"
-version = "0.2.2"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "96da9f0d675870e540417cb4c0268ae6f8b0841f16131b9cd39fb6a21f653a8f"
+checksum = "ffdd290d89a261593ca4d876c01dd1f8249ec61795c30fec77cd77f3af96827e"
 dependencies = [
  "multiversion",
  "seiza-stretch",
@@ -1628,10 +1628,11 @@ dependencies = [
 
 [[package]]
 name = "seiza-stacking"
-version = "0.17.0"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "892d7640d50f563aa0243a5d7b62a02cb9208bee2d91faa31414ec6f8e6766a6"
+checksum = "c0654485473f4cf64f50ee18522a961b6808d67aad4ca6130a8b796e4be305e6"
 dependencies = [
+ "multiversion",
  "postcard",
  "rayon",
  "seiza",
@@ -1652,9 +1653,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-stars"
-version = "0.1.3"
+version = "0.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ccdc59b25bdc630c3305f7b87032efd68f6d43c132ad464440abf1a8af92ceaf"
+checksum = "8742e71a2ec808bc28c57e8fc206c7a243d1a5620d5bc250b68dec575346610b"
 dependencies = [
  "nalgebra",
  "rayon",

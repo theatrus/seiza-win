@@ -16,6 +16,8 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
     private readonly TimeProvider _timeProvider;
     private readonly LiveStackSessionStore _store;
     private readonly StackFolderMonitor _monitor;
+    private readonly StackFolderMonitorOptions _monitorOptions;
+    private readonly Func<IReadOnlyList<string>, CancellationToken, Task<StackReferenceSelection>> _referenceSelector;
     private readonly SemaphoreSlim _lifecycleGate = new(1, 1);
     private readonly SemaphoreSlim _operationGate = new(1, 1);
     private readonly object _stateSync = new();
@@ -58,13 +60,15 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
 
     public LiveStackCoordinator(
         LiveStackRunConfiguration configuration,
-        TimeProvider? timeProvider = null)
+        TimeProvider? timeProvider = null,
+        Func<IReadOnlyList<string>, CancellationToken, Task<StackReferenceSelection>>? referenceSelector = null)
     {
         ArgumentNullException.ThrowIfNull(configuration);
         configuration.Validate();
         _timeProvider = timeProvider ?? TimeProvider.System;
         _createdAtUtc = _timeProvider.GetUtcNow();
         _configuration = SnapshotConfiguration(configuration);
+        _referenceSelector = referenceSelector ?? StackReferenceService.ChooseAsync;
         _calibration = CloneCalibration(_configuration.Calibration);
         _optionsJson = _configuration.Options.ToJson();
         _outputPath = FullPathOrEmpty(_configuration.OutputPath);
@@ -75,13 +79,14 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
         _store = new LiveStackSessionStore(groupDirectory);
 
         string[] excludedPaths = _configuration.MonitorExcludedPaths();
-        _monitor = new StackFolderMonitor(new StackFolderMonitorOptions
+        _monitorOptions = new StackFolderMonitorOptions
         {
             FolderPath = _configuration.WatchFolder,
             IncludeSubdirectories = _configuration.IncludeSubdirectories,
             ExcludedPaths = excludedPaths,
-            ExcludedDirectories = [groupDirectory],
-        }, _timeProvider);
+            ExcludedDirectories = [_configuration.SessionRootDirectory],
+        };
+        _monitor = new StackFolderMonitor(_monitorOptions, _timeProvider);
         _monitor.StateChanged += MonitorOnStateChanged;
     }
 
@@ -828,7 +833,11 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
             }
         }
 
-        if (_session is null && _configuration.InitialReferencePath is string referencePath)
+        if (_session is null && _configuration.ChooseReferenceAutomatically)
+        {
+            await TryOpenAutomaticReferenceAsync(cancellationToken).ConfigureAwait(false);
+        }
+        else if (_session is null && _configuration.InitialReferencePath is string referencePath)
         {
             await OpenInitialReferenceAsync(referencePath, cancellationToken)
                 .ConfigureAwait(false);
@@ -849,15 +858,107 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
                 : "The saved live stack is ready to resume.");
     }
 
-    private async Task OpenInitialReferenceAsync(
-        string referencePath,
-        CancellationToken cancellationToken)
+    private async Task TryOpenAutomaticReferenceAsync(CancellationToken cancellationToken)
     {
+        try
+        {
+            SetState(LiveStackRunState.Restoring, "Observing existing lights for a stable reference…");
+            var observations = new LiveStackReferenceCandidates(_monitorOptions);
+            _ = await Task.Run(() => observations.ObserveExisting(_timeProvider.GetUtcNow()), cancellationToken)
+                .ConfigureAwait(false);
+            if (!observations.HasPendingCandidates)
+            {
+                return;
+            }
+            await Task.Delay(_monitorOptions.MinimumStableDuration, _timeProvider, cancellationToken)
+                .ConfigureAwait(false);
+            IReadOnlyList<StackFileReadyCandidate> stable = observations.ObserveExisting(_timeProvider.GetUtcNow());
+            var eligible = new List<StackFileReadyCandidate>();
+            CalibrationFrameProbe? firstProbe = null;
+            foreach (StackFileReadyCandidate candidate in stable)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                if (!LiveStackReferenceCandidates.IsUnchanged(candidate))
+                {
+                    continue;
+                }
+                try
+                {
+                    CalibrationFrameProbe probe = await CalibrationService.ProbeAsync(candidate.Path, cancellationToken)
+                        .ConfigureAwait(false);
+                    if (!CalibrationLightEligibility.IsEligible(probe) ||
+                        !LiveStackReferenceCandidates.IsUnchanged(candidate))
+                    {
+                        continue;
+                    }
+                    if (firstProbe is not null &&
+                        (!LiveStackFilterIdentity.FromProbe(firstProbe).Matches(LiveStackFilterIdentity.FromProbe(probe)) ||
+                         !LiveStackCalibrationIdentity.Matches(firstProbe.Signature, probe.Signature, out _)))
+                    {
+                        continue;
+                    }
+                    firstProbe ??= probe;
+                    eligible.Add(candidate);
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch
+                {
+                    // Unreadable and partially written lights will be retried by the watcher.
+                }
+            }
+            if (eligible.Count == 0)
+            {
+                AddAttention("No stable raw light could be ranked; waiting for the first stable light.");
+                return;
+            }
+            SetState(LiveStackRunState.Restoring, "Choosing the best existing reference…");
+            StackReferenceSelection selection = await _referenceSelector(
+                eligible.Select(candidate => candidate.Path).ToArray(), cancellationToken).ConfigureAwait(false);
+            selection.Validate(eligible.Select(candidate => candidate.Path).ToArray());
+            StackFileReadyCandidate selected = eligible[selection.ReferenceIndex];
+            if (!await OpenInitialReferenceAsync(selected.Path, cancellationToken, selected).ConfigureAwait(false))
+            {
+                AddAttention("The selected reference changed during scoring; waiting for the first stable light.",
+                    selected.Path);
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception exception)
+        {
+            if (_session is not null)
+            {
+                // A committed reference or checkpoint failure must retain the
+                // normal safety path instead of pretending that startup was empty.
+                throw;
+            }
+            AddAttention($"Could not rank an existing reference; waiting for the first stable light. {exception.Message}");
+        }
+    }
+
+    private async Task<bool> OpenInitialReferenceAsync(
+        string referencePath,
+        CancellationToken cancellationToken,
+        StackFileReadyCandidate? expectedCandidate = null)
+    {
+        if (expectedCandidate is not null && !LiveStackReferenceCandidates.IsUnchanged(expectedCandidate))
+        {
+            return false;
+        }
         string fullPath = Path.GetFullPath(referencePath);
         SetCurrentCandidate(fullPath, "Opening the selected reference frame…");
         CalibrationFrameProbe probe = await CalibrationService
             .ProbeAsync(fullPath, cancellationToken)
             .ConfigureAwait(false);
+        if (expectedCandidate is not null && !LiveStackReferenceCandidates.IsUnchanged(expectedCandidate))
+        {
+            return false;
+        }
         if (!string.Equals(
                 probe.Role.Trim(),
                 CalibrationFrameRoles.Light,
@@ -895,6 +996,13 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
             {
                 throw new SeizaCoreException(
                     "The native live stack did not retain exactly one reference frame.");
+            }
+
+            // Native reads are synchronous. Recheck before committing the
+            // managed ledger so a replaced/rewritten source is never seeded.
+            if (expectedCandidate is not null && !LiveStackReferenceCandidates.IsUnchanged(expectedCandidate))
+            {
+                return false;
             }
 
             _session = opened;
@@ -935,6 +1043,7 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
                 BlockOnCheckpointFailure(exception);
                 throw;
             }
+            return true;
         }
         finally
         {
@@ -2076,20 +2185,7 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
             Calibration = CloneCalibration(source.Calibration),
         };
 
-    private static ImageStackOptions CloneOptions(ImageStackOptions source) => new()
-    {
-        Normalization = source.Normalization,
-        LocalTileSize = source.LocalTileSize,
-        Rejection = source.Rejection,
-        SigmaLow = source.SigmaLow,
-        SigmaHigh = source.SigmaHigh,
-        RejectionWarmup = source.RejectionWarmup,
-        MaximumRegistrationRms = source.MaximumRegistrationRms,
-        MaximumDriftPixels = source.MaximumDriftPixels,
-        MaximumDriftFraction = source.MaximumDriftFraction,
-        MinimumOverlap = source.MinimumOverlap,
-        RemoveTransients = source.RemoveTransients,
-    };
+    private static ImageStackOptions CloneOptions(ImageStackOptions source) => source.Copy();
 
     private static ImageStackCalibration CloneCalibration(ImageStackCalibration source) => new()
     {

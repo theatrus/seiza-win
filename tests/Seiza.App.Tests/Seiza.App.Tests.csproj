@@ -31,6 +31,8 @@
     <Compile Include="..\..\src\Seiza.App\Models\ImageSampling.cs" Link="Models\ImageSampling.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\FitsStretch.cs" Link="Models\FitsStretch.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageStacking.cs" Link="Models\ImageStacking.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\StackReferenceSelection.cs" Link="Models\StackReferenceSelection.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\StackReferenceService.cs" Link="Services\StackReferenceService.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageStackSession.cs" Link="Models\ImageStackSession.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageMetadata.cs" Link="Models\ImageMetadata.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\CatalogStatus.cs" Link="Models\CatalogStatus.cs" />
@@ -61,6 +63,7 @@
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackSnapshot.cs" Link="Services\ImageStackSnapshot.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\InlineProgress.cs" Link="Services\InlineProgress.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\LiveStackCoordinator.cs" Link="Services\LiveStackCoordinator.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\LiveStackReferenceCandidates.cs" Link="Services\LiveStackReferenceCandidates.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\LiveStackSessionStore.cs" Link="Services\LiveStackSessionStore.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\LiveStackSessionPaths.cs" Link="Services\LiveStackSessionPaths.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\Rgba16Compositor.cs" Link="Services\Rgba16Compositor.cs" />

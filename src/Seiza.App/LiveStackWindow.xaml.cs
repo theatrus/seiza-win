@@ -45,6 +45,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
     internal LiveStackWindow(string initialFolder)
     {
         InitializeComponent();
+        MinimumWeightBox.Value = new ImageStackOptions().MinimumWeight;
         WatchFolderTextBox.Text = Path.GetFullPath(initialFolder);
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(LiveStackTitleBar);
@@ -238,7 +239,13 @@ public sealed partial class LiveStackWindow : Window, IDisposable
         AutomaticCalibrationPanel.Visibility = calibrationMode == "Automatic"
             ? Visibility.Visible
             : Visibility.Collapsed;
-        LocalTileRow.Visibility = SelectedTag(NormalizationPicker) == "Local"
+        LocalTileRow.Visibility = SelectedTag(NormalizationPicker) is "Local" or "LocalBackground"
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        WeightingOptionsPanel.Visibility = SelectedTag(WeightingPicker) == "InverseNoiseVariance"
+            ? Visibility.Visible
+            : Visibility.Collapsed;
+        CosmeticOptionsPanel.Visibility = SuppressHotPixelsToggle.IsOn
             ? Visibility.Visible
             : Visibility.Collapsed;
         RejectionOptionsPanel.Visibility = SelectedTag(RejectionPicker) == "DeltaSigma"
@@ -270,13 +277,40 @@ public sealed partial class LiveStackWindow : Window, IDisposable
 
     private ImageStackOptions CreateOptions() => new()
     {
+        RegistrationModel = SelectedTag(RegistrationModelPicker) switch
+        {
+            "Affine" => StackRegistrationModel.Affine,
+            "Quadratic" => StackRegistrationModel.Quadratic,
+            _ => StackRegistrationModel.Similarity,
+        },
         Normalization = SelectedTag(NormalizationPicker) switch
         {
             "None" => StackNormalizationMode.None,
             "Local" => StackNormalizationMode.Local,
+            "LocalBackground" => StackNormalizationMode.LocalBackground,
             _ => StackNormalizationMode.Global,
         },
         LocalTileSize = IntegerValue(LocalTileSizeBox, 256),
+        Weighting = SelectedTag(WeightingPicker) == "InverseNoiseVariance"
+            ? StackWeightingMode.InverseNoiseVariance
+            : StackWeightingMode.Equal,
+        MinimumWeight = FiniteValue(MinimumWeightBox, 0.05),
+        MaximumWeight = FiniteValue(MaximumWeightBox, 20),
+        Interpolation = SelectedTag(InterpolationPicker) == "Lanczos3"
+            ? StackInterpolation.Lanczos3
+            : StackInterpolation.Bilinear,
+        Demosaic = SelectedTag(DemosaicPicker) switch
+        {
+            "Mhc" => StackDemosaic.Mhc,
+            "Bilinear" => StackDemosaic.Bilinear,
+            _ => StackDemosaic.Vng,
+        },
+        CfaIntegration = SelectedTag(CfaIntegrationPicker) == "BayerDrizzle"
+            ? StackCfaIntegration.BayerDrizzle
+            : StackCfaIntegration.Demosaic,
+        SuppressHotPixels = SuppressHotPixelsToggle.IsOn,
+        CosmeticLowSigma = FiniteValue(CosmeticLowSigmaBox, 16),
+        CosmeticHighSigma = FiniteValue(CosmeticHighSigmaBox, 16),
         Rejection = SelectedTag(RejectionPicker) == "None"
             ? StackRejectionMode.None
             : StackRejectionMode.DeltaSigma,
@@ -400,6 +434,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
                 GroupTitle = $"Live stack — {Path.GetFileName(watchFolder)}",
                 IncludeSubdirectories = IncludeSubdirectoriesToggle.IsOn,
                 ResumeExisting = ResumeToggle.IsOn,
+                ChooseReferenceAutomatically = AutomaticReferenceToggle.IsOn,
                 ApplyCalibrationOnResume = calibrationMode != "None",
                 InitialReferencePath = _initialReferencePath,
                 Options = options,
@@ -1046,6 +1081,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
         {
             return;
         }
+        ConfigurationScrollViewer.IsEnabled = !busy;
         if (IsConfigured)
         {
             UpdateConfigurationState();

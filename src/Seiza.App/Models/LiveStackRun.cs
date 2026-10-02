@@ -170,6 +170,7 @@ internal sealed record LiveStackRunConfiguration
     public string GroupTitle { get; init; } = "Live stack";
     public bool IncludeSubdirectories { get; init; }
     public bool ResumeExisting { get; init; } = true;
+    public bool ChooseReferenceAutomatically { get; init; }
     public bool ApplyCalibrationOnResume { get; init; }
     public string? InitialReferencePath { get; init; }
     public string? OutputPath { get; init; }

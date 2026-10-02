@@ -122,6 +122,15 @@ internal static partial class NativeMethods
 
     [LibraryImport(
         LibraryName,
+        EntryPoint = "seiza_stack_choose_reference_json",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint ChooseStackReferenceJson(
+        string pathsJson,
+        nuint concurrency,
+        out nint error);
+
+    [LibraryImport(
+        LibraryName,
         EntryPoint = "seiza_live_stacker_open_context",
         StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint OpenLiveStackerContext(string contextPath, out nint error);
