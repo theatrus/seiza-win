@@ -239,18 +239,14 @@ internal sealed class ParallaxSession : INotifyPropertyChanged, IDisposable
         if (Composition.ValidationMessage is string message) throw new InvalidDataException(message);
         string cache = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Seiza", "ParallaxDistances");
         Directory.CreateDirectory(cache);
-        return new()
-        {
-            Inputs = new()
+        return ParallaxRequestSource.Create(Composition, preview, SnapshotPath, AutomaticSeparation, _starless, _stars,
+            new()
             {
-                Image = SnapshotPath, Starless = AutomaticSeparation ? null : _starless, Stars = AutomaticSeparation ? null : _stars,
                 Wcs = _wcs, CatalogDirectory = CatalogSettingsStore.LoadCatalogDirectory(), GaiaCache = cache,
                 Objects = _inputs.GetValueOrDefault(ParallaxInputFile.Objects), ObjectDistances = _inputs.GetValueOrDefault(ParallaxInputFile.ObjectDistances),
                 StarDistances = _inputs.GetValueOrDefault(ParallaxInputFile.StarDistances),
                 RcAstroExecutable = AutomaticSeparation ? _inputs.GetValueOrDefault(ParallaxInputFile.Separator) : null, RcAstroHost = "seiza-win",
-            },
-            Scene = Composition.Scene.DeepClone(), Video = Composition.VideoSettings(preview),
-        };
+            });
     }
     private (CancellationTokenSource Cancellation, int Revision) Begin(string message)
     {
@@ -290,11 +286,9 @@ internal sealed class ParallaxSession : INotifyPropertyChanged, IDisposable
         var (signal, generation) = Begin(HasWcs ? "Planning tour…" : "Solving image and planning tour…");
         try
         {
-            if (request.Inputs.Wcs is null)
-            {
-                var solution = await Task.Run(() => SeizaCore.Solve(SnapshotPath, request.Inputs.CatalogDirectory, request.Scene.MinimumScaleArcsecPerPixel, request.Scene.MaximumScaleArcsecPerPixel));
-                signal.Token.ThrowIfCancellationRequested(); request.Inputs.Wcs = solution.Wcs;
-            }
+            await ParallaxRequestSource.EnsureWcsAsync(request,
+                path => Task.Run(() => SeizaCore.Solve(path, request.Inputs.CatalogDirectory, request.Scene.MinimumScaleArcsecPerPixel, request.Scene.MaximumScaleArcsecPerPixel).Wcs),
+                signal.Token);
             var plan = await ParallaxCore.PlanAsync(request, events: Events(generation), cancellationToken: signal.Token);
             if (!_closed && generation == _revision) { _wcs = request.Inputs.Wcs; Candidate = plan; Status = $"Generated {plan.Tour.Count} stops. Apply the tour or keep your draft."; }
             Finish(signal, null);

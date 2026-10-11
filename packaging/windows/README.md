@@ -7,7 +7,8 @@ Default Apps for `.fit`, `.fits`, `.fts`, and `.xisf` files. It also registers
 content-thumbnail and Preview Pane handlers for all four extensions.
 
 The payload is self-contained: it includes .NET 10, the Windows App SDK/WinUI
-runtime, Win2D, and the Cargo-locked Seiza Rust core. Installation and first launch do
+runtime, Win2D, and the Cargo-locked Seiza Rust core and offline distance adapter.
+It also includes the Inter font license used by parallax labels. Installation and first launch do
 not need a network connection or separate runtime installers.
 
 Explorer supplies file contents through `IInitializeWithStream`. Windows loads
@@ -23,7 +24,7 @@ Build the installer from the repository root:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.6
+  -p:SeizaVersion=0.8.0
 ```
 
 The MSI is written to `dist`. The version must be a valid three-part MSI
@@ -38,12 +39,12 @@ work in two:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.6 `
+  -p:SeizaVersion=0.8.0 `
   -t:PublishSeizaApp
 # sign artifacts\publish\win-x64 here
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.6 `
+  -p:SeizaVersion=0.8.0 `
   -p:SeizaSkipPublish=true
 ```
 
@@ -58,7 +59,7 @@ The interactive installer's selected-by-default **Launch Seiza** option uses
 WiX's unelevated shell action so an all-users install opens Seiza in the
 signed-in user's desktop session. CI verifies the generated MSI custom-action
 and Finish-button tables before running the elevated smoke test.
-The smoke test also verifies the provider DLL, both COM classes, Preview Pane
+The smoke test also verifies the native distance adapter, Inter license, provider DLL, both COM classes, Preview Pane
 host AppID and global handler-list registration, all thumbnail and preview
 extension mappings, the Shell-notification action, and complete registration
 removal on uninstall.
@@ -68,7 +69,7 @@ validation:
 
 ```powershell
 .\.github\scripts\test-windows-installer.ps1 `
-  -Msi .\dist\seiza-0.7.6-windows-x86_64.msi
+  -Msi .\dist\seiza-0.8.0-windows-x86_64.msi
 ```
 
 Tagged releases use `.github/workflows/release.yml` to build and smoke-test

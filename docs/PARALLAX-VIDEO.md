@@ -6,6 +6,8 @@ WinUI controls and Windows video encoding. Scene preparation, depth assignment,
 camera fitting, tour planning, labels, dust and frame rendering remain in the
 shared Seiza Rust core; Windows does not reproduce those pixel algorithms.
 
+![Native Windows parallax workspace with a prepared Iris preview and manual source layers](images/parallax-video.png)
+
 ## Workflow
 
 Open an image and choose **Parallax Video**. The generator owns an independent
@@ -17,10 +19,13 @@ Windows image codecs to make a lossless 16-bit PNG snapshot, normalizing EXIF
 orientation without passing through the viewer's eight-bit display bitmap.
 
 1. In **Source**, configure star separation and scene depth. Use a locally
-   supplied StarXTerminator executable, or choose aligned starless/stars layers.
-   Manual layers must have the source dimensions, matching orientation and
-   stretch; confirm their alignment before preparation. StarXTerminator is not
-   bundled or installed by Seiza.
+   installed RC-Astro CLI (`rc-astro.exe`) licensed for StarXTerminator, or
+   choose aligned starless/stars layers. Manual layers must have the source
+   dimensions, matching orientation and stretch; confirm their alignment
+   before preparation. Neither RC-Astro's CLI nor StarXTerminator is bundled
+   or installed by Seiza. If the source has no existing plate solution,
+   manual-layer preparation and tour generation solve the selected stars layer,
+   including when the viewer contains the starless image.
 2. In **Camera**, choose **Fly In** or **Tour**. Pick destinations on the image
    or enter source-pixel coordinates. Prepare a bounded preview, scrub or play
    it, then adjust the camera. Camera-only edits reuse the prepared scene;
@@ -70,6 +75,9 @@ them. The displayed stellar magnitude coverage comes from the native database
 header. Default-directory status follows the shared core's environment overrides
 and legacy fallback paths; an explicitly selected directory is checked as-is.
 Choosing a deeper Gaia limit than that coverage produces a warning.
+Object-distance readiness also requires a readable, fingerprint-matched
+`objects.bin`. Missing or corrupt pinned environment overrides show their actual
+path and variable; downloading to another directory cannot repair those choices.
 
 The platform adapter delegates manifest loading, transfer, decompression,
 SHA-256 checks and installation to the published `seiza-download` crate. It
@@ -134,6 +142,12 @@ the native editor. The GUI-generated movie was independently decoded and checked
 for 1280 × 720 dimensions, 48 H.264 frames at 24 fps, two-second duration, correct
 orientation and no audio. This offline validation uses explicit illustrative
 background/unmatched-star distances, not a downloaded per-star distance database.
+
+The 0.8.0 manual-layer solving regression was also checked interactively with
+the starless Iris TIFF open in the viewer and both aligned layers selected.
+Preparation solved sky coordinates from the imported stars, detected 139,381
+stars and matched 5,834 to the installed offline distance catalog. The independent
+workspace remained usable after closing the source viewer.
 
 Native adapter tests use local manifest/file fixtures without downloading data:
 they check exact three-file selection, compressed progress accounting, missing

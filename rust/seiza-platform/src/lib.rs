@@ -2,6 +2,7 @@
 //! currently offers distances only as part of Everything; transfer, cache,
 //! hashing and atomic installation still come from seiza-download.
 use seiza::catalog::{ObjectDistances, StarDistanceCatalog};
+use seiza::objects::ObjectCatalog;
 use seiza_download::{
     CachePolicy, CatalogBundle, CatalogManager, CatalogSet, Dataset, DownloadEvent,
 };
@@ -44,22 +45,29 @@ fn status(directory: Option<&Path>) -> Value {
         Some(directory) => Ok(Some(directory.join("star-distances.bin"))),
         None => seiza::data_paths::star_distances(None),
     };
+    let object_catalog = match directory {
+        Some(directory) => Ok(directory.join("objects.bin")),
+        None => seiza::data_paths::objects(None),
+    };
     let objects = match directory {
         Some(directory) => Ok(Some(directory.join("object-distances.bin"))),
-        None => match seiza::data_paths::objects(None) {
-            Ok(objects) => seiza::data_paths::object_distances_beside(None, &objects),
+        None => match &object_catalog {
+            Ok(objects) => seiza::data_paths::object_distances_beside(None, objects),
             Err(_) => seiza::data_paths::object_distances(None),
         },
     };
     json!({"directory": destination,
-    "stars": component_status(stars, destination.join("star-distances.bin"), |path| {
+    "stars": component_status(stars, destination.join("star-distances.bin"), directory.is_none().then_some("SEIZA_STAR_DISTANCES"), |path| {
         StarDistanceCatalog::open(path)
             .map(|catalog| json!({"maxMagnitude": catalog.max_mag(), "starCount": catalog.star_count()}))
             .map_err(|error| error.to_string())
     }),
-    "objects": component_status(objects, destination.join("object-distances.bin"), |path| {
-        ObjectDistances::open_unpaired(path)
-            .map(|_| json!({}))
+    "objects": component_status(objects, destination.join("object-distances.bin"), directory.is_none().then_some("SEIZA_OBJECT_DISTANCES"), |path| {
+        let catalog_path = object_catalog.as_ref().map_err(|error| error.to_string())?;
+        let catalog = ObjectCatalog::open(catalog_path)
+            .map_err(|error| format!("Object catalogue {} could not be read: {error}", catalog_path.display()))?;
+        ObjectDistances::open(path, &catalog)
+            .map(|_| json!({"objectCatalogPath": catalog_path}))
             .map_err(|error| error.to_string())
     })})
 }
@@ -67,9 +75,10 @@ fn status(directory: Option<&Path>) -> Value {
 fn component_status(
     resolved: Result<Option<PathBuf>, seiza::data_paths::DataPathError>,
     missing_path: PathBuf,
+    override_variable: Option<&str>,
     read: impl FnOnce(&Path) -> Result<Value, String>,
 ) -> Value {
-    match resolved {
+    let mut result = match resolved {
         Ok(path) => {
             let path = path.unwrap_or(missing_path);
             match read(&path) {
@@ -84,9 +93,25 @@ fn component_status(
         }
         // A pinned but missing environment choice is a resolution failure, not
         // corrupt file contents. Do not silently fall back or mislabel it.
-        Err(error) => json!({"available": false, "path": missing_path,
-            "error": null, "resolutionError": error.to_string()}),
+        Err(error) => {
+            let path = match &error {
+                seiza::data_paths::DataPathError::EnvVar { path, .. }
+                | seiza::data_paths::DataPathError::Missing { path, .. }
+                | seiza::data_paths::DataPathError::NotFoundInDirectory { path, .. } => path,
+                _ => &missing_path,
+            };
+            json!({"available": false, "path": path,
+                "error": null, "resolutionError": error.to_string()})
+        }
+    };
+    if let Some(variable) = override_variable
+        && std::env::var_os(variable).is_some_and(|value| !value.is_empty())
+    {
+        // Setup installs into its destination; it never changes a per-kind
+        // environment override, including one pointing at a corrupt file.
+        result["overrideVariable"] = variable.into();
     }
+    result
 }
 
 fn progress_json(event: DownloadEvent, completed: usize) -> Value {
@@ -425,12 +450,75 @@ mod tests {
         assert_eq!(result["stars"]["maxMagnitude"], 17.0);
         assert_eq!(result["stars"]["starCount"], 0);
         assert_eq!(result["objects"]["available"], false);
+        write_object_pair(temp.path());
         std::fs::write(temp.path().join("object-distances.bin"), b"bad").unwrap();
         assert!(status(Some(temp.path()))["objects"]["error"].is_string());
-        seiza::catalog::ObjectDistancesBuilder::new("test", [0; 32])
+        write_object_pair(temp.path());
+        assert_eq!(status(Some(temp.path()))["objects"]["available"], true);
+    }
+
+    fn write_object_pair(directory: &Path) {
+        let path = directory.join("objects.bin");
+        ObjectCatalog::default().write_to(&path).unwrap();
+        let catalog = ObjectCatalog::open(&path).unwrap();
+        seiza::catalog::ObjectDistancesBuilder::new("test", catalog.fingerprint().unwrap())
+            .write_to(&directory.join("object-distances.bin"))
+            .unwrap();
+    }
+
+    #[test]
+    fn object_distances_are_unavailable_without_their_object_catalogue() {
+        let temp = tempfile::tempdir().unwrap();
+        write_object_pair(temp.path());
+        std::fs::remove_file(temp.path().join("objects.bin")).unwrap();
+        let result = status(Some(temp.path()));
+        assert_eq!(result["objects"]["available"], false);
+        assert!(
+            result["objects"]["error"]
+                .as_str()
+                .unwrap()
+                .contains("objects.bin")
+        );
+        assert!(result["objects"]["resolutionError"].is_null());
+    }
+
+    #[test]
+    fn object_distances_are_unavailable_with_a_corrupt_object_catalogue() {
+        let temp = tempfile::tempdir().unwrap();
+        write_object_pair(temp.path());
+        std::fs::write(temp.path().join("objects.bin"), b"corrupt catalogue").unwrap();
+        let result = status(Some(temp.path()));
+        assert_eq!(result["objects"]["available"], false);
+        assert!(
+            result["objects"]["error"]
+                .as_str()
+                .unwrap()
+                .contains("could not be read")
+        );
+    }
+
+    #[test]
+    fn object_distances_are_unavailable_with_a_different_catalogue_fingerprint() {
+        let temp = tempfile::tempdir().unwrap();
+        write_object_pair(temp.path());
+        seiza::catalog::ObjectDistancesBuilder::new("different catalogue", [0; 32])
             .write_to(&temp.path().join("object-distances.bin"))
             .unwrap();
-        assert_eq!(status(Some(temp.path()))["objects"]["available"], true);
+        let result = status(Some(temp.path()));
+        assert_eq!(result["objects"]["available"], false);
+        assert!(
+            result["objects"]["error"]
+                .as_str()
+                .unwrap()
+                .contains("built for")
+        );
+        write_object_pair(temp.path());
+        let repaired = status(Some(temp.path()));
+        assert_eq!(repaired["objects"]["available"], true);
+        assert_eq!(
+            repaired["objects"]["objectCatalogPath"],
+            json!(temp.path().join("objects.bin"))
+        );
     }
 
     #[test]
@@ -455,10 +543,24 @@ mod tests {
             assert_eq!(result["directory"], json!(destination));
             assert_eq!(unsafe { directory(std::ptr::null()) }.unwrap(), destination);
             if mode == "missing-override" {
-                for key in ["stars", "objects"] {
+                for (key, variable, name) in [
+                    ("stars", "SEIZA_STAR_DISTANCES", "star-distances.bin"),
+                    ("objects", "SEIZA_OBJECT_DISTANCES", "object-distances.bin"),
+                ] {
                     assert_eq!(result[key]["available"], false);
                     assert!(result[key]["resolutionError"].is_string());
                     assert!(result[key]["error"].is_null());
+                    assert_eq!(result[key]["overrideVariable"], variable);
+                    assert_eq!(
+                        result[key]["path"],
+                        json!(root.join("overrides").join(name))
+                    );
+                    assert!(
+                        result[key]["resolutionError"]
+                            .as_str()
+                            .unwrap()
+                            .contains(variable)
+                    );
                 }
             } else {
                 let selected = if mode == "legacy-fallback" {
@@ -474,8 +576,16 @@ mod tests {
                     result["objects"]["path"],
                     json!(selected.join("object-distances.bin"))
                 );
-                for key in ["stars", "objects"] {
+                for (key, variable) in [
+                    ("stars", "SEIZA_STAR_DISTANCES"),
+                    ("objects", "SEIZA_OBJECT_DISTANCES"),
+                ] {
                     assert_eq!(result[key]["available"], mode != "corrupt-override");
+                    if mode == "legacy-fallback" {
+                        assert!(result[key]["overrideVariable"].is_null());
+                    } else {
+                        assert_eq!(result[key]["overrideVariable"], variable);
+                    }
                     if mode == "corrupt-override" {
                         assert!(result[key]["error"].is_string());
                     }
@@ -504,6 +614,8 @@ mod tests {
                 json!(custom.join("object-distances.bin"))
             );
             assert_eq!(explicit["objects"]["available"], true);
+            assert!(explicit["stars"]["overrideVariable"].is_null());
+            assert!(explicit["objects"]["overrideVariable"].is_null());
             return;
         }
 
@@ -512,11 +624,7 @@ mod tests {
             seiza::catalog::StarDistanceCatalogBuilder::new(16, 2016.0, depth, "status fixture")
                 .write_to(&directory.join("star-distances.bin"))
                 .unwrap();
-            seiza::catalog::ObjectDistancesBuilder::new("status fixture", [0; 32])
-                .write_to(&directory.join("object-distances.bin"))
-                .unwrap();
-            // Only its location is inspected; status does not parse objects.bin.
-            std::fs::write(directory.join("objects.bin"), b"path fixture").unwrap();
+            write_object_pair(directory);
         }
 
         for mode in [

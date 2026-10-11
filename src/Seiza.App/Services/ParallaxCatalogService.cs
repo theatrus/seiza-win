@@ -23,13 +23,7 @@ internal static unsafe partial class ParallaxCatalogService
         try
         {
             using JsonDocument json = JsonDocument.Parse(Marshal.PtrToStringUTF8(value)!);
-            JsonElement stars = json.RootElement.GetProperty("stars"), objects = json.RootElement.GetProperty("objects");
-            string DescribeMissing(JsonElement component) => component.TryGetProperty("error", out var e) && e.ValueKind == JsonValueKind.String ? "corrupt — download to repair" : "not installed";
-            string starText = stars.GetProperty("available").GetBoolean()
-                ? $"{stars.GetProperty("starCount").GetUInt64():N0} stellar distances, G≤{stars.GetProperty("maxMagnitude").GetDouble():0.#}" : $"stellar distances {DescribeMissing(stars)}";
-            string objectText = objects.GetProperty("available").GetBoolean() ? "object distances ready" : $"object distances {DescribeMissing(objects)}";
-            string warning = stars.TryGetProperty("maxMagnitude", out var depth) && magnitude > depth.GetDouble() ? " Selected Gaia depth exceeds offline coverage." : "";
-            return (json.RootElement.GetProperty("directory").GetString()!, $"{starText}; {objectText}.{warning}");
+            return ParallaxCatalogStatusPresentation.Format(json.RootElement, magnitude);
         }
         finally { Free(value); }
     }

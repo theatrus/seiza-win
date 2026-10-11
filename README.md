@@ -5,7 +5,7 @@ It combines a modern WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust image, catalog, and solving
 core.
 
-[Download Seiza for Windows 0.7.6 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.7.6/seiza-0.7.6-windows-x86_64.msi)
+[Download Seiza for Windows 0.8.0 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.0/seiza-0.8.0-windows-x86_64.msi)
 · [Release notes and previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -14,14 +14,31 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
-## In development: parallax video
+## Seiza for Windows 0.8.0: parallax video
 
 The native Windows parallax editor follows [seiza-mac #56](https://github.com/theatrus/seiza-mac/pull/56):
 fly-in camera moves, generated and editable tours, depth-aware labels, offline
 distances, and silent H.264/HEVC MP4 export. Open an image, then choose
 **Parallax video…** from the toolbar’s More options menu. See the
 [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements, controls,
-encoder availability, and safety details. This work is not yet part of a release.
+encoder availability, and safety details.
+
+- Import aligned starless and unscreened-stars layers, or use a separately
+  installed RC-Astro CLI (`rc-astro.exe`) licensed for StarXTerminator.
+  Manual-layer solving uses the selected stars even when the viewer contains
+  the starless image.
+- Pick destinations on the image, preview camera moves, generate and edit
+  multi-stop tours, and save portable tour itinerary JSON.
+- Configure star/background depth, offline distance catalogs, labels, output
+  size and frame rate. Export through Windows Media Foundation; encoder
+  availability depends on your machine.
+- Parallax windows keep their private source snapshot and remain usable after
+  the original viewer closes. Export cancellation preserves existing files.
+
+This release uses published Seiza 0.25.1, stacking 0.27.0 and parallax 0.2.1
+crates, without vendored patches.
+
+![Native parallax workspace with aligned manual layers, solved coordinates and offline stellar distances](docs/images/parallax-video.png)
 
 ## Seiza for Windows 0.7.6
 
@@ -297,8 +314,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.7.6 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.7.6/seiza-0.7.6-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.7.6/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.8.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.0/seiza-0.8.0-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.0/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -359,7 +376,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.7.6
+  -p:SeizaVersion=0.8.0
 ```
 
 The installer is written to `dist`. See the

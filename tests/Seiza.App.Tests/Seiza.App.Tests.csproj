@@ -27,6 +27,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\Seiza.App\Services\WindowLifetimeRegistry.cs" Link="Services\WindowLifetimeRegistry.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ParallaxRequestSource.cs" Link="Services\ParallaxRequestSource.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ParallaxCatalogStatusPresentation.cs" Link="Services\ParallaxCatalogStatusPresentation.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ParallaxModels.cs" Link="Models\ParallaxModels.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ParallaxJson.cs" Link="Models\ParallaxJson.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ParallaxCore.cs" Link="Services\ParallaxCore.cs" />

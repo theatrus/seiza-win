@@ -236,8 +236,19 @@ public sealed record ParallaxComposition
 
     public ParallaxVideoSettings VideoSettings(bool preview)
     {
-        double scale = preview ? Math.Min(1, 960.0 / Math.Max(Width, Height)) : 1;
-        int width = Math.Max(16, (int)(Width * scale) / 2 * 2), height = Math.Max(16, (int)(Height * scale) / 2 * 2);
+        int width = Math.Max(16, Width / 2 * 2), height = Math.Max(16, Height / 2 * 2);
+        if (preview && Math.Max(width, height) > 960)
+        {
+            bool landscape = width >= height;
+            int longSide = Math.Max(width, height), shortSide = Math.Min(width, height);
+            int previewShort = Math.Max(16, (int)(shortSide * (960.0 / longSide)) / 2 * 2);
+            // Use the even short side to choose one common scale. Thin outputs
+            // may need a preview longer than 960 to keep the minimum side at 16;
+            // only the long side is rounded, by at most one pixel, afterwards.
+            double scale = (double)previewShort / shortSide;
+            int previewLong = Math.Min(longSide, (int)Math.Round(longSide * scale / 2, MidpointRounding.AwayFromZero) * 2);
+            (width, height) = landscape ? (previewLong, previewShort) : (previewShort, previewLong);
+        }
         return new()
         {
             Focus = Focus?.ToArray(), Start = Start, Dolly = Dolly, Truck = Truck, TruckAngleDegrees = TruckAngleDegrees,

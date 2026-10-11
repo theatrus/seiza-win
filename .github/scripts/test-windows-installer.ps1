@@ -69,6 +69,8 @@ try {
     $requiredFiles = @(
         $installedApp,
         (Join-Path $installDirectory "seiza_cabi.dll"),
+        (Join-Path $installDirectory "seiza_platform.dll"),
+        (Join-Path $installDirectory "Notices\LICENSE-Inter.txt"),
         (Join-Path $installDirectory "SeizaThumbnailProvider.dll"),
         (Join-Path $installDirectory "coreclr.dll"),
         (Join-Path $installDirectory "hostfxr.dll"),

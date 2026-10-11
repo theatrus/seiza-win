@@ -108,6 +108,38 @@ public sealed class ParallaxModelTests
         Assert.Equal("high", composition.VideoSettings(false).Quality);
     }
 
+    [Theory]
+    [InlineData(16, 3840, "16x3840")]
+    [InlineData(3840, 16, "3840x16")]
+    [InlineData(32, 3840, "16x1920")]
+    [InlineData(3840, 32, "1920x16")]
+    [InlineData(18, 3840, "16x3414")]
+    [InlineData(3840, 18, "3414x16")]
+    [InlineData(66, 3840, "16x930")]
+    [InlineData(3840, 66, "930x16")]
+    [InlineData(68, 3840, "16x904")]
+    [InlineData(3840, 68, "904x16")]
+    [InlineData(1922, 1080, "958x538")]
+    [InlineData(1080, 1922, "538x958")]
+    public void CustomPreviewUsesOneScaleWithOnlyAnEvenPixelRoundingDifference(int width, int height, string expected)
+    {
+        var composition = new ParallaxComposition { Width = width, Height = height };
+        Assert.Null(composition.ValidationMessage);
+        Assert.Equal(expected, composition.VideoSettings(true).Size);
+        Assert.Equal($"{width}x{height}", composition.VideoSettings(false).Size);
+        int[] preview = composition.VideoSettings(true).Size.Split('x').Select(int.Parse).ToArray();
+        Assert.InRange(preview[0], 16, width);
+        Assert.InRange(preview[1], 16, height);
+        Assert.Equal(0, preview[0] % 2);
+        Assert.Equal(0, preview[1] % 2);
+        Assert.InRange(preview[0] * preview[1], 16 * 16, 960 * 960);
+        int shortSide = Math.Min(width, height), longSide = Math.Max(width, height);
+        int previewShort = Math.Min(preview[0], preview[1]), previewLong = Math.Max(preview[0], preview[1]);
+        double scaledLong = (double)longSide * previewShort / shortSide;
+        Assert.InRange(Math.Abs(previewLong - scaledLong), 0, 1.000001);
+        if (previewShort > 16) Assert.InRange(previewLong, 16, 960);
+    }
+
     [Fact]
     public void HistoryDeepCloneKeepsEditableCollectionsAndArraysIndependent()
     {

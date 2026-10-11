@@ -57,7 +57,6 @@ public sealed partial class MainPage : Page, IDisposable
     private FitsStretchWindow? _stretchWindow;
     private ImageStackWindow? _stackWindow;
     private LiveStackWindow? _liveStackWindow;
-    private readonly HashSet<ParallaxWindow> _parallaxWindows = [];
     private MainWindow? _ownerWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
@@ -121,9 +120,8 @@ public sealed partial class MainPage : Page, IDisposable
         if (_currentPath is null || ViewModel.IsLoading) return;
         var session = new ParallaxSession(_currentPath, CurrentProcessing(), _solveResult?.Wcs, DispatcherQueue);
         var window = new ParallaxWindow(session);
-        _parallaxWindows.Add(window);
+        App.RegisterParallaxWindow(window);
         window.OpenCatalogSettingsRequested += (_, _) => App.ShowCatalogSettings();
-        window.Closed += (_, _) => _parallaxWindows.Remove(window);
         // Parallax owns a source snapshot, not the viewer's disposable CanvasBitmap.
         window.Activate();
         await session.InitializeAsync();

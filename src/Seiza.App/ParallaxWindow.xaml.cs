@@ -372,8 +372,8 @@ public sealed partial class ParallaxWindow : Window, IDisposable
         Toggle(separation, "Use StarXTerminator", () => Session.AutomaticSeparation, value => Session.AutomaticSeparation = value);
         var automatic = new StackPanel { Spacing = 8 };
         separation.Children.Add(automatic);
-        InputPicker(automatic, ParallaxInputFile.Separator, "StarXTerminator executable");
-        Note(automatic, "Requires your installed, licensed rc-astro CLI.");
+        InputPicker(automatic, ParallaxInputFile.Separator, "RC-Astro CLI (rc-astro.exe)");
+        Note(automatic, "Requires a local RC-Astro CLI with a valid StarXTerminator license.");
         var manual = new StackPanel { Spacing = 8 };
         separation.Children.Add(manual);
         AsyncButton(manual, "Choose Starless…", () => ChooseLayerAsync(true), () => Session.SourceReady);
