@@ -4,6 +4,7 @@ namespace Seiza.App.Services;
 
 internal static class CatalogSettingsStore
 {
+    public static event EventHandler? CatalogDirectoryChanged;
     private static readonly object SyncRoot = new();
     private static readonly string SettingsDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -29,6 +30,7 @@ internal static class CatalogSettingsStore
             };
             SaveSettings(settings);
         }
+        CatalogDirectoryChanged?.Invoke(null, EventArgs.Empty);
     }
 
     public static bool LoadAutomaticallyCheckForUpdates()

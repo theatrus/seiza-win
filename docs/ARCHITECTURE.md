@@ -130,6 +130,16 @@ Windows CI.
     optional parallelogram tilt diagram reuses the four native corner-cell HFR
     medians. The triangle tilt diagram consumes native three-sector analysis;
     neither renderer decodes pixels or recomputes detector measurements.
+18. Parallax video uses an independent full-resolution RGBA16 PNG snapshot with
+    the committed processing configuration and WCS/SIP geometry. Seiza owns
+    scene preparation, distance lookup, camera fitting, tours, labels and frame
+    rendering. Windows owns native inspectors and bounded streaming MP4
+    encoding through MediaStreamSource/MediaTranscoder; no pixel math is ported
+    to C#. The separate `seiza-platform` DLL adapts only focused catalog
+    status/setup through the published Rust download APIs, not a fork of the
+    shared C ABI. Core/C ABI 0.25.1 and parallax 0.2.1 come from published
+    crates, with the upstream font notice included in the app. See
+    [Parallax video](PARALLAX-VIDEO.md).
 
 ## Performance rules
 

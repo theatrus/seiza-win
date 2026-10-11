@@ -286,6 +286,11 @@
                                     Style="{StaticResource AccentButtonStyle}" />
                             </Grid>
 
+                            <StackPanel Spacing="8">
+                                <TextBlock Text="Parallax video distances" FontWeight="SemiBold" />
+                                <TextBlock Text="Download only stellar distances, object distances, and the matching object catalog. Plate-solving catalogs are installed separately above." TextWrapping="Wrap" />
+                                <Button Click="InstallParallax_Click" Content="Download offline distances" IsEnabled="{x:Bind ViewModel.CanStartSetup, Mode=OneWay}" />
+                            </StackPanel>
                             <StackPanel x:Name="ProgressPanel" Spacing="8">
                                 <ProgressBar
                                     IsIndeterminate="{x:Bind ViewModel.IsProgressIndeterminate, Mode=OneWay}"

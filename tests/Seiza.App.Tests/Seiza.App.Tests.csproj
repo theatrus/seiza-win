@@ -27,6 +27,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\Seiza.App\Models\ParallaxModels.cs" Link="Models\ParallaxModels.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ParallaxJson.cs" Link="Models\ParallaxJson.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ParallaxCore.cs" Link="Services\ParallaxCore.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.Parallax.cs" Link="Interop\NativeMethods.Parallax.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeParallaxVideoHandle.cs" Link="Interop\SafeParallaxVideoHandle.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\FitsBackground.cs" Link="Models\FitsBackground.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageSampling.cs" Link="Models\ImageSampling.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\FitsStretch.cs" Link="Models\FitsStretch.cs" />

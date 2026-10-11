@@ -57,6 +57,7 @@ public sealed partial class MainPage : Page, IDisposable
     private FitsStretchWindow? _stretchWindow;
     private ImageStackWindow? _stackWindow;
     private LiveStackWindow? _liveStackWindow;
+    private readonly HashSet<ParallaxWindow> _parallaxWindows = [];
     private MainWindow? _ownerWindow;
 
     public MainPageViewModel ViewModel { get; } = new();
@@ -113,6 +114,19 @@ public sealed partial class MainPage : Page, IDisposable
         {
             await App.OpenFolderInWindowAsync(path, _ownerWindow);
         }
+    }
+
+    private async void ParallaxVideo_Click(object sender, RoutedEventArgs e)
+    {
+        if (_currentPath is null || ViewModel.IsLoading) return;
+        var session = new ParallaxSession(_currentPath, CurrentProcessing(), _solveResult?.Wcs, DispatcherQueue);
+        var window = new ParallaxWindow(session);
+        _parallaxWindows.Add(window);
+        window.OpenCatalogSettingsRequested += (_, _) => App.ShowCatalogSettings();
+        window.Closed += (_, _) => _parallaxWindows.Remove(window);
+        // Parallax owns a source snapshot, not the viewer's disposable CanvasBitmap.
+        window.Activate();
+        await session.InitializeAsync();
     }
 
     private async void StackImages_Click(object sender, RoutedEventArgs e)
@@ -1678,6 +1692,7 @@ public sealed partial class MainPage : Page, IDisposable
             !ViewModel.IsLoading &&
             _imagePaths.Count(ImageFileService.IsStackableImage) >= 2;
         LiveStackButton.IsEnabled = _liveStackWindow is null && !ViewModel.IsLoading;
+        ParallaxVideoButton.IsEnabled = _currentPath is not null && _bitmap is not null && !ViewModel.IsLoading;
         ImageBrowserButton.Label = _isBrowserOpen ? "Hide images" : "Images";
         ImageBrowserPane.Visibility = _isBrowserOpen && BrowserItems.Count > 1
             ? Visibility.Visible

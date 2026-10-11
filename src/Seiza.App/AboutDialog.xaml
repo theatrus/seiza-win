@@ -74,6 +74,11 @@
 
         <TextBlock
             Foreground="{ThemeResource TextFillColorTertiaryBrush}"
+            Text="{x:Bind ParallaxText, Mode=OneTime}"
+            IsTextSelectionEnabled="True"
+            TextWrapping="WrapWholeWords" />
+        <TextBlock
+            Foreground="{ThemeResource TextFillColorTertiaryBrush}"
             Text="Seiza is open source under the Apache License 2.0."
             TextWrapping="Wrap" />
     </StackPanel>

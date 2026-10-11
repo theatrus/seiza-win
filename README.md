@@ -14,6 +14,15 @@ core.
 
 ![A solved NGC 7000 FITS image with WCS grid, catalog overlays, solution summary, and histogram inspector](docs/images/solved-overlays.png)
 
+## In development: parallax video
+
+The native Windows parallax editor follows [seiza-mac #56](https://github.com/theatrus/seiza-mac/pull/56):
+fly-in camera moves, generated and editable tours, depth-aware labels, offline
+distances, and silent H.264/HEVC MP4 export. Open an image, then choose
+**Parallax video…** from the toolbar’s More options menu. See the
+[Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements, controls,
+encoder availability, and safety details. This work is not yet part of a release.
+
 ## Seiza for Windows 0.7.6
 
 This point release fixes missing image thumbnails in the directory sidebar.

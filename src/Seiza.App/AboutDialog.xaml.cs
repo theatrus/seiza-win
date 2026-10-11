@@ -17,6 +17,7 @@ public sealed partial class AboutDialog : ContentDialog
     public string SeizaCommit => BuildInfo.Commit;
 
     public Uri SeizaCommitUri => BuildInfo.CommitUri;
+    public string ParallaxText => $"Parallax {BuildInfo.ParallaxVersion}";
 
     public AboutDialog()
     {

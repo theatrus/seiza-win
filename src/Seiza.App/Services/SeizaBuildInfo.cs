@@ -4,6 +4,7 @@ namespace Seiza.App.Services;
 
 internal sealed record SeizaBuildInfo(string Version, string Commit, Uri Repository)
 {
+    public string ParallaxVersion { get; init; } = "unknown";
     private const string BuildInfoFileName = "seiza-build-info.json";
 
     public static SeizaBuildInfo Current { get; } = Load();
@@ -32,7 +33,10 @@ internal sealed record SeizaBuildInfo(string Version, string Commit, Uri Reposit
             return new SeizaBuildInfo(
                 version,
                 commit,
-                new Uri(repository.TrimEnd('/') + '/', UriKind.Absolute));
+                new Uri(repository.TrimEnd('/') + '/', UriKind.Absolute))
+            {
+                ParallaxVersion = ReadString(root, "parallaxVersion") ?? "unknown",
+            };
         }
         catch (IOException)
         {

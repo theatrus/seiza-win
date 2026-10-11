@@ -201,7 +201,11 @@ public partial class CatalogSettingsViewModel : ObservableObject
         }
     }
 
-    public async Task StartSetupAsync()
+    public Task StartSetupAsync() => RunSetupAsync(parallax: false);
+
+    public Task StartParallaxSetupAsync() => RunSetupAsync(parallax: true);
+
+    private async Task RunSetupAsync(bool parallax)
     {
         if (!CanStartSetup)
         {
@@ -220,7 +224,11 @@ public partial class CatalogSettingsViewModel : ObservableObject
 
         try
         {
-            await Task.Run(() => SeizaCore.SetupCatalog(directory, preset, QueueProgress));
+            await Task.Run(() =>
+            {
+                if (parallax) ParallaxCatalogService.Install(directory, QueueProgress);
+                else SeizaCore.SetupCatalog(directory, preset, QueueProgress);
+            });
             SetupMessage = "Catalog setup complete.";
             SetupDetail = "All selected files were downloaded and SHA-256 verified.";
             ProgressPercent = 100;

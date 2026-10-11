@@ -52,6 +52,16 @@ if ($stackingPackages.Count -ne 1) {
     throw "Expected exactly one registry seiza-stacking package, found $($stackingPackages.Count)."
 }
 $stackingPackage = $stackingPackages[0]
+$parallaxPackages = @(
+    $metadata.packages | Where-Object {
+        $_.name -eq "seiza-parallax" -and
+        $_.source -like "registry+*"
+    }
+)
+if ($parallaxPackages.Count -ne 1) {
+    throw "Expected exactly one registry seiza-parallax package, found $($parallaxPackages.Count)."
+}
+$parallaxPackage = $parallaxPackages[0]
 $vcsInfoPath = Join-Path (Split-Path -Parent $nativePackage.manifest_path) ".cargo_vcs_info.json"
 if (-not (Test-Path -LiteralPath $vcsInfoPath)) {
     throw "The published seiza-cabi package does not contain Cargo VCS metadata."
@@ -85,8 +95,14 @@ else {
     $cargoCommand = $workspaceNativeBuildCommand
 }
 $thumbnailCommand = "cargo $cargoAction --package seiza-thumbnail-provider --target-dir `"$targetDirectory`" --locked$releaseFlag"
+$platformCommand = "cargo $cargoAction --package seiza-platform --target-dir `"$targetDirectory`" --locked$releaseFlag"
+if ($Test) {
+    # Dependency dev-targets must run from the published archive, not the
+    # application workspace. The shipped DLL still uses the application lock.
+    $platformCommand += " && cargo test --manifest-path `"$($parallaxPackage.manifest_path)`" --package seiza-parallax --lib --target-dir `"$targetDirectory`" --locked$releaseFlag"
+}
 
-$buildCommand = "call `"$developerCommand`" -no_logo -arch=x64 -host_arch=x64 && $cargoCommand && $thumbnailCommand"
+$buildCommand = "call `"$developerCommand`" -no_logo -arch=x64 -host_arch=x64 && $cargoCommand && $thumbnailCommand && $platformCommand"
 
 Push-Location $workspaceRoot
 try {
@@ -99,7 +115,9 @@ try {
         version = [string]$nativePackage.version
         commit = $resolvedRevision
         repository = "https://github.com/theatrus/seiza"
-    } | ConvertTo-Json -Compress
+        parallaxVersion = [string]$parallaxPackage.version
+    }
+    $buildInfo = $buildInfo | ConvertTo-Json -Compress
     $buildInfoPath = Join-Path $targetDirectory "seiza-build-info.json"
     [System.IO.Directory]::CreateDirectory($targetDirectory) | Out-Null
     [System.IO.File]::WriteAllText(

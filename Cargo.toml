@@ -3,4 +3,5 @@ resolver = "3"
 members = [
     "rust/seiza-cabi-pin",
     "rust/seiza-thumbnail-provider",
+    "rust/seiza-platform",
 ]

@@ -56,6 +56,9 @@ public sealed partial class CatalogSettingsWindow : Window
     private async void Install_Click(object sender, RoutedEventArgs e) =>
         await ViewModel.StartSetupAsync();
 
+    private async void InstallParallax_Click(object sender, RoutedEventArgs e) =>
+        await ViewModel.StartParallaxSetupAsync();
+
     private void AutomaticUpdateChecks_Toggled(object sender, RoutedEventArgs e) =>
         CatalogSettingsStore.SaveAutomaticallyCheckForUpdates(
             AutomaticUpdateChecksToggle.IsOn);
