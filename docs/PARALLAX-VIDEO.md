@@ -6,7 +6,7 @@ WinUI controls and Windows video encoding. Scene preparation, depth assignment,
 camera fitting, tour planning, labels, dust and frame rendering remain in the
 shared Seiza Rust core; Windows does not reproduce those pixel algorithms.
 
-![Native Windows parallax workspace with a prepared Iris preview and manual source layers](images/parallax-video.png)
+![Native Windows parallax workspace with a prepared Iris preview and manual source layers](images/parallax-video.jpg)
 
 ## Workflow
 

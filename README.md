@@ -38,7 +38,7 @@ encoder availability, and safety details.
 This release uses published Seiza 0.25.1, stacking 0.27.0 and parallax 0.2.1
 crates, without vendored patches.
 
-![Native parallax workspace with aligned manual layers, solved coordinates and offline stellar distances](docs/images/parallax-video.png)
+![Native parallax workspace with aligned manual layers, solved coordinates and offline stellar distances](docs/images/parallax-video.jpg)
 
 ## Seiza for Windows 0.7.6
 
