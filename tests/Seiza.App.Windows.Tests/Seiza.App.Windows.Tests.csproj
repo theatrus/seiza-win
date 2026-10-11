@@ -6,7 +6,19 @@
     <IsTestProject>true</IsTestProject>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))\</RepositoryRoot>
+    <RustProfile Condition="'$(Configuration)' == 'Release'">release</RustProfile>
+    <RustProfile Condition="'$(Configuration)' != 'Release'">debug</RustProfile>
+    <SeizaNativeDll>$(RepositoryRoot)target\$(RustProfile)\seiza_cabi.dll</SeizaNativeDll>
   </PropertyGroup>
+
+  <ItemGroup>
+    <Content Include="$(SeizaNativeDll)" Condition="Exists('$(SeizaNativeDll)')">
+      <Link>seiza_cabi.dll</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
@@ -19,5 +31,19 @@
 
   <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Services\ThumbnailPngReader.cs" Link="Services\ThumbnailPngReader.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ParallaxRasterSnapshot.cs" Link="Services\ParallaxRasterSnapshot.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ParallaxVideoExporter.cs" Link="Services\ParallaxVideoExporter.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ParallaxVideoExporter.Native.cs" Link="Services\ParallaxVideoExporter.Native.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ParallaxCore.cs" Link="Services\ParallaxCore.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\SeizaCoreException.cs" Link="Services\SeizaCoreException.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.cs" Link="Interop\NativeMethods.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.Parallax.cs" Link="Interop\NativeMethods.Parallax.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeString.cs" Link="Interop\NativeString.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeCancelSignalHandle.cs" Link="Interop\SafeCancelSignalHandle.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\SafeParallaxVideoHandle.cs" Link="Interop\SafeParallaxVideoHandle.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ParallaxExport.cs" Link="Models\ParallaxExport.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ParallaxModels.cs" Link="Models\ParallaxModels.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ParallaxJson.cs" Link="Models\ParallaxJson.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\SolveResult.cs" Link="Models\SolveResult.cs" />
   </ItemGroup>
 </Project>

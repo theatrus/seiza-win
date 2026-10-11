@@ -155,6 +155,7 @@ jobs:
             "Seiza.App.exe",              # the native host Windows actually launches
             "Seiza.App.dll",              # the managed application itself
             "seiza_cabi.dll",             # first-party Rust core
+            "seiza_platform.dll",         # first-party offline distance adapter
             "SeizaThumbnailProvider.dll"  # first-party Rust shell extension
           )
           $paths = foreach ($name in $names) {
@@ -222,7 +223,7 @@ jobs:
           tenant-id: ${{ vars.AZURE_TENANT_ID }}
           subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
 
-      # Only the installer here. The four binaries were signed before packaging;
+      # Only the installer here. The five binaries were signed before packaging;
       # signing them again would spend quota twice and append a second signature
       # to a file that already carries a good one.
       - name: Sign the MSI
@@ -236,8 +237,8 @@ jobs:
           timestamp-rfc3161: http://timestamp.acs.microsoft.com
           timestamp-digest: SHA256
 
-      # Five artifacts must verify, not one. The MSI is what a user downloads;
-      # the four binaries are what gets installed and run afterwards. Checking
+      # Six artifacts must verify, not one. The MSI is what a user downloads;
+      # the five binaries are what gets installed and run afterwards. Checking
       # the MSI alone would pass happily while shipping unsigned executables
       # inside a signed wrapper.
       - name: Verify Windows signatures
@@ -282,10 +283,14 @@ jobs:
           # msiexec /a rather than 7z: an administrative install restores the
           # real file names, while 7z yields the MSI's internal mangled names
           # and nothing can be found by name.
-          $msiExtract = Join-Path $env:RUNNER_TEMP "msi-payload-check"
-          Remove-Item -Recurse -Force $msiExtract -ErrorAction SilentlyContinue
+          $runnerTemp = [System.IO.Path]::GetFullPath($env:RUNNER_TEMP).TrimEnd('\')
+          $msiExtract = [System.IO.Path]::GetFullPath((Join-Path $runnerTemp "msi-payload-check"))
+          if (-not $msiExtract.StartsWith("$runnerTemp\", [StringComparison]::OrdinalIgnoreCase)) {
+            throw "MSI extraction path must be inside the runner temporary directory"
+          }
+          Remove-Item -LiteralPath $msiExtract -Recurse -Force -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force $msiExtract | Out-Null
-          $proc = Start-Process msiexec -Wait -PassThru -ArgumentList @(
+          $proc = Start-Process msiexec -WindowStyle Hidden -Wait -PassThru -ArgumentList @(
             '/a', "`"$msi`"", '/qn', "TARGETDIR=`"$msiExtract`""
           )
           if ($proc.ExitCode -ne 0) {
@@ -298,8 +303,7 @@ jobs:
             $inner = Get-ChildItem -Path $msiExtract -Recurse -Filter $name |
               Select-Object -First 1
             if (-not $inner) {
-              Write-Output "--- (inside MSI) ${name}: not present in the payload; skipping"
-              continue
+              throw "Required signed binary ${name} is missing from the MSI payload"
             }
             $checked++
             $signedHash = (Get-FileHash -Algorithm SHA256 -LiteralPath $binary).Hash
@@ -308,7 +312,7 @@ jobs:
             Write-Output "    signed : $signedHash"
             Write-Output "    inside : $innerHash"
             if ($signedHash -ne $innerHash) {
-              Write-Output "    -> DIFFERS from the signed file (packaging rewrote it)"
+              throw "The $name inside the MSI differs from the signed published file"
             }
             $report = & $signtool.FullName verify /pa /v $inner.FullName
             $report | Write-Output
@@ -319,8 +323,8 @@ jobs:
               throw "the $name inside the MSI is signed by someone other than StackFoundry LLC"
             }
           }
-          if ($checked -eq 0) {
-            throw "no first-party binary was found inside the MSI payload -- the check proved nothing, which is not the same as passing"
+          if ($checked -ne $binaries.Count) {
+            throw "Not every required first-party binary was verified inside the MSI payload"
           }
 
           Write-Output "OK: the installer, the loose binaries, and $checked copies inside the MSI are all signed as StackFoundry LLC"

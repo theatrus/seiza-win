@@ -195,7 +195,7 @@ Then verify all of the following:
 - the GitHub release title and body use the intended Windows version and notes;
 - every expected asset exists and `SHA256SUMS.txt` matches downloaded files;
 - the downloaded MSI's Digital Signatures tab names StackFoundry LLC, and so
-  do `Seiza.App.exe`, `Seiza.App.dll`, `seiza_cabi.dll`, and
+  do `Seiza.App.exe`, `Seiza.App.dll`, `seiza_cabi.dll`, `seiza_platform.dll`, and
   `SeizaThumbnailProvider.dll` once installed;
 - `appcast.xml` names the new version, points at the versioned MSI asset, and
   contains its Ed25519 signature;

@@ -11,14 +11,15 @@ namespace Seiza.App;
 /// </summary>
 public partial class App : Application
 {
+    internal static UpdateController Updates { get; } = new();
+
     private static readonly HashSet<MainWindow> DocumentWindows = [];
+    private static readonly WindowLifetimeRegistry<Window> IndependentWindows = new(() => Updates.Dispose());
     private static CatalogSettingsWindow? _catalogSettingsWindow;
     private static AppInstance? _mainInstance;
     private static AppActivationArguments? _initialActivation;
     private static string[] _initialCommandLinePaths = [];
     private static int _automaticUpdateCheckStarted;
-
-    internal static UpdateController Updates { get; } = new();
 
     public static Microsoft.UI.Dispatching.DispatcherQueue DispatcherQueue { get; private set; } = null!;
 
@@ -45,6 +46,7 @@ public partial class App : Application
         MainWindow window = new();
         DocumentWindows.Add(window);
         window.Closed += DocumentWindow_Closed;
+        RegisterIndependentWindow(window);
         window.Activate();
         return window;
     }
@@ -95,8 +97,29 @@ public partial class App : Application
 
     public static void ShowCatalogSettings()
     {
-        _catalogSettingsWindow ??= new CatalogSettingsWindow();
+        if (_catalogSettingsWindow is null)
+        {
+            _catalogSettingsWindow = new CatalogSettingsWindow();
+            RegisterIndependentWindow(_catalogSettingsWindow);
+        }
         _catalogSettingsWindow.Activate();
+    }
+
+    internal static void RegisterParallaxWindow(ParallaxWindow window)
+    {
+        RegisterIndependentWindow(window);
+    }
+
+    private static void RegisterIndependentWindow(Window window)
+    {
+        if (IndependentWindows.Add(window)) window.Closed += IndependentWindow_Closed;
+    }
+
+    private static void IndependentWindow_Closed(object sender, WindowEventArgs args)
+    {
+        if (sender is not Window window) return;
+        window.Closed -= IndependentWindow_Closed;
+        IndependentWindows.Remove(window);
     }
 
     internal static void NotifyCatalogSettingsClosed(CatalogSettingsWindow window)
@@ -105,7 +128,6 @@ public partial class App : Application
         {
             _catalogSettingsWindow = null;
         }
-        DisposeUpdatesIfLastWindowClosed();
     }
 
     protected override void OnLaunched(Microsoft.UI.Xaml.LaunchActivatedEventArgs args)
@@ -226,15 +248,6 @@ public partial class App : Application
         {
             window.Closed -= DocumentWindow_Closed;
             DocumentWindows.Remove(window);
-        }
-        DisposeUpdatesIfLastWindowClosed();
-    }
-
-    private static void DisposeUpdatesIfLastWindowClosed()
-    {
-        if (DocumentWindows.Count == 0 && _catalogSettingsWindow is null)
-        {
-            Updates.Dispose();
         }
     }
 }

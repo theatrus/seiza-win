@@ -12,7 +12,8 @@ namespace Seiza.App.Tests;
 /// </summary>
 public sealed class StackingOptionsNativeTests
 {
-    private static readonly int[] ExpectedReintegrationPasses = [0, 1, 2];
+    private static readonly int[] ExpectedReintegrationPasses = [0, 2];
+    private static readonly int[] ExpectedReintegrationFrameIndices = [0, 1, 2, 3];
 
     [Fact]
     public async Task LiveCoordinatorSnapshotsEveryAdvancedOptionBeforeOpeningTheNativeStack()
@@ -187,7 +188,16 @@ public sealed class StackingOptionsNativeTests
                 new ImmediateProgress(reports));
             Assert.Equal(4, cleaned.AcceptedFrames);
             Assert.Equal(0, cleaned.RejectedFrames);
+            // Seiza 0.25 integrates retained scratch frames band by band. All
+            // three rejection passes still run, but the ABI reports pass 0
+            // for normalization reads and pass 2 across the bands; pass 1 is
+            // announced separately only on the whole-frame fallback path.
             Assert.Equal(ExpectedReintegrationPasses, reports.Select(report => report.Pass).Distinct().ToArray());
+            foreach (int pass in ExpectedReintegrationPasses)
+            {
+                Assert.Equal(ExpectedReintegrationFrameIndices,
+                    reports.Where(report => report.Pass == pass).Select(report => report.Index).ToArray());
+            }
             Assert.All(reports, report => Assert.Equal(4, report.Count));
             string output = Path.Combine(directory, "cleaned.fits");
             await cleaned.WriteFitsAsync(output);

@@ -74,6 +74,28 @@ test exist.
 | Stack SNR analysis | Available | **Complete** | Directory and live stacks measure the native accumulator at doubling depths plus the final depth and present noise improvement against the square-root ideal. Runtime-tested with four distinct 6,248 x 4,176, 30-second telescope FITS lights: measured noise fell from 41.76 at one frame to 19.83 at four frames, a 2.11x improvement against the ideal 2.00x. |
 | Resumable live folder stacking | Available | **Complete** | A native WinUI window watches and reconciles stable FITS/XISF arrivals, locks one compatible filter/camera geometry, renders bounded previews, snapshots or finishes FITS output, and checkpoints exact native online state with current/previous generation recovery. Runtime-tested end to end through pause, app relaunch, exact resume, new-file ingestion, a 104,371,200-byte non-destructive snapshot, final export, and completion-tombstone retirement. |
 
+## Parallax video (0.8.0)
+
+This slice is audited against [seiza-mac #56](https://github.com/theatrus/seiza-mac/pull/56)
+at `48469d6f3588ac651cd13d3ba0689ac187583344` (2026-10-10), independently of the
+historical baseline above. It uses published `seiza-cabi 0.25.1` and
+`seiza-parallax 0.2.1`, with no vendored renderer or crate patch. It is included
+in the 0.8.0 release.
+
+| Capability | macOS #56 | Windows | Validation / remaining acceptance criterion |
+| --- | --- | --- | --- |
+| Independent source snapshot and retained WCS | Available | **Complete** | Native windows opened a real 6,248 × 4,176 FITS snapshot with committed stretch and a 9,595 × 6,346 RGB16 Iris TIFF with solved coordinates. Lossless WIC raster snapshots retain 16-bit distinctions and normalize orientation; originals are not modified. |
+| Source/depth, camera, labels and output controls | Available | **Complete** | Native WinUI inspectors expose the Mac controls; source-pixel destination picking and undo were exercised interactively. Renderer, JSON and validation contracts have automated coverage. |
+| Generated and editable tours | Available | **Complete** | A real solved image generated and applied an eight-stop, 51.7-second itinerary, with target markers and arrival-time selection. JSON portability, loops, spin and travel turns are also tested. |
+| Manual layers and StarXTerminator | Available | **Partial** | Supplied full-size Iris starless/unscreened-stars TIFF layers imported and prepared interactively, with alignment confirmation and orientation checks. Local RC-Astro CLI selection is implemented; a licensed StarXTerminator run still requires user QA. Nothing is bundled or installed. |
+| Scene preparation, immutable refit and bounded preview | Available | **Complete** | Actual C ABI integration checks random frame rendering, padded BGRA, scene reuse after input removal, concurrent handles, native fit warnings and cancellation/retry. The published renderer's 88 library tests pass. |
+| Focused offline distances | Available | **Complete** | Native adapter selects the exact three datasets, validates header coverage and integrity, and tests narrow corrupt-cache repair entirely offline. Catalog changes invalidate prepared scenes. |
+| Silent native H.264 MP4 export | Available | **Complete** | Windows-runtime tests encode and decode MP4, verifying exact sample count, dimensions, FPS, duration, color, top-down orientation, silence, bounded buffers and cancellation/failure preservation. Real Iris TIFF layers produced a 1280 × 720, 48-frame movie at 24 fps with all eight source-folder files hash-identical. |
+| Native HEVC MP4 export | Available | **Partial** | Choice and native encoder integration are implemented. This machine lacks an HEVC encoder; its actionable error and preservation of previous output are tested. Successful HEVC encoding needs an encoder-equipped machine. |
+
+See [the Windows workflow and safety guide](PARALLAX-VIDEO.md) for input
+requirements, itinerary scope, limits and validation commands.
+
 ## Catalog settings and managed data
 
 The macOS Settings flow is now part of first-release parity, not a future

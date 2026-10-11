@@ -27,6 +27,7 @@
             IsDynamicOverflowEnabled="True">
             <CommandBar.SecondaryCommands>
                 <AppBarButton Click="NewWindow_Click" Label="New window" />
+                <AppBarButton x:Name="ParallaxVideoButton" Click="ParallaxVideo_Click" Label="Parallax video…" IsEnabled="False" />
                 <AppBarSeparator />
                 <AppBarButton Click="CheckForUpdates_Click" Label="Check for updates…" />
                 <AppBarSeparator />
