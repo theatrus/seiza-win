@@ -1,8 +1,11 @@
+using System.Diagnostics.CodeAnalysis;
+using System.Runtime.InteropServices;
 using Seiza.App.Models;
 using Seiza.App.Services;
 using Windows.Graphics.Imaging;
 using Windows.Media.Editing;
 using Windows.Media.MediaProperties;
+using Windows.Media.Transcoding;
 using Windows.Storage;
 using Windows.Storage.Streams;
 using Xunit;
@@ -130,8 +133,12 @@ public sealed class ParallaxVideoExporterTests(ITestOutputHelper output)
         }
         catch (InvalidOperationException exception) when (exception.Message.StartsWith("Windows cannot encode this movie as HEVC", StringComparison.Ordinal))
         {
-            output.WriteLine(exception.Message);
+            output.WriteLine(exception.ToString());
             Assert.Contains("Try H.264", exception.Message, StringComparison.Ordinal);
+            if (exception.InnerException is COMException nativeFailure)
+            {
+                Assert.Contains($"HRESULT 0x{nativeFailure.HResult:X8}", exception.Message, StringComparison.Ordinal);
+            }
             Assert.Equal(previous, await File.ReadAllBytesAsync(path));
             Assert.Empty(Directory.GetFiles(directory.Path, ".seiza-parallax-*.mp4"));
             return;
@@ -143,6 +150,107 @@ public sealed class ParallaxVideoExporterTests(ITestOutputHelper output)
         Assert.Equal(source.FrameCount, CountVideoSamples(await File.ReadAllBytesAsync(path)));
         Assert.InRange(clip.OriginalDuration.TotalSeconds, 0.49, 0.51);
         output.WriteLine("HEVC was encoded successfully by this Windows installation.");
+        Assert.Empty(Directory.GetFiles(directory.Path, ".seiza-parallax-*.mp4"));
+    }
+
+    [Theory]
+    [InlineData(unchecked((int)0x80004005), false)]
+    [InlineData(unchecked((int)0x80004005), true)]
+    [InlineData(unchecked((int)0xC00D5212), false)]
+    [InlineData(unchecked((int)0xC00D5212), true)]
+    public async Task HevcSetupComFailureReportsHresultAndPreservesDestination(int hresult, bool asynchronous)
+    {
+        using var directory = new TemporaryDirectory();
+        string path = Path.Combine(directory.Path, "movie.mp4");
+        byte[] previous = [4, 8, 12];
+        await File.WriteAllBytesAsync(path, previous);
+        COMException expected = CreateWindowsComFailure(hresult);
+        var source = new SyntheticFrames();
+
+        InvalidOperationException actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            ParallaxVideoExporter.ExportWithPreparationAsync(source, path, ParallaxVideoCodec.Hevc,
+                (_, _, _, _, _) => asynchronous ? FailAfterYieldAsync() : throw expected));
+
+        Assert.StartsWith("Windows cannot encode this movie as HEVC", actual.Message, StringComparison.Ordinal);
+        Assert.Contains($"HRESULT 0x{hresult:X8}", actual.Message, StringComparison.Ordinal);
+        Assert.Contains("Try H.264", actual.Message, StringComparison.Ordinal);
+        Assert.Same(expected, actual.InnerException);
+        Assert.Equal(previous, await File.ReadAllBytesAsync(path));
+        Assert.Empty(source.RenderedIndices);
+        Assert.Empty(Directory.GetFiles(directory.Path, ".seiza-parallax-*.mp4"));
+
+        async Task<PrepareTranscodeResult> FailAfterYieldAsync()
+        {
+            await Task.Yield();
+            throw expected;
+        }
+    }
+
+    [Fact]
+    public async Task HevcSetupNotSupportedFailureIsActionableAndPreservesDestination()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = Path.Combine(directory.Path, "movie.mp4");
+        byte[] previous = [1, 2, 3];
+        await File.WriteAllBytesAsync(path, previous);
+        var expected = new NotSupportedException("No supported encoding profile.");
+        var source = new SyntheticFrames();
+
+        InvalidOperationException actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            ParallaxVideoExporter.ExportWithPreparationAsync(source, path, ParallaxVideoCodec.Hevc,
+                (_, _, _, _, _) => throw expected));
+
+        Assert.StartsWith("Windows cannot encode this movie as HEVC", actual.Message, StringComparison.Ordinal);
+        Assert.Contains($"HRESULT 0x{expected.HResult:X8}", actual.Message, StringComparison.Ordinal);
+        Assert.Contains("Try H.264", actual.Message, StringComparison.Ordinal);
+        Assert.Same(expected, actual.InnerException);
+        Assert.Equal(previous, await File.ReadAllBytesAsync(path));
+        Assert.Empty(source.RenderedIndices);
+        Assert.Empty(Directory.GetFiles(directory.Path, ".seiza-parallax-*.mp4"));
+    }
+
+    [Fact]
+    public async Task CancellationTakesPrecedenceOverHevcSetupComFailure()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = Path.Combine(directory.Path, "movie.mp4");
+        byte[] previous = [5, 10, 15];
+        await File.WriteAllBytesAsync(path, previous);
+        using var cancellation = new CancellationTokenSource();
+        var source = new SyntheticFrames();
+        COMException expected = CreateWindowsComFailure(unchecked((int)0x80004005));
+
+        OperationCanceledException actual = await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            ParallaxVideoExporter.ExportWithPreparationAsync(source, path, ParallaxVideoCodec.Hevc,
+                (_, _, _, _, _) =>
+                {
+                    cancellation.Cancel();
+                    throw expected;
+                }, cancellationToken: cancellation.Token));
+
+        Assert.Equal(cancellation.Token, actual.CancellationToken);
+        Assert.Equal(previous, await File.ReadAllBytesAsync(path));
+        Assert.Empty(source.RenderedIndices);
+        Assert.Empty(Directory.GetFiles(directory.Path, ".seiza-parallax-*.mp4"));
+    }
+
+    [Fact]
+    public async Task NonInteropSetupFailureIsNotRelabeledAsUnavailableEncoder()
+    {
+        using var directory = new TemporaryDirectory();
+        string path = Path.Combine(directory.Path, "movie.mp4");
+        byte[] previous = [6, 12, 18];
+        await File.WriteAllBytesAsync(path, previous);
+        var expected = new IOException("Synthetic setup I/O failure.");
+        var source = new SyntheticFrames();
+
+        IOException actual = await Assert.ThrowsAsync<IOException>(() =>
+            ParallaxVideoExporter.ExportWithPreparationAsync(source, path, ParallaxVideoCodec.Hevc,
+                (_, _, _, _, _) => throw expected));
+
+        Assert.Same(expected, actual);
+        Assert.Equal(previous, await File.ReadAllBytesAsync(path));
+        Assert.Empty(source.RenderedIndices);
         Assert.Empty(Directory.GetFiles(directory.Path, ".seiza-parallax-*.mp4"));
     }
 
@@ -174,16 +282,20 @@ public sealed class ParallaxVideoExporterTests(ITestOutputHelper output)
         Assert.Empty(Directory.GetFiles(directory.Path, ".seiza-parallax-*.mp4"));
     }
 
-    [Fact]
-    public async Task ProducerFailurePreservesDestinationAndReportsOriginalFailure()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task ProducerFailurePreservesDestinationAndReportsOriginalFailure(bool comFailure)
     {
         using var directory = new TemporaryDirectory();
         string path = Path.Combine(directory.Path, "movie.mp4");
         byte[] previous = [2, 4, 6];
         await File.WriteAllBytesAsync(path, previous);
-        var expected = new InvalidOperationException("Synthetic frame failure.");
+        Exception expected = comFailure
+            ? CreateWindowsComFailure(unchecked((int)0x80004005))
+            : new InvalidOperationException("Synthetic frame failure.");
         var source = new SyntheticFrames { RenderFailure = expected };
-        InvalidOperationException actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+        Exception? actual = await Record.ExceptionAsync(() =>
             ParallaxVideoExporter.ExportAsync(source, path, ParallaxVideoCodec.H264));
         Assert.Same(expected, actual);
         Assert.Equal(previous, await File.ReadAllBytesAsync(path));
@@ -251,6 +363,10 @@ public sealed class ParallaxVideoExporterTests(ITestOutputHelper output)
             }
         }
     }
+
+    [SuppressMessage("Usage", "CA2201:Do not raise reserved exception types",
+        Justification = "Fault injection reproduces the empty COMException returned by Windows encoder setup.")]
+    private static COMException CreateWindowsComFailure(int hresult) => new(string.Empty, hresult);
 
     private sealed class SyntheticFrames : IParallaxVideoFrameSource
     {

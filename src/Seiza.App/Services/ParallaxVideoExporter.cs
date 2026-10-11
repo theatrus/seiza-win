@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using System.Runtime.ExceptionServices;
+using System.Runtime.InteropServices;
 using System.Runtime.InteropServices.WindowsRuntime;
 using Seiza.App.Models;
 using Windows.Media.Core;
@@ -15,14 +16,33 @@ internal static partial class ParallaxVideoExporter
 {
     internal const int MaximumBufferedFrames = 6;
 
-    public static async Task ExportAsync(
+    internal delegate Task<PrepareTranscodeResult> PrepareEncoding(
+        MediaStreamSource source,
+        IRandomAccessStream destination,
+        ParallaxVideoCodec codec,
+        IParallaxVideoFrameSource video,
+        CancellationToken cancellationToken);
+
+    public static Task ExportAsync(
         IParallaxVideoFrameSource video,
         string destinationPath,
         ParallaxVideoCodec codec,
         IProgress<ParallaxExportProgress>? progress = null,
+        CancellationToken cancellationToken = default) =>
+        ExportWithPreparationAsync(video, destinationPath, codec, PrepareEncodingAsync,
+            progress, cancellationToken);
+
+    // Per-export injection keeps setup failures testable without mutable process-wide state.
+    internal static async Task ExportWithPreparationAsync(
+        IParallaxVideoFrameSource video,
+        string destinationPath,
+        ParallaxVideoCodec codec,
+        PrepareEncoding prepareEncoding,
+        IProgress<ParallaxExportProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(video);
+        ArgumentNullException.ThrowIfNull(prepareEncoding);
         ArgumentException.ThrowIfNullOrWhiteSpace(destinationPath);
         Validate(video, codec);
         cancellationToken.ThrowIfCancellationRequested();
@@ -45,7 +65,7 @@ internal static partial class ParallaxVideoExporter
             StorageFile output = await StorageFile.GetFileFromPathAsync(staging);
             using (IRandomAccessStream stream = await output.OpenAsync(FileAccessMode.ReadWrite))
             {
-                await using var job = new EncodingJob(video, progress, cancellationToken);
+                await using var job = new EncodingJob(video, progress, prepareEncoding, cancellationToken);
                 await job.EncodeAsync(stream, codec).ConfigureAwait(false);
             }
             cancellationToken.ThrowIfCancellationRequested();
@@ -89,9 +109,41 @@ internal static partial class ParallaxVideoExporter
         properties.Properties[new Guid("3e23d450-2c75-4d25-a00e-b91670d12327")] = 1u;
     }
 
+    private static async Task<PrepareTranscodeResult> PrepareEncodingAsync(
+        MediaStreamSource source,
+        IRandomAccessStream destination,
+        ParallaxVideoCodec codec,
+        IParallaxVideoFrameSource video,
+        CancellationToken cancellationToken)
+    {
+        // Keep Windows' codec-specific profile defaults (including HEVC profile
+        // attributes) instead of replacing Video with a minimally initialized type.
+        var profile = codec == ParallaxVideoCodec.Hevc
+            ? MediaEncodingProfile.CreateHevc(VideoEncodingQuality.HD1080p)
+            : MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD1080p);
+        profile.Audio = null;
+        profile.Video.Width = (uint)video.Width;
+        profile.Video.Height = (uint)video.Height;
+        profile.Video.FrameRate.Numerator = (uint)video.FramesPerSecond;
+        profile.Video.FrameRate.Denominator = 1;
+        profile.Video.PixelAspectRatio.Numerator = 1;
+        profile.Video.PixelAspectRatio.Denominator = 1;
+        profile.Video.Bitrate = (uint)Math.Max(2_000_000L,
+            (long)video.Width * video.Height * video.FramesPerSecond / 2);
+        SetDisplayColorProperties(profile.Video);
+        // Request no B-frame lookahead. Hardware encoders may ignore optional
+        // codec properties; the sample pool remains capped independently.
+        profile.Video.Properties[new Guid("8d390aac-dc5c-4200-b57f-814d04babab2")] = 0u;
+
+        var transcoder = new MediaTranscoder { HardwareAccelerationEnabled = true };
+        return await transcoder.PrepareMediaStreamSourceTranscodeAsync(source, destination, profile)
+            .AsTask(cancellationToken).ConfigureAwait(false);
+    }
+
     private sealed class EncodingJob : IAsyncDisposable
     {
         private readonly IParallaxVideoFrameSource _video;
+        private readonly PrepareEncoding _prepareEncoding;
         private readonly IProgress<ParallaxExportProgress>? _progress;
         private readonly CancellationToken _callerCancellation;
         private readonly CancellationTokenSource _stop;
@@ -110,9 +162,11 @@ internal static partial class ParallaxVideoExporter
         internal EncodingJob(
             IParallaxVideoFrameSource video,
             IProgress<ParallaxExportProgress>? progress,
+            PrepareEncoding prepareEncoding,
             CancellationToken cancellationToken)
         {
             _video = video;
+            _prepareEncoding = prepareEncoding;
             _progress = progress;
             _callerCancellation = cancellationToken;
             _stop = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
@@ -140,31 +194,26 @@ internal static partial class ParallaxVideoExporter
 
         internal async Task EncodeAsync(IRandomAccessStream destination, ParallaxVideoCodec codec)
         {
-            // Keep Windows' codec-specific profile defaults (including HEVC profile
-            // attributes) instead of replacing Video with a minimally initialized type.
-            var profile = codec == ParallaxVideoCodec.Hevc
-                ? MediaEncodingProfile.CreateHevc(VideoEncodingQuality.HD1080p)
-                : MediaEncodingProfile.CreateMp4(VideoEncodingQuality.HD1080p);
-            profile.Audio = null;
-            profile.Video.Width = (uint)_video.Width;
-            profile.Video.Height = (uint)_video.Height;
-            profile.Video.FrameRate.Numerator = (uint)_video.FramesPerSecond;
-            profile.Video.FrameRate.Denominator = 1;
-            profile.Video.PixelAspectRatio.Numerator = 1;
-            profile.Video.PixelAspectRatio.Denominator = 1;
-            profile.Video.Bitrate = (uint)Math.Max(2_000_000L,
-                (long)_video.Width * _video.Height * _video.FramesPerSecond / 2);
-            SetDisplayColorProperties(profile.Video);
-            // Request no B-frame lookahead. Hardware encoders may ignore optional
-            // codec properties; the sample pool remains capped independently.
-            profile.Video.Properties[new Guid("8d390aac-dc5c-4200-b57f-814d04babab2")] = 0u;
-
-            var transcoder = new MediaTranscoder { HardwareAccelerationEnabled = true };
             try
             {
-                PrepareTranscodeResult prepared = await transcoder
-                    .PrepareMediaStreamSourceTranscodeAsync(Source, destination, profile)
-                    .AsTask(_stop.Token).ConfigureAwait(false);
+                PrepareTranscodeResult prepared;
+                try
+                {
+                    prepared = await _prepareEncoding(Source, destination, codec, _video, _stop.Token)
+                        .ConfigureAwait(false);
+                }
+                catch (Exception exception) when (exception is COMException or NotSupportedException)
+                {
+                    // Windows can reject a profile or fail asynchronous preparation before
+                    // returning CanTranscode/FailureReason. Do not infer a specific missing
+                    // codec from an unknown HRESULT, or relabel render/transcode failures.
+                    _callerCancellation.ThrowIfCancellationRequested();
+                    Volatile.Read(ref _failure)?.Throw();
+                    throw new InvalidOperationException(
+                        $"Windows cannot encode this movie as {(codec == ParallaxVideoCodec.Hevc ? "HEVC" : "H.264")} " +
+                        $"(Windows encoder preparation failed; HRESULT 0x{exception.HResult:X8}). " +
+                        "Try H.264 at 1080p; HEVC requires an available Windows encoder.", exception);
+                }
                 if (!prepared.CanTranscode)
                 {
                     throw new InvalidOperationException(
