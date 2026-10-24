@@ -1,5 +1,10 @@
 name: CI
 
+# Linux and Windows jobs run on ephemeral 32-core runners (tfinfra
+# roots/github-runners, docs/github-runners-plan.md). Other platforms, releases,
+# and every pull request from a fork stay on GitHub's runners: a fork's code
+# never runs on ours. Job names are unchanged.
+
 on:
   push:
     branches: [main]
@@ -14,7 +19,7 @@ concurrency:
 
 jobs:
   windows:
-    runs-on: windows-latest
+    runs-on: ${{ github.event.pull_request.head.repo.fork && 'windows-latest' || fromJSON('["self-hosted","windows","ghr-windows-x64"]') }}
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
       DOTNET_NOLOGO: true
