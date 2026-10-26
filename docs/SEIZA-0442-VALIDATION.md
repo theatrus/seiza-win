@@ -108,10 +108,25 @@ disposal; cancellation before virtual loading leaves source pixels intact.
 
 An isolated production App entry point loaded a synthetic 20,001 × 1,025 FITS
 fixture and exposed its correct dimensions and normal viewer controls. The
-desktop screenshot was black and activation twice failed with
-`GetCursorPos failed: Access is denied. (0x80070005)`, so manual mosaic
-zoom/pan/navigation is not claimed. Automated GPU rendering and codec checks
-above passed. No real astronomical mosaic color/quality assessment is claimed.
+initial desktop check was blocked by access errors. A later interactive retry
+displayed that fixture and two 20,001 × 2,160 M31 diagnostic copies. Loading,
+zooming and panning were observed without a GPU dimension error.
+
+The astronomical source available for this retry was 3,840 × 2,160. Its samples
+were placed unchanged in the middle of the larger canvas, first with integer
+black padding and then with float NaN coverage outside the observed field.
+The float copy also carried the source's previously verified WCS translated to
+the padded grid. These are derived fixtures, not independently observed wide
+mosaics. Original and fixture hashes remained unchanged during testing.
+
+The integer fixture's interactive Solve returned unverified header coordinates.
+A direct 0.44.2 C ABI solve of the NaN fixture returned `header-unchecked`, zero
+matches and 600 detections after 56.339 s (55.638 s native elapsed). A control
+solve of the unchanged original returned `header-checked`, 584 matches and
+0.662 arcsec RMS in 227 ms. The retry confirms large-image viewing, but does
+not establish successful solving of a >20k astronomical mosaic. Automated
+GPU rendering and codec checks above passed; a representative full mosaic
+remains a separate validation input.
 
 These changes remove the per-texture dimension limit. Native rendering still
 materializes the complete CPU image and uses managed pixel arrays; available
