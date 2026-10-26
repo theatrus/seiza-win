@@ -123,10 +123,24 @@ The integer fixture's interactive Solve returned unverified header coordinates.
 A direct 0.44.2 C ABI solve of the NaN fixture returned `header-unchecked`, zero
 matches and 600 detections after 56.339 s (55.638 s native elapsed). A control
 solve of the unchanged original returned `header-checked`, 584 matches and
-0.662 arcsec RMS in 227 ms. The retry confirms large-image viewing, but does
-not establish successful solving of a >20k astronomical mosaic. Automated
-GPU rendering and codec checks above passed; a representative full mosaic
-remains a separate validation input.
+0.662 arcsec RMS in 227 ms. That padded-field experiment confirmed viewing but
+did not establish a star-validated solve.
+
+A subsequent borderless test proportionally enlarged the same M31 field to
+**20,480 × 11,520**. Preparation averaged 2 × 2 Bayer blocks to mono, used
+bilinear resampling, and rescaled the verified WCS with pixel-center mapping.
+The complete field fills the image; no border was added. Both the original
+source and the enlarged fixture retained their SHA-256 hashes.
+
+The production App loaded this image and its **Solve** command completed in
+**1.17 s**, reporting **456 matched / 600 detected**, **0.468 arcsec RMS** and
+`header-checked`. The coordinate grid and object overlays were observed over
+the image. An independent direct 0.44.2 C ABI call returned the same star count
+and RMS in **1.313 s wall time / 1.309 s native elapsed**, at 0.254676 arcsec/px.
+This validates loading and star-checked solving beyond 20k pixels with
+resampled test data; an independently observed full mosaic remains a separate
+quality/performance input. The earlier padded-field fallback is retained above
+as a distinct experiment.
 
 These changes remove the per-texture dimension limit. Native rendering still
 materializes the complete CPU image and uses managed pixel arrays; available
