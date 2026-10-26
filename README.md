@@ -8,8 +8,8 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.8.6 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.6/seiza-0.8.6-windows-x86_64.msi)
-· [0.8.6 release notes](docs/releases/v0.8.6.md)
+[Download Seiza for Windows 0.8.7 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.7/seiza-0.8.7-windows-x86_64.msi)
+· [0.8.7 release notes](docs/releases/v0.8.7.md)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -91,7 +91,7 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.8.6 uses Seiza/C ABI 0.44.2, stacking 0.51.2, parallax
+0.8.7 uses Seiza/C ABI 0.44.2, stacking 0.51.2, parallax
 0.19.2 and image-io 0.11.0 from published crates.
 
 ## Image viewing and folder review
@@ -106,6 +106,8 @@ images are loaded, regardless of SubframeSelector's Approved flag. Quote CSV
 paths containing commas. Absolute paths are accepted, and relative paths resolve
 from the directory containing the list file. Duplicate paths appear once; the
 browser reports missing, invalid, or unsupported entries that were skipped.
+The sidebar identifies the source list by filename, with its full path in the
+tooltip, instead of displaying the first image's directory as the collection root.
 
 For example, a TXT list can contain:
 
@@ -146,6 +148,20 @@ RGB histograms, searchable source headers, and processing provenance.
 | ![Native sidebar with nested relative paths, collapsible groups and synthetic sample thumbnails](docs/images/nested-browser/folder-path.png) | ![Native sidebar grouping synthetic sample images by filename filter, with relative labels distinguishing same-named files](docs/images/nested-browser/filter.png) |
 
 Native sidebar controls shown with synthetic sample images.
+
+## Seiza for Windows 0.8.7: TXT and CSV image collections
+
+Open a saved TXT or CSV list as one collection across capture folders. Review
+thumbnails, change grouping, navigate images and use the collection for stacking.
+The sidebar shows the list filename and image count, reports skipped entries,
+and hides the folder-only root label and subfolder control. PixInsight
+SubframeSelector exports can include settings before their image table; all
+listed images are included regardless of the Approved flag.
+
+![Native image browser showing a CSV list source, skipped-entry count and images from two folders](docs/images/csv-image-list-sidebar.png)
+
+Native sidebar captured with synthetic sample images. See the
+[0.8.7 release notes](docs/releases/v0.8.7.md) for input formats and validation.
 
 ## Seiza for Windows 0.8.6: GPU stacking, mosaics and color tools
 
@@ -670,8 +686,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.8.6 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.6/seiza-0.8.6-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.6/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.8.7 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.7/seiza-0.8.7-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.7/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -737,7 +753,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.8.6
+  -p:SeizaVersion=0.8.7
 ```
 
 The installer is written to `dist`. See the
