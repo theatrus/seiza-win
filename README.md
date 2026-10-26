@@ -8,8 +8,8 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.8.5 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.5/seiza-0.8.5-windows-x86_64.msi)
-· [0.8.5 release notes](docs/releases/v0.8.5.md)
+[Download Seiza for Windows 0.8.6 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.6/seiza-0.8.6-windows-x86_64.msi)
+· [0.8.6 release notes](docs/releases/v0.8.6.md)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -91,8 +91,8 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.8.5 uses Seiza/C ABI 0.39.0, stacking 0.42.0, parallax
-0.16.0, image-io 0.9.0, and stretch 0.3.1 from published crates.
+0.8.6 uses Seiza/C ABI 0.44.2, stacking 0.51.2, parallax
+0.19.2 and image-io 0.11.0 from published crates.
 
 ## Image viewing and folder review
 
@@ -121,9 +121,9 @@ RGB histograms, searchable source headers, and processing provenance.
 
 Native sidebar controls shown with synthetic sample images.
 
-## In development: faster solving and expanded mosaic stacks
+## Seiza for Windows 0.8.6: GPU stacking, mosaics and color tools
 
-The development build adopts published Seiza/C ABI **0.44.2**, stacking
+This release adopts published Seiza/C ABI **0.44.2**, stacking
 **0.51.2**, parallax **0.19.2**, and image-io **0.11.0**. Blind solving now uses
 Seiza's faster candidate search and full-catalog refinement. In an earlier local
 0.40.1 warm-cache comparison against 0.39.0, Tulip solved in **0.35 s instead of
@@ -138,9 +138,9 @@ Manual selection offers **Fixed reference frame** or **Expanded mosaic /
 dithered edges**, with a canvas memory limit, a 5% default overlap, existing
 registration and normalization choices, and visible planning/lens notes. See the
 [mosaic stacking guide and validation notes](docs/MOSAIC-STACKING.md) for limits,
-measurements, and compatibility details. These changes are not in 0.8.5.
+measurements, and compatibility details.
 
-The development viewer also opens mosaics wider or taller than 16,384 pixels
+The viewer also opens mosaics wider or taller than 16,384 pixels
 using on-demand GPU tiles at full resolution. Clipboard and image exports avoid
 an oversized GPU bitmap, including when exporting overlays. CPU memory and
 output-format limits still apply.
@@ -169,9 +169,19 @@ RC-Astro tools without opening console windows on Windows.
 | --- | --- |
 | ![Expanded mosaic canvas selection and memory ceiling in the native Windows stacking dialog](docs/images/mosaic-stacking/readme-canvas.png) | ![Native Windows Settings showing GPU acceleration and its planning budget](docs/images/stacking-gpu-budget-settings.png) |
 
-These are native UI captures from the development build. The panel examples use
+These are native UI captures of the released controls. The panel examples use
 crops and repeated copies of an M31 image to demonstrate selection, not
 independently captured mosaic exposures. No original exposures were modified.
+
+New [narrowband, continuum and RGB star tools](docs/COLOR-TOOLS.md) follow a
+preview-first flow with optional settings collapsed. Build HOO/SHO palettes,
+review stellar continuum fits before signed subtraction, and stretch or restore
+RGB star layers. A borderless 20,480 × 11,520 M31 upscale loaded and solved in
+the app in 1.17 s, with 456 matched stars and 0.468 arcsec RMS; it is resampled
+validation data. Folder browsing also follows Windows image shortcuts and
+deduplicates their targets. See the [0.8.6 release notes](docs/releases/v0.8.6.md).
+
+![Native color tools showing required sources and collapsed optional processing](docs/images/color-tools-sources.jpg)
 
 ## Seiza for Windows 0.8.5: multi-filter sessions, flat review and color stacking
 
@@ -356,7 +366,7 @@ without a Windows restart.
 | --- | --- |
 | ![Autostretched FITS content thumbnails in Windows File Explorer](docs/images/explorer-fits-thumbnails.png) | ![Mono and color XISF content thumbnails in Windows File Explorer](docs/images/explorer-xisf-thumbnails.png) |
 
-## Color stacking and calibration (development builds)
+## Color stacking and calibration
 
 Open **Color stacking** from the main toolbar to combine linear R, G and B
 stacks, optionally with luminance, or calibrate an existing RGB/OSC stack.
@@ -406,7 +416,7 @@ a new stack, so a learned correction cannot be combined with a new dark.
 Calibration-master caches use the native stacking-output version, so unrelated
 core releases no longer force identical masters to be rebuilt.
 
-## Flat quality review (development builds)
+## Flat quality review
 
 In directory or live stacking, choose automatic calibration and enable
 **Review flat quality before stacking**. This follows the workflow in
@@ -634,8 +644,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.8.5 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.5/seiza-0.8.5-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.5/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.8.6 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.6/seiza-0.8.6-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.6/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -701,7 +711,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.8.5
+  -p:SeizaVersion=0.8.6
 ```
 
 The installer is written to `dist`. See the

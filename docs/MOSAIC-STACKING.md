@@ -1,6 +1,6 @@
-# Expanded mosaic stacking (development build)
+# Expanded mosaic stacking
 
-These controls are newer than Windows 0.8.5. They use published Seiza/C ABI
+These controls ship in Windows 0.8.6. They use published Seiza/C ABI
 0.44.2 and stacking 0.51.2; no Git or vendored core dependency is used.
 
 ## GPU preference
@@ -121,7 +121,7 @@ procedural stars and diffuse emission were integrated by the production batch
 stacker into a 760 × 541 canvas (four accepted, zero rejected). This is generated
 test data, not an observed sky image; the result uses Seiza's normal image renderer.
 
-## Viewing large mosaics (development builds)
+## Viewing large mosaics
 
 The Windows viewer opens mosaics wider or taller than the graphics device's
 single-bitmap limit (commonly 16,384 pixels). Large display images use Win2D
