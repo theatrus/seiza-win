@@ -91,6 +91,17 @@
             </AppBarButton>
 
             <AppBarButton
+                x:Name="ProjectAnalysisButton"
+                Click="ProjectAnalysis_Click"
+                IsEnabled="False"
+                Label="Analysis report"
+                ToolTipService.ToolTip="Analyze the open FITS/XISF collection and generate an HTML report">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE9D9;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarButton
                 x:Name="ImageBrowserButton"
                 Click="ImageBrowser_Click"
                 IsEnabled="False"

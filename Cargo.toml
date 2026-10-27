@@ -1,7 +1,34 @@
 [workspace]
 resolver = "3"
 members = [
+    "rust/seiza-analysis",
     "rust/seiza-cabi-pin",
     "rust/seiza-thumbnail-provider",
     "rust/seiza-platform",
 ]
+
+# Analysis is not yet published; keep all Seiza crates on one reviewed revision.
+[patch.crates-io]
+seiza = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-analysis = { path = "rust/seiza-analysis" }
+seiza-background = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-cabi = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-calibration = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-core = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-deconvolution = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-download = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-draw = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-fits = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-image-io = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-imgproc = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-parallax = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-satellites = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-stacking = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-stars = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-stats = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-stretch = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-sources = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+seiza-xisf = { git = "https://github.com/theatrus/seiza", rev = "7343ada6ee2bfb39a12090fff15618e864b664a2" }
+
+[patch."https://github.com/theatrus/seiza"]
+seiza-analysis = { path = "rust/seiza-analysis" }

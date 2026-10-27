@@ -12,6 +12,9 @@
 
   <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Services\CommandLineActivationRelay.cs" Link="Services\CommandLineActivationRelay.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ProjectAnalysisService.cs" Link="Services\ProjectAnalysisService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ProjectAnalysisProgress.cs" Link="Services\ProjectAnalysisProgress.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.ProjectAnalysis.cs" Link="Interop\NativeMethods.ProjectAnalysis.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImagePathList.cs" Link="Services\ImagePathList.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\WindowsShortcutTarget.cs" Link="Services\WindowsShortcutTarget.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\LiveStackOverviewItem.cs" Link="Models\LiveStackOverviewItem.cs" />

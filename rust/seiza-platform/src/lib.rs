@@ -2,6 +2,7 @@
 //! currently offers distances only as part of Everything; transfer, cache,
 //! hashing and atomic installation still come from seiza-download.
 use seiza::catalog::{ObjectDistances, StarDistanceCatalog};
+mod analysis;
 mod color;
 mod color_tools;
 mod sky_overlap;

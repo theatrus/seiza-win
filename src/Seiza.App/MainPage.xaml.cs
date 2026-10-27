@@ -1645,6 +1645,8 @@ public sealed partial class MainPage : Page, IDisposable
             !ViewModel.IsLoading &&
             !ViewModel.IsSolving;
         StarAnalysisButton.Label = _isAnalyzingStars ? "Analyzing…" : "Analyze stars";
+        ProjectAnalysisButton.IsEnabled = !_isAnalyzingProject && !_isScanningFolder &&
+            !ViewModel.IsLoading && _imagePaths.Any(ImageFileService.IsAstronomyImage);
         StarAnalysisButton.IsEnabled =
             _bitmap is not null &&
             _currentPath is not null &&
@@ -1896,6 +1898,7 @@ public sealed partial class MainPage : Page, IDisposable
             return;
         }
         _disposed = true;
+        _projectAnalysisCancellation?.Cancel();
         CancelBrowserDiscovery();
         _loadGeneration++;
         _solveCancellation?.Cancel();

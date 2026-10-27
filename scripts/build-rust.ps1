@@ -34,7 +34,7 @@ $metadata = $metadataJson | ConvertFrom-Json
 $nativePackages = @(
     $metadata.packages | Where-Object {
         $_.name -eq "seiza-cabi" -and
-        $_.source -like "registry+*"
+        ($_.source -like "registry+*" -or $_.source -like "git+*")
     }
 )
 if ($nativePackages.Count -ne 1) {
@@ -45,7 +45,7 @@ $nativePackage = $nativePackages[0]
 $stackingPackages = @(
     $metadata.packages | Where-Object {
         $_.name -eq "seiza-stacking" -and
-        $_.source -like "registry+*"
+        ($_.source -like "registry+*" -or $_.source -like "git+*")
     }
 )
 if ($stackingPackages.Count -ne 1) {
@@ -55,7 +55,7 @@ $stackingPackage = $stackingPackages[0]
 $parallaxPackages = @(
     $metadata.packages | Where-Object {
         $_.name -eq "seiza-parallax" -and
-        $_.source -like "registry+*"
+        ($_.source -like "registry+*" -or $_.source -like "git+*")
     }
 )
 if ($parallaxPackages.Count -ne 1) {
@@ -63,12 +63,17 @@ if ($parallaxPackages.Count -ne 1) {
 }
 $parallaxPackage = $parallaxPackages[0]
 $vcsInfoPath = Join-Path (Split-Path -Parent $nativePackage.manifest_path) ".cargo_vcs_info.json"
-if (-not (Test-Path -LiteralPath $vcsInfoPath)) {
+if ($nativePackage.source -like "git+*") {
+    $resolvedRevision = ([string]$nativePackage.source).Split('#')[-1]
+}
+elseif (Test-Path -LiteralPath $vcsInfoPath) {
+    $vcsInfo = Get-Content -LiteralPath $vcsInfoPath -Raw | ConvertFrom-Json
+    $resolvedRevision = [string]$vcsInfo.git.sha1
+}
+else {
     throw "The published seiza-cabi package does not contain Cargo VCS metadata."
 }
 
-$vcsInfo = Get-Content -LiteralPath $vcsInfoPath -Raw | ConvertFrom-Json
-$resolvedRevision = [string]$vcsInfo.git.sha1
 if ($resolvedRevision -notmatch '^[0-9a-f]{40}$') {
     throw "Could not read the Seiza source commit from '$vcsInfoPath'."
 }
@@ -129,6 +134,7 @@ try {
         commit = $resolvedRevision
         repository = "https://github.com/theatrus/seiza"
         parallaxVersion = [string]$parallaxPackage.version
+        analysisPatch = "local-progress-cancellation-v1"
     }
     $buildInfo = $buildInfo | ConvertTo-Json -Compress
     $buildInfoPath = Join-Path $targetDirectory "seiza-build-info.json"

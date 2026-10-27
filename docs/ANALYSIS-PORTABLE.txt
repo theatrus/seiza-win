@@ -1,0 +1,46 @@
+Seiza analysis portable test build - Windows x64
+
+RUN
+1. Extract the entire ZIP to a writable folder on Windows 11 24H2 or newer.
+2. Close all running copies of Seiza. Leave the installed version installed.
+3. Run Seiza.App.exe from the extracted folder.
+4. Open a folder or TXT/CSV image list for one panel/pointing.
+5. Click Analysis report in the toolbar (or its overflow menu).
+6. Follow frame counts, phase percentage and estimated remaining phase time.
+   Choose Cancel to stop, or wait and choose Open report or Close.
+
+The open collection's FITS/XISF files are analyzed together using seiza-analysis.
+The engine currently supports monochrome, non-Bayer images. Color, unreadable,
+or unregistrable frames remain diagnostic entries in the report. The completion
+dialog reports how many frames were measured, including when none succeeded.
+Progress reports actual completed frames, current operation and filename, then
+depth replay progress. ETA is an estimate for the active phase after at least
+two frames complete; depth calculation follows frame analysis. Cancel stops at
+the next safe checkpoint; an in-flight image read/detection/registration finishes
+first. Cancelled runs save no report and discard temporary samples.
+Sources are not modified. Reports are saved under %LOCALAPPDATA%\Seiza\AnalysisReports
+with unique names, and remain available if you choose not to open the browser.
+
+SIDE-BY-SIDE
+This is a self-contained, unsigned development build. No installation, file
+association changes, or Explorer extension registration is required. It uses
+the same per-user settings/cache and single-instance key as the installed app.
+Do not run both copies at once or install an app update from the test copy.
+To remove it, close the app and delete the extracted folder. Saved reports
+and the installed application remain.
+
+CORE
+Seiza source revision: 7343ada6ee2bfb39a12090fff15618e864b664a2
+Latest main as resolved for this build; analysis is not yet in published crates.
+Seiza/C ABI 0.45.0; stacking 0.52.0; parallax 0.19.3.
+The packaged seiza-build-info.json records the compiled native revision.
+The local progress/cancellation patch is described in ANALYSIS-PATCH.md and
+recorded separately in build metadata. Scientific calculations are unchanged.
+
+SMOKE TEST
+Try a real mono image list with several frames of one pointing. Confirm that
+the dialog remains responsive, frame counts and ETA update, and Open report opens
+the saved interactive HTML in your default browser. Run again and choose Close;
+confirm both saved reports remain. Also try an unsupported color collection
+and confirm the report explains the measurement failures. Cancel a longer run
+and confirm no new report is saved and another run can start normally.

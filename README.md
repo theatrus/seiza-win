@@ -760,6 +760,18 @@ Photoshop layers. See the
 
 ## Build and test
 
+The development build adds **Analysis report** to the toolbar. Open a folder
+or image list for one monochrome FITS/XISF panel, then run analysis to generate
+a saved HTML report and optionally open it in your browser. The dialog shows
+completed-frame counts, phase percentage, elapsed time and estimated remaining
+time for the current phase. Cancel stops at the next safe image-operation
+checkpoint without saving a report. Reports remain under `%LOCALAPPDATA%\Seiza\AnalysisReports`.
+This build pins the latest Seiza analysis source; see [native ABI notes](docs/ABI.md).
+
+For a self-contained portable test ZIP, run `scripts\build-portable.ps1`.
+Close the installed copy before launching the extracted `Seiza.App.exe`.
+See [portable test instructions](docs/ANALYSIS-PORTABLE.txt).
+
 Install:
 
 - Visual Studio with the **WinUI application development** workload

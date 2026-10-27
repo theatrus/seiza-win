@@ -3,10 +3,24 @@
 `seiza-cabi.dll` deliberately exposes a small C ABI rather than Rust symbols.
 The same API is statically linked by the macOS app and dynamically loaded by
 the Windows app. Its implementation lives in the upstream Seiza workspace;
-this repository resolves the published crates.io crate through `Cargo.lock`
-rather than maintaining a Windows fork or using a Git dependency.
+this repository normally resolves published crates through `Cargo.lock`.
+The analysis test build pins all Seiza crates to upstream revision
+`7343ada6ee2bfb39a12090fff15618e864b664a2` using `[patch.crates-io]`, because
+project analysis has not yet been published. The packaged build metadata records
+that Git revision.
 
 Rules:
+
+- Project analysis calls `seiza_analyze_project_json` once for the complete
+  collection, then `seiza_analysis_html` to render the report. Both return
+  owned UTF-8 strings. The Windows workflow now uses
+  `seiza_win_analyze_project_json` in the platform adapter with a callback that
+  returns zero to cancel. It returns HTML and measured/total counts, and its
+  strings are freed by `seiza_win_string_free`. The locally patched
+  `rust/seiza-analysis` retains upstream calculations and adds frame/depth
+  progress checkpoints. Cancellation drops temporary samples; the managed
+  writer also checks cancellation before publishing the report. Failed frames
+  stay in the report and the completion UI counts measured frames explicitly.
 
 - Opaque image handles own their pixel and metadata buffers.
 - A handle remains alive until the host calls its matching free function.

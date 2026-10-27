@@ -1,0 +1,20 @@
+[package]
+name = "seiza-analysis"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.89"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+seiza-image-io = "=0.11.0"
+seiza-stacking = "=0.52.0"
+seiza-stars = "=0.4.0"
+seiza-stats = "=0.1.1"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+thiserror = "2"
+tempfile = "3"
+
+[dev-dependencies]
+seiza-fits = "=0.6.0"
