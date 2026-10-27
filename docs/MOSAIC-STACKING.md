@@ -1,9 +1,9 @@
 # Expanded mosaic stacking
 
-Expanded stacking shipped in Windows 0.8.6. This guide describes the current
-development layout, including parity updates from Mac PR #91. Windows 0.8.7
-still has the earlier layout. The published Seiza/C ABI 0.44.2 and stacking
-0.51.2 dependencies are unchanged; no Git or vendored core dependency is used.
+Expanded stacking shipped in Windows 0.8.6. This guide describes the Windows
+0.8.8 layout, including parity updates from Mac PR #91. The published
+Seiza/C ABI 0.44.2 and stacking 0.51.2 dependencies are unchanged; no Git or
+vendored core dependency is used.
 
 ## GPU preference
 
@@ -48,7 +48,7 @@ bound processing; there is no 512-light selection cap.
 
 ![Stacking mode and expanded-canvas ceiling before light selection](images/mosaic-stacking/stacking-mode-first.png)
 
-Current development controls shown with a synthetic 513-light selection. This
+Windows 0.8.8 controls shown with a synthetic 513-light selection. This
 checks selection admission and layout; it is not an integration benchmark.
 
 ## Optional sky-panel analysis

@@ -2,8 +2,8 @@
 
 Compared against [Mac PR #91](https://github.com/theatrus/seiza-mac/pull/91)
 at `74926a9ae542b3a1ade714644925d426f9944dfd`.
-These are development changes after Windows 0.8.7; this work does not change the
-application version, native dependency pins, or publish another release.
+These behaviors ship in Windows 0.8.8. Native dependency pins are unchanged
+from Windows 0.8.7; see the [release notes](releases/v0.8.8.md).
 
 | Mac PR #91 behavior | Windows behavior |
 | --- | --- |

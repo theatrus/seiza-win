@@ -8,8 +8,8 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.8.7 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.7/seiza-0.8.7-windows-x86_64.msi)
-· [0.8.7 release notes](docs/releases/v0.8.7.md)
+[Download Seiza for Windows 0.8.8 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.8/seiza-0.8.8-windows-x86_64.msi)
+· [0.8.8 release notes](docs/releases/v0.8.8.md)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -91,13 +91,14 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.8.7 uses Seiza/C ABI 0.44.2, stacking 0.51.2, parallax
+0.8.8 uses Seiza/C ABI 0.44.2, stacking 0.51.2, parallax
 0.19.2 and image-io 0.11.0 from published crates.
 
 ## Image viewing and folder review
 
-Use **Open image list** to browse images named in a `.txt` or `.csv` file as one
-collection, including images from different folders. TXT files contain one path
+Use **Open image list** (Ctrl+Alt+O), regular Open, or drag/drop to browse images
+named in a `.txt` or `.csv` file as one collection, including images from
+different folders. TXT files contain one path
 per line (optional surrounding quotes). CSV files use a `path`, `filepath`,
 `file_path`, `file`, or `filename` header (case-insensitive); without one, the first
 column contains the paths. Leading settings rows before a recognized header,
@@ -106,6 +107,11 @@ images are loaded, regardless of SubframeSelector's Approved flag. Quote CSV
 paths containing commas. Absolute paths are accepted, and relative paths resolve
 from the directory containing the list file. Duplicate paths appear once; the
 browser reports missing, invalid, or unsupported entries that were skipped.
+Expand **Skipped entries** for each source line and reason. Imports start
+grouped by source folder without changing your saved preference; **None**
+restores the original list order. Windows shortcuts and file aliases are
+deduplicated. UTF-8 and BOM-marked UTF-16 lists are supported; malformed quoting
+or invalid encoding reports an error.
 The sidebar identifies the source list by filename, with its full path in the
 tooltip, instead of displaying the first image's directory as the collection root.
 
@@ -149,9 +155,9 @@ RGB histograms, searchable source headers, and processing provenance.
 
 Native sidebar controls shown with synthetic sample images.
 
-## In development: image-list and mosaic workflow parity
+## Seiza for Windows 0.8.8: image-list and mosaic workflow parity
 
-The current development branch adds parity with
+This release adds parity with
 [Seiza for Mac PR #91](https://github.com/theatrus/seiza-mac/pull/91):
 
 - Open TXT/CSV lists through the welcome button, regular Open, drag/drop or
@@ -167,7 +173,7 @@ The current development branch adds parity with
   The full footprint matrix still grows quadratically with solved-light count.
 
 See [the parity comparison](docs/MAC-PR-91-PARITY.md) and the updated
-[mosaic guide](docs/MOSAIC-STACKING.md). These changes are not in release 0.8.7.
+[mosaic guide](docs/MOSAIC-STACKING.md), or read the [0.8.8 release notes](docs/releases/v0.8.8.md).
 
 ## Seiza for Windows 0.8.7: TXT and CSV image collections
 
@@ -706,8 +712,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.8.7 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.7/seiza-0.8.7-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.7/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.8.8 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.8/seiza-0.8.8-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.8/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -773,7 +779,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.8.7
+  -p:SeizaVersion=0.8.8
 ```
 
 The installer is written to `dist`. See the

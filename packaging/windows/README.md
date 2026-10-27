@@ -24,7 +24,7 @@ Build the installer from the repository root:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.8.7
+  -p:SeizaVersion=0.8.8
 ```
 
 The MSI is written to `dist`. The version must be a valid three-part MSI
@@ -39,12 +39,12 @@ work in two:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.8.7 `
+  -p:SeizaVersion=0.8.8 `
   -t:PublishSeizaApp
 # sign artifacts\publish\win-x64 here
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.8.7 `
+  -p:SeizaVersion=0.8.8 `
   -p:SeizaSkipPublish=true
 ```
 
@@ -69,7 +69,7 @@ validation:
 
 ```powershell
 .\.github\scripts\test-windows-installer.ps1 `
-  -Msi .\dist\seiza-0.8.7-windows-x86_64.msi
+  -Msi .\dist\seiza-0.8.8-windows-x86_64.msi
 ```
 
 Tagged releases use `.github/workflows/release.yml` to build and smoke-test
