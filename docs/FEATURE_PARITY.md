@@ -30,6 +30,20 @@ test exist.
 | **Planned** | No usable Windows implementation yet. |
 | **Deferred** | Intentionally outside the first parity release. |
 
+## Calibration sessions in development
+
+[Mac #92](https://github.com/theatrus/seiza-mac/pull/92) and
+[Seiza #385](https://github.com/theatrus/seiza/pull/385) add the foundations for
+per-light calibration. This is a scoped update after Windows 0.8.8, not a new
+audit of the older baseline above. See the
+[Windows boundary and implementation plan](STACKING-CALIBRATION-FOUNDATIONS.md).
+
+| Capability | Windows | Remaining acceptance criterion |
+| --- | --- | --- |
+| Bias/dark evidence and native grading | **Partial** | Typed measurement/screening and captured PSF Guard peer fixtures pass; library-wide peer selection, eligibility/overrides and review UI remain. |
+| Shared measured flat grouping | **Planned** | Export-gated JSON bridge and unchanged core fixture are staged. The current pin lacks the export; its integration test is visibly skipped pending a released #385 contract. |
+| Per-light calibration on one output | **Partial** | Native fixed/expanded A→B→A integration/checkpoint/pixel replay is tested. Session-aware calibrated expanded planning, shared recipes and the Windows executor/UI remain; current automatic preparation still uses one set per output. |
+
 ## Viewer and navigation
 
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |

@@ -11,6 +11,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\Seiza.App\Models\CalibrationQuality.cs" Link="Models\CalibrationQuality.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationCoreCapabilities.cs" Link="Services\CalibrationCoreCapabilities.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationQualityService.cs" Link="Services\CalibrationQualityService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\FlatGroupPolicyService.cs" Link="Services\FlatGroupPolicyService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.CalibrationSessions.cs" Link="Interop\NativeMethods.CalibrationSessions.cs" />
+    <Content Include="Fixtures\CalibrationParity\*.json" CopyToOutputDirectory="PreserveNewest" />
     <Compile Include="..\..\src\Seiza.App\Services\CommandLineActivationRelay.cs" Link="Services\CommandLineActivationRelay.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImagePathList.cs" Link="Services\ImagePathList.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\WindowsShortcutTarget.cs" Link="Services\WindowsShortcutTarget.cs" />

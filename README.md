@@ -175,6 +175,14 @@ This release adds parity with
 See [the parity comparison](docs/MAC-PR-91-PARITY.md) and the updated
 [mosaic guide](docs/MOSAIC-STACKING.md), or read the [0.8.8 release notes](docs/releases/v0.8.8.md).
 
+## In development: per-light calibration
+
+Windows foundations for [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
+and [Seiza #385](https://github.com/theatrus/seiza/pull/385) add native quality
+wrappers, shared reference fixtures and calibration-session/replay tests. The
+new workflow is not enabled: automatic preparation still uses one compatible
+set per output. See the [boundary and next steps](docs/STACKING-CALIBRATION-FOUNDATIONS.md).
+
 ## Seiza for Windows 0.8.7: TXT and CSV image collections
 
 Open a saved TXT or CSV list as one collection across capture folders. Review

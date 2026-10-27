@@ -372,6 +372,9 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
         }, cancellationToken);
     }
 
+    /// <summary>Replaces masters after validating geometry/layout. Each subsequent light
+    /// must match its active masters' sensor/optical metadata. This does not recalibrate
+    /// expanded planning references or make separate gate setters one transaction.</summary>
     public Task SetCalibrationAsync(
         ImageStackCalibration calibration,
         CancellationToken cancellationToken = default)
