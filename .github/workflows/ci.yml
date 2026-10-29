@@ -32,6 +32,9 @@ jobs:
       - name: Check Rust formatting
         run: cargo fmt --all --check
 
+      - name: Test native archive staging
+        run: .\scripts\test-native-test-manifest.ps1
+
       - name: Test Rust core
         run: .\scripts\build-rust.ps1 -Configuration Release -Test
 

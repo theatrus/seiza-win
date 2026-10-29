@@ -89,31 +89,13 @@ if ($Test) {
     if ($calibrationPackages.Count -ne 1) {
         throw "Expected exactly one published calibration package for native test fixtures."
     }
-    $calibrationDirectory = Split-Path -Parent $calibrationPackages[0].manifest_path
-    $fixtureDirectory = Join-Path $calibrationDirectory "tests\fixtures"
-    $needsSiblingFixtures = Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent $nativePackage.manifest_path) "src") -Recurse -Filter *.rs |
-        Select-String -SimpleMatch "../../seiza-calibration/tests/fixtures/" -Quiet | Select-Object -First 1
-    if ($needsSiblingFixtures) {
-        if (-not (Test-Path -LiteralPath $fixtureDirectory)) {
-            throw "The published calibration archive does not contain required native test fixtures."
-        }
-        $calibrationVcs = Get-Content -LiteralPath (Join-Path $calibrationDirectory ".cargo_vcs_info.json") -Raw | ConvertFrom-Json
-        if ($calibrationVcs.git.sha1 -ne $resolvedRevision) {
-            throw "Calibration test fixtures must come from the C ABI's exact published source revision."
-        }
-        $testRoot = Join-Path $targetDirectory "published-tests\$resolvedRevision"
-        $testCrate = Join-Path $testRoot "seiza-cabi"
-        $testFixtures = Join-Path $testRoot "seiza-calibration\tests\fixtures"
-        New-Item -ItemType Directory -Force -Path $testCrate, $testFixtures | Out-Null
-        Copy-Item -Path (Join-Path (Split-Path -Parent $nativePackage.manifest_path) "*") -Destination $testCrate -Recurse -Force
-        Copy-Item -Path (Join-Path $fixtureDirectory "*") -Destination $testFixtures -Recurse -Force
-        $nativeTestManifest = Join-Path $testCrate "Cargo.toml"
-        # Keep this standalone test manifest out of the host workspace. Cargo's
-        # normalized registry manifest already has explicit dependency versions.
-        if ((Get-Content -LiteralPath $nativeTestManifest -Raw) -notmatch '(?m)^\[workspace\]') {
-            Add-Content -LiteralPath $nativeTestManifest -Value "`n[workspace]" -Encoding utf8
-        }
-    }
+    . (Join-Path $PSScriptRoot "native-test-manifest.ps1")
+    $nativeTestManifest = Get-SeizaNativeTestManifest `
+        -NativeManifest $nativePackage.manifest_path `
+        -CalibrationManifest $calibrationPackages[0].manifest_path `
+        -TargetDirectory $targetDirectory `
+        -SourceRevision $resolvedRevision
+    Write-Host "Testing published C ABI using $nativeTestManifest"
     # Cargo cannot run a dependency package's dev-targets from the consuming
     # workspace, so exercise the published crate's own locked test suite, then
     # exercise the exact stacking leaf selected by the application lock. The
