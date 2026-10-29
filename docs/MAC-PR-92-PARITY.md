@@ -94,6 +94,27 @@ grade. Changes invalidate displayed readings. Single-frame inspection does not
 claim set stability or association with lights. Individual fields and map cells
 have accessible labels; long details scroll without expanding the window.
 
+## Windows screenshots
+
+Captured from the validated Windows build using synthetic FITS data: two lights,
+three bias frames and three flats with a dust shadow.
+
+**Inputs and mixed-folder routing**
+
+![Inputs with two lights selected](images/stacking-calibration/inputs.jpg)
+
+**Calibration sources and independent matching modes**
+
+![Calibration sources and matching controls](images/stacking-calibration/calibration.jpg)
+
+**Grades and matches in the same window**
+
+![Calibration review with four evidence sections](images/stacking-calibration/review.jpg)
+
+**Flat Inspector with native measurements and illumination**
+
+![Flat Inspector showing source-unit readings and illumination](images/stacking-calibration/flat-inspector.jpg)
+
 ## Validation boundary
 
 The managed application-driver tests run the actual published Windows DLL,
