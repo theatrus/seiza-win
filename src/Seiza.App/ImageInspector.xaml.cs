@@ -34,10 +34,14 @@ public sealed partial class ImageInspector : UserControl
     public ImageInspector()
     {
         InitializeComponent();
+        InspectorSections.Children.Insert(0, FlatInspection);
     }
+
+    internal FlatInspectionControl FlatInspection { get; } = new();
 
     public void ClearMetadata()
     {
+        FlatInspection.SetSource(null);
         ImageDetails.Clear();
         SidebarAnalyzeStarsButton.IsEnabled = false;
         _allHeaders.Clear();

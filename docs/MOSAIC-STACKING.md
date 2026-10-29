@@ -93,10 +93,13 @@ preparation, between batches and during grouping. The full footprint matrix
 still uses time and memory proportional to the square of the solved-light
 count; removing the selection cap does not make this analysis linear.
 
-Automatic calibration prepares one compatible set per output across that output's
-eligible raw lights. Panels and folders within one output share that calibration
-set. Calibrate lights requiring different flat sessions separately before
-combining them into one mosaic output.
+The development branch adds **Graded calibration files or library**, following
+[Mac #92](MAC-PR-92-PARITY.md). Review per-light sessions in the Calibration and
+Review tabs. The native session-aware opener calibrates each planning input
+before detecting stars and planning its footprint, then retains those same
+assignments for integration and replay. Several flat/bias/dark sessions can
+contribute to one output. Windows 0.8.8's older one-set workflow remains the
+behavior of the currently published application.
 
 ![Automatic coordinate-grouping setup in the native Windows dialog](images/mosaic-stacking/automatic-setup.png)
 

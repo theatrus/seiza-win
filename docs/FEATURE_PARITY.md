@@ -30,6 +30,22 @@ test exist.
 | **Planned** | No usable Windows implementation yet. |
 | **Deferred** | Intentionally outside the first parity release. |
 
+## Mac #92 calibration parity (development branch)
+
+Scoped against merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
+head `3c09a71245505890352bd364597831c61d9fff62`, using published Seiza/C ABI
+0.47.0 (calibration 0.11.0, stacking 0.54.0). This supersedes the older
+single-set directory-calibration row below; the older global baseline has not
+been re-audited. See [the detailed comparison and validation](MAC-PR-92-PARITY.md).
+
+| Capability | Windows branch | Scope |
+| --- | --- | --- |
+| Native graded file/library coordinator | Implemented | Direct C analyze → reviewed execute → source verify; native caches, quality choices, families, cohorts, recipes, retries, pedestal and corrections. |
+| Per-light fixed/expanded sessions | Implemented | A→B→A, session-aware raw planning, full gates and candidate-specific fixed references; transient replay, source/master protection. |
+| Calibration controls and review | Implemented | Inputs/Calibration/Processing/Review tabs; native global/per-rig settings, independent flat/dark modes, Stop/Keep/Exclude, quality/group/side choices and four evidence views. |
+| Mixed folders and flat inspection | Implemented | Native role routing leaves calibration browsable; linear flat levels, clipping, grade, dust/optics, vignetting and illumination. |
+| Full PSF Guard catalog UI and live acquisition migration | Outside Mac #92 | Existing Windows live workflow is retained; automatic cache eviction is absent on both hosts. |
+
 ## Viewer and navigation
 
 | Capability | macOS current | Windows | Windows gap / acceptance criterion |

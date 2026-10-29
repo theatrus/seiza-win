@@ -23,14 +23,12 @@
             </TitleBar.IconSource>
         </TitleBar>
 
-        <ScrollViewer
+        <Grid
             Grid.Row="1"
-            Margin="24"
-            HorizontalScrollBarVisibility="Disabled"
-            VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="18">
-                <ContentControl x:Name="ConfigurationHost" HorizontalContentAlignment="Stretch">
-                <StackPanel x:Name="ConfigurationPanel" Spacing="18">
+            Margin="24,8">
+            <Grid>
+                <ContentControl x:Name="ConfigurationHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                <Grid x:Name="ConfigurationPanel">
                     <StackPanel Spacing="4">
                         <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="Image stacking" />
                         <TextBlock
@@ -284,14 +282,14 @@
                         </StackPanel>
                     </Border>
 
-                    <Expander Header="Calibration">
+                    <Expander x:Name="CalibrationExpander" Header="Calibration">
                         <StackPanel Margin="0,12,0,0" Spacing="10">
                             <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="160" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Source" VerticalAlignment="Center" />
+                                <TextBlock Text="Calibration source" VerticalAlignment="Center" />
                                 <ComboBox
                                     x:Name="CalibrationSourcePicker"
                                     Grid.Column="1"
@@ -299,7 +297,7 @@
                                     HorizontalAlignment="Stretch"
                                     SelectionChanged="CalibrationSource_Changed">
                                     <ComboBoxItem Content="None or existing masters" Tag="Masters" IsSelected="True" />
-                                    <ComboBoxItem Content="Build from calibration frames" Tag="Automatic" />
+                                    <ComboBoxItem Content="Graded calibration files or library" Tag="Automatic" />
                                 </ComboBox>
                             </Grid>
                             <StackPanel x:Name="ManualCalibrationPanel" Spacing="10">
@@ -353,7 +351,7 @@
                             <StackPanel x:Name="AutomaticCalibrationPanel" Spacing="10" Visibility="Collapsed">
                                 <TextBlock
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Seiza prepares one compatible calibration set per output across that output's selected raw lights. It builds bias, dark, dark-flat, and flat masters in dependency order and caches them for reuse. Panels and folders within one output share that calibration set."
+                                    Text="Provide files, a recursive library folder, or both. Seiza grades and matches each light, then builds reusable masters when stacking. A mosaic can use several calibration sessions in one output."
                                     TextWrapping="Wrap" />
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
@@ -364,7 +362,16 @@
                                     <Button AutomationProperties.Name="Choose calibration library folder" Grid.Column="1" Click="ChooseCalibrationLibrary_Click" Content="Choose…" />
                                 </Grid>
                                 <TextBlock x:Name="AutomaticCalibrationHintText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                <local:FlatQualityOptionsControl x:Name="FlatQualityOptions" />
+                                <Expander x:Name="ProvidedCalibrationExpander" Header="Included calibration files" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                    <ScrollViewer MaxHeight="220" HorizontalScrollBarVisibility="Disabled">
+                                        <StackPanel x:Name="ProvidedCalibrationPanel" Spacing="6" />
+                                    </ScrollViewer>
+                                </Expander>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Click="AddCalibrationFiles_Click" Content="Add files…" AutomationProperties.Name="Add calibration files" />
+                                    <Button x:Name="RemoveCalibrationLibraryButton" IsEnabled="False" Click="RemoveCalibrationLibrary_Click" Content="Remove folder" AutomationProperties.Name="Remove calibration library folder" />
+                                </StackPanel>
+                                <StackPanel x:Name="GradedCalibrationHost" Spacing="10" />
                             </StackPanel>
                         </StackPanel>
                     </Expander>
@@ -385,7 +392,7 @@
                     </StackPanel>
 
                     <InfoBar x:Name="ValidationInfoBar" IsClosable="False" IsOpen="False" Severity="Error" />
-                </StackPanel>
+                </Grid>
                 </ContentControl>
 
                 <StackPanel x:Name="ProgressPanel" Spacing="12" Visibility="Collapsed">
@@ -394,8 +401,8 @@
                     <TextBlock x:Name="ProgressMessageText" TextWrapping="Wrap" />
                     <TextBlock x:Name="ProgressCountsText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
-            </StackPanel>
-        </ScrollViewer>
+            </Grid>
+        </Grid>
 
         <Grid
             Grid.Row="2"

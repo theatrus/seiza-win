@@ -78,13 +78,31 @@ $releaseFlag = if ($Configuration -eq "Release") { " --release" } else { "" }
 $nativePackageSpec = "seiza-cabi@$($nativePackage.version)"
 $workspaceNativeBuildCommand = "cargo build --package $nativePackageSpec --target-dir `"$targetDirectory`" --locked$releaseFlag"
 if ($Test) {
+    # The 0.47.0 C ABI archive refers to sibling calibration fixtures. Stage
+    # the unchanged published crate and fixtures from the matching published
+    # calibration archive; never write into Cargo's registry cache or fetch a
+    # moving branch. The production DLL is still built from the app lock below.
+    $nativeTestManifest = $nativePackage.manifest_path
+    $calibrationPackages = @($metadata.packages | Where-Object {
+        $_.name -eq "seiza-calibration" -and $_.source -like "registry+*"
+    })
+    if ($calibrationPackages.Count -ne 1) {
+        throw "Expected exactly one published calibration package for native test fixtures."
+    }
+    . (Join-Path $PSScriptRoot "native-test-manifest.ps1")
+    $nativeTestManifest = Get-SeizaNativeTestManifest `
+        -NativeManifest $nativePackage.manifest_path `
+        -CalibrationManifest $calibrationPackages[0].manifest_path `
+        -TargetDirectory $targetDirectory `
+        -SourceRevision $resolvedRevision
+    Write-Host "Testing published C ABI using $nativeTestManifest"
     # Cargo cannot run a dependency package's dev-targets from the consuming
     # workspace, so exercise the published crate's own locked test suite, then
     # exercise the exact stacking leaf selected by the application lock. The
     # C ABI archive can predate a compatible stacking patch and retain the
     # earlier leaf in its packaged lockfile. Finally build the shipped DLL from
     # the application's locked dependency graph.
-    $nativeTestCommand = "cargo test --manifest-path `"$($nativePackage.manifest_path)`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked$releaseFlag"
+    $nativeTestCommand = "cargo test --manifest-path `"$nativeTestManifest`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked$releaseFlag"
     $stackingTestCommand = "cargo test --manifest-path `"$($stackingPackage.manifest_path)`" --package seiza-stacking --target-dir `"$targetDirectory`" --locked$releaseFlag"
     $cargoCommand = "$nativeTestCommand && $stackingTestCommand && $workspaceNativeBuildCommand"
 }

@@ -10,8 +10,8 @@ license = "Apache-2.0"
 crate-type = ["cdylib", "rlib"]
 
 [dependencies]
-seiza = "=0.44.2"
-seiza-stacking = "=0.51.2"
+seiza = "=0.47.0"
+seiza-stacking = "=0.54.0"
 seiza-stretch = "=0.3.2"
 sha2 = "0.11"
 seiza-fits = "=0.6.0"
