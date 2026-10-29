@@ -20,7 +20,7 @@ internal sealed record CalibrationCoreCapabilities(
     {
         if (!SupportsFlatGroupPlanning)
             throw new SeizaCoreException("Shared measured flat grouping requires a published C ABI with Seiza #385 support. " +
-                "The current automatic calibration workflow still prepares one compatible set per output.");
+                "Update Seiza to use graded calibration.");
     }
 
     private static CalibrationCoreCapabilities Detect()

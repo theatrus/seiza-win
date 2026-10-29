@@ -4,6 +4,10 @@ namespace Seiza.App.Interop;
 
 internal static partial class NativeMethods
 {
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_open_fits_expanding_sessions", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint OpenLiveStackerExpandingSessions(string pathsJson, string sessionsJson,
+        string assignmentsJson, string optionsJson, nuint maximumMegasamples, SafeCancelSignalHandle cancel, out nint error);
+
     [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_set_match_tolerances")]
     [return: MarshalAs(UnmanagedType.U1)]
     internal static unsafe partial bool SetLiveStackerMatchTolerances(nint stacker, NativeMatchTolerances* tolerances, out nint error);

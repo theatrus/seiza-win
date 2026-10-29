@@ -81,6 +81,8 @@ public sealed partial class MainPage : Page, IDisposable
         InspectorControl.SolveRequested += InspectorControl_SolveRequested;
         InspectorControl.ExportWcsRequested += InspectorControl_ExportWcsRequested;
         InspectorControl.StarAnalysisRequested += InspectorControl_StarAnalysisRequested;
+        InspectorControl.FlatInspection.AvailabilityChanged += (_, _) => InspectFlatButton.Visibility =
+            InspectorControl.FlatInspection.IsAvailable ? Visibility.Visible : Visibility.Collapsed;
         Loaded += MainPage_Loaded;
         Unloaded += MainPage_Unloaded;
     }
@@ -565,6 +567,14 @@ public sealed partial class MainPage : Page, IDisposable
         UpdateVisualState();
     }
 
+    private void Inspector_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (!ViewModel.HasImage) return;
+        _isInspectorOpen = !_isInspectorOpen;
+        UpdateVisualState();
+        args.Handled = true;
+    }
+
     private void CloseInspector_Click(object sender, RoutedEventArgs e)
     {
         _isInspectorOpen = false;
@@ -582,6 +592,12 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void AnalyzeStars_Click(object sender, RoutedEventArgs e) =>
         await AnalyzeCurrentStarsAsync();
+
+    private async void InspectFlat_Click(object sender, RoutedEventArgs e)
+    {
+        _isInspectorOpen = true; UpdateVisualState();
+        await InspectorControl.FlatInspection.InspectAsync();
+    }
 
     private async void InspectorControl_SolveRequested(object? sender, EventArgs e) =>
         await SolveCurrentAsync();
@@ -1178,7 +1194,10 @@ public sealed partial class MainPage : Page, IDisposable
                 return false;
             }
 
-            CanvasDisplayImage nextBitmap = await CanvasDisplayImage.CreateAsync(ImageCanvas, image, cancellationToken: cancellationToken);
+            // A command-line/list activation can finish rendering before the
+            // CanvasControl's first resource event. It uses this shared device
+            // too; creating the bitmap directly avoids that startup race.
+            CanvasDisplayImage nextBitmap = await CanvasDisplayImage.CreateAsync(CanvasDevice.GetSharedDevice(), image, cancellationToken: cancellationToken);
             if (_disposed || generation != _loadGeneration) { nextBitmap.Dispose(); return false; }
 
             SetCommittedBitmap(nextBitmap);
@@ -1191,6 +1210,7 @@ public sealed partial class MainPage : Page, IDisposable
                 _processingHistory.Reset(processing);
             }
             InspectorControl.ShowMetadata(image.Metadata, processing);
+            InspectorControl.FlatInspection.SetSource(path);
             ViewModel.CompleteLoading(path, image.Metadata);
             _ownerWindow?.SetDocumentTitle(Path.GetFileName(path));
 
@@ -1235,7 +1255,7 @@ public sealed partial class MainPage : Page, IDisposable
             return;
         }
 
-        CanvasDisplayImage nextBitmap = await CanvasDisplayImage.CreateAsync(ImageCanvas, image, cancellationToken: request.CancellationToken);
+        CanvasDisplayImage nextBitmap = await CanvasDisplayImage.CreateAsync(CanvasDevice.GetSharedDevice(), image, cancellationToken: request.CancellationToken);
         if (_stretchWindow is null || !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
         { nextBitmap.Dispose(); return; }
         if (!ReferenceEquals(_bitmap, _committedBitmap))

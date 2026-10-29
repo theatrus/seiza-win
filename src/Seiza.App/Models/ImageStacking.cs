@@ -540,6 +540,7 @@ internal sealed record ImageStackRequest(
     ImageStackOptions Options,
     ImageStackCalibration Calibration)
 {
+    public LibraryPreparedPlan? LibraryPlan { get; init; }
     /// <summary>
     /// Optional geometry-only image shared by channel stacks. It is never
     /// included implicitly or used to select calibration/normalization.
@@ -641,7 +642,8 @@ internal static class ImageStackValidation
     }
 
     private static IEnumerable<string> SourcePaths(ImageStackRequest request) =>
-        request.Inputs.Concat(new[]
+        request.Inputs.Concat(request.LibraryPlan?.Review.Sources.Select(s => s.Path) ?? [])
+        .Concat(request.LibraryPlan?.OriginalPaths ?? []).Concat(new[]
         {
             request.Calibration.BiasPath,
             request.Calibration.DarkPath,

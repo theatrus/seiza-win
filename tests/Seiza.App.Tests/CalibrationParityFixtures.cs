@@ -10,7 +10,7 @@ internal static class CalibrationParityFixtures
         Path.Combine(AppContext.BaseDirectory, "Fixtures", "CalibrationParity", name)));
 
     internal static void WriteFrame(string path, int width, int height, Func<int, int, ushort> pixel,
-        string kind = "LIGHT", int gain = 100, int rotation = 0, bool normalizedFlat = false)
+        string kind = "LIGHT", int gain = 100, int rotation = 0, bool normalizedFlat = false, IReadOnlyList<string>? extraCards = null)
     {
         int bytes = checked(width * height * 2);
         byte[] fits = new byte[2880 + ((bytes + 2879) / 2880) * 2880];
@@ -20,6 +20,7 @@ internal static class CalibrationParityFixtures
             $"IMAGETYP= '{kind}'", "INSTRUME= 'Parity camera'", "TELESCOP= 'Parity scope'", "XBINNING=                    1",
             "YBINNING=                    1", "EXPTIME =                   60", "CCD-TEMP=                  -10", "FOCALLEN=                  500",
             $"GAIN    = {gain,20}", $"ROTATANG= {rotation,20}", normalizedFlat ? "FLATNORM=                    T" : "COMMENT raw test image", "END"];
+        cards = [.. cards[..^1], .. extraCards ?? [], "END"];
         for (int i = 0; i < cards.Length; i++) Encoding.ASCII.GetBytes(cards[i].PadRight(80)).CopyTo(fits, i * 80);
         for (int y = 0; y < height; y++)
             for (int x = 0; x < width; x++)

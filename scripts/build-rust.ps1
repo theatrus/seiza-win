@@ -78,13 +78,49 @@ $releaseFlag = if ($Configuration -eq "Release") { " --release" } else { "" }
 $nativePackageSpec = "seiza-cabi@$($nativePackage.version)"
 $workspaceNativeBuildCommand = "cargo build --package $nativePackageSpec --target-dir `"$targetDirectory`" --locked$releaseFlag"
 if ($Test) {
+    # The 0.47.0 C ABI archive refers to sibling calibration fixtures. Stage
+    # the unchanged published crate and fixtures from the matching published
+    # calibration archive; never write into Cargo's registry cache or fetch a
+    # moving branch. The production DLL is still built from the app lock below.
+    $nativeTestManifest = $nativePackage.manifest_path
+    $calibrationPackages = @($metadata.packages | Where-Object {
+        $_.name -eq "seiza-calibration" -and $_.source -like "registry+*"
+    })
+    if ($calibrationPackages.Count -ne 1) {
+        throw "Expected exactly one published calibration package for native test fixtures."
+    }
+    $calibrationDirectory = Split-Path -Parent $calibrationPackages[0].manifest_path
+    $fixtureDirectory = Join-Path $calibrationDirectory "tests\fixtures"
+    $needsSiblingFixtures = Get-ChildItem -LiteralPath (Join-Path (Split-Path -Parent $nativePackage.manifest_path) "src") -Recurse -Filter *.rs |
+        Select-String -SimpleMatch "../../seiza-calibration/tests/fixtures/" -Quiet | Select-Object -First 1
+    if ($needsSiblingFixtures) {
+        if (-not (Test-Path -LiteralPath $fixtureDirectory)) {
+            throw "The published calibration archive does not contain required native test fixtures."
+        }
+        $calibrationVcs = Get-Content -LiteralPath (Join-Path $calibrationDirectory ".cargo_vcs_info.json") -Raw | ConvertFrom-Json
+        if ($calibrationVcs.git.sha1 -ne $resolvedRevision) {
+            throw "Calibration test fixtures must come from the C ABI's exact published source revision."
+        }
+        $testRoot = Join-Path $targetDirectory "published-tests\$resolvedRevision"
+        $testCrate = Join-Path $testRoot "seiza-cabi"
+        $testFixtures = Join-Path $testRoot "seiza-calibration\tests\fixtures"
+        New-Item -ItemType Directory -Force -Path $testCrate, $testFixtures | Out-Null
+        Copy-Item -Path (Join-Path (Split-Path -Parent $nativePackage.manifest_path) "*") -Destination $testCrate -Recurse -Force
+        Copy-Item -Path (Join-Path $fixtureDirectory "*") -Destination $testFixtures -Recurse -Force
+        $nativeTestManifest = Join-Path $testCrate "Cargo.toml"
+        # Keep this standalone test manifest out of the host workspace. Cargo's
+        # normalized registry manifest already has explicit dependency versions.
+        if ((Get-Content -LiteralPath $nativeTestManifest -Raw) -notmatch '(?m)^\[workspace\]') {
+            Add-Content -LiteralPath $nativeTestManifest -Value "`n[workspace]" -Encoding utf8
+        }
+    }
     # Cargo cannot run a dependency package's dev-targets from the consuming
     # workspace, so exercise the published crate's own locked test suite, then
     # exercise the exact stacking leaf selected by the application lock. The
     # C ABI archive can predate a compatible stacking patch and retain the
     # earlier leaf in its packaged lockfile. Finally build the shipped DLL from
     # the application's locked dependency graph.
-    $nativeTestCommand = "cargo test --manifest-path `"$($nativePackage.manifest_path)`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked$releaseFlag"
+    $nativeTestCommand = "cargo test --manifest-path `"$nativeTestManifest`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked$releaseFlag"
     $stackingTestCommand = "cargo test --manifest-path `"$($stackingPackage.manifest_path)`" --package seiza-stacking --target-dir `"$targetDirectory`" --locked$releaseFlag"
     $cargoCommand = "$nativeTestCommand && $stackingTestCommand && $workspaceNativeBuildCommand"
 }

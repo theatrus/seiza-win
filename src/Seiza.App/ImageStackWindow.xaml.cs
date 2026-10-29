@@ -11,7 +11,12 @@ namespace Seiza.App;
 
 public sealed partial class ImageStackWindow : Window, IDisposable
 {
-    private readonly IReadOnlyList<StackFrameChoice> _frames;
+    private IReadOnlyList<StackFrameChoice> _frames;
+    private readonly string[] _sourcePaths;
+    private readonly List<string> _providedCalibration = [];
+    private readonly CancellationTokenSource _routingCancellation = new();
+    private bool _routing = true;
+    private readonly GradedCalibrationControl _graded = new();
     private readonly string? _browserRoot;
     private readonly Func<bool> _useGpuSetting;
     private readonly Func<int?> _gpuMemorySetting;
@@ -46,6 +51,10 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         _useGpuSetting = useGpuSetting ?? (() => CatalogSettingsStore.LoadUseGpuForStacking());
         _gpuMemorySetting = gpuMemorySetting ?? (() => CatalogSettingsStore.LoadStackingGpuMemoryMib());
         InitializeComponent();
+        BuildSetupTabs();
+        GradedCalibrationHost.Children.Add(_graded);
+        GradedCalibrationHost.Children.Add(_graded.SettingsView);
+        _graded.StateChanged += (_, _) => { if (!_closed && !_initializing) UpdateOptionsAndValidation(); };
         _browserRoot = browserRoot;
         MinimumWeightBox.Value = new ImageStackOptions().MinimumWeight;
         SharedAlignmentToggle.IsEnabled = StackingCoreCapabilities.Current.SupportsReferenceImage;
@@ -64,6 +73,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(path => new StackFrameChoice(path, ImageStackFrameLabel.DisplayName(path, _browserRoot)))
             .ToArray();
+        _sourcePaths = _frames.Select(f => f.Path).ToArray();
         FrameList.ItemsSource = _frames;
         foreach (StackFrameChoice frame in _frames)
         {
@@ -96,7 +106,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private bool SplitsOutput => _groups.Count > 1;
 
-    private void ContentRoot_Loaded(object sender, RoutedEventArgs e)
+    private async void ContentRoot_Loaded(object sender, RoutedEventArgs e)
     {
         if (_loaded)
         {
@@ -107,11 +117,59 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         RectInt32 workArea = display.WorkArea;
         double scale = ContentRoot.XamlRoot.RasterizationScale;
         int margin = Math.Max(24, (int)Math.Round(24 * scale));
-        int width = Math.Min((int)Math.Round(720 * scale), workArea.Width - (margin * 2));
+        int width = Math.Min((int)Math.Round(1040 * scale), workArea.Width - (margin * 2));
         int height = Math.Min((int)Math.Round(860 * scale), workArea.Height - (margin * 2));
         int x = workArea.X + workArea.Width - width - margin;
         int y = workArea.Y + ((workArea.Height - height) / 2);
         AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
+        try
+        {
+            StackInputRoutingResult routed = await StackInputRouting.RouteAsync(_sourcePaths, _routingCancellation.Token);
+            if (_closed) return;
+            _initializing = true;
+            _frames = routed.Lights.Select(p => new StackFrameChoice(p, ImageStackFrameLabel.DisplayName(p, _browserRoot))).ToArray();
+            FrameList.ItemsSource = _frames;
+            foreach (var frame in _frames) FrameList.SelectedItems.Add(frame);
+            _providedCalibration.AddRange(routed.Calibration);
+            if (_providedCalibration.Count > 0) CalibrationSourcePicker.SelectedIndex = 1;
+            RoutingNotes.Text = $"{routed.Lights.Length} lights · {routed.Calibration.Length} calibration files" +
+                (routed.Notes.Length > 0 ? Environment.NewLine + string.Join(Environment.NewLine, routed.Notes) : "");
+            RenderProvidedCalibration();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { if (!_closed) RoutingNotes.Text = exception.Message; }
+        finally
+        {
+            _routing = false; _initializing = false;
+            if (!_closed) RefreshGroupsAndValidation();
+        }
+    }
+
+    private readonly TextBlock RoutingNotes = new() { Text = "Reading FITS/XISF image roles…", TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+    private void BuildSetupTabs()
+    {
+        UIElement[] sections = ConfigurationPanel.Children.ToArray();
+        ConfigurationPanel.Children.Clear();
+        ConfigurationPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        ConfigurationPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var tabs = new TabView { IsAddTabButtonVisible = false, CanDragTabs = false, CanReorderTabs = false };
+        StackPanel Page(string title, IEnumerable<UIElement> children)
+        {
+            var panel = new StackPanel { Spacing = 18, Padding = new Thickness(0, 16, 12, 16) };
+            foreach (UIElement child in children) panel.Children.Add(child);
+            tabs.TabItems.Add(new TabViewItem { Header = title, IsClosable = false, Content = new ScrollViewer
+                { Content = panel, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } });
+            return panel;
+        }
+        StackPanel inputs = Page("Inputs", sections.Take(4).Append(sections[7]));
+        inputs.Children.Insert(1, RoutingNotes);
+        UIElement calibrationContent = (UIElement)CalibrationExpander.Content;
+        CalibrationExpander.Content = null;
+        Page("Calibration", [calibrationContent]);
+        Page("Processing", [sections[4], sections[6]]);
+        tabs.TabItems.Add(new TabViewItem { Header = "Review", IsClosable = false, Content = _graded.ReviewView });
+        ConfigurationPanel.Children.Add(tabs);
+        Grid.SetRow(ValidationInfoBar, 1); ConfigurationPanel.Children.Add(ValidationInfoBar);
     }
 
     private void SelectAll_Click(object sender, RoutedEventArgs e)
@@ -465,6 +523,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             ? Visibility.Visible
             : Visibility.Collapsed;
         bool automaticCalibration = SelectedTag(CalibrationSourcePicker) == "Automatic";
+        RemoveCalibrationLibraryButton.IsEnabled = _calibrationLibraryPath is not null;
+        _graded.SetInputs(_calibrationLibraryPath, SelectedPaths, _providedCalibration, automaticCalibration && !_routing);
         ManualCalibrationPanel.Visibility = automaticCalibration
             ? Visibility.Collapsed
             : Visibility.Visible;
@@ -488,6 +548,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private string? ValidationMessage(ImageStackOptions options)
     {
+        if (_routing) return "Reading image roles before selecting lights…";
         if (SkyGroupingToggle.IsOn)
         {
             if (_skyAnalysis is null) return "Solve and review panels, or turn off optional sky-panel analysis to stack the selected lights directly.";
@@ -524,11 +585,13 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         {
             return "Enter an output base name.";
         }
-        if (SelectedTag(CalibrationSourcePicker) == "Automatic" &&
-            (string.IsNullOrWhiteSpace(_calibrationLibraryPath) ||
-             !Directory.Exists(_calibrationLibraryPath)))
+        if (SelectedTag(CalibrationSourcePicker) == "Automatic")
         {
-            return "Choose a calibration library folder.";
+            if (_calibrationLibraryPath is null && _providedCalibration.Count == 0) return "Add calibration files or choose a library folder.";
+            if (_calibrationLibraryPath is not null && !Directory.Exists(_calibrationLibraryPath)) return "The calibration folder is unavailable.";
+            if (!_graded.IsCurrent) return "Calibration review needs analysis. See Calibration for progress or errors.";
+            if (options.LearnDefects) return "Turn off learned sensor defects when using graded per-light calibration.";
+            if (_graded.Preferences.Incomplete == "stop" && _graded.Review!.Missing.Any(m => m)) return "Some lights have incomplete calibration. Review the matches or choose Keep or Exclude in Calibration.";
         }
         return options.ValidationMessage ??
             (SelectedTag(CalibrationSourcePicker) == "Automatic"
@@ -622,8 +685,42 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         _calibrationLibraryPath = folder.Path;
         CalibrationLibraryTextBox.Text = folder.Path;
         AutomaticCalibrationHintText.Text =
-            "Masters are matched independently for each output and cached for reuse. Panels and folders within one output share the same calibration set.";
+            "The folder is scanned recursively. Calibration files remain available in the browser.";
         UpdateOptionsAndValidation();
+    }
+
+    private async void AddCalibrationFiles_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.PicturesLibrary };
+        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" }) picker.FileTypeFilter.Add(extension);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WindowHandle);
+        IReadOnlyList<StorageFile> files = await picker.PickMultipleFilesAsync();
+        if (_closed) return;
+        foreach (StorageFile file in files)
+            if (!_providedCalibration.Contains(file.Path, StringComparer.OrdinalIgnoreCase)) _providedCalibration.Add(file.Path);
+        RenderProvidedCalibration(); UpdateOptionsAndValidation();
+    }
+    private void RemoveCalibrationLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        _calibrationLibraryPath = null; CalibrationLibraryTextBox.Text = "";
+        AutomaticCalibrationHintText.Text = ""; UpdateOptionsAndValidation();
+    }
+    private void RenderProvidedCalibration()
+    {
+        ProvidedCalibrationExpander.Header = $"Included calibration files ({_providedCalibration.Count})";
+        ProvidedCalibrationPanel.Children.Clear();
+        foreach (string path in _providedCalibration)
+        {
+            var row = new Grid { ColumnSpacing = 8 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.Children.Add(new TextBlock { Text = path, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true });
+            var remove = new Button { Content = "Remove" };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(remove, "Remove calibration file " + Path.GetFileName(path));
+            Grid.SetColumn(remove, 1); row.Children.Add(remove);
+            remove.Click += (_, _) => { _providedCalibration.Remove(path); RenderProvidedCalibration(); UpdateOptionsAndValidation(); };
+            ProvidedCalibrationPanel.Children.Add(row);
+        }
     }
 
     private async void ChooseBias_Click(object sender, RoutedEventArgs e) =>
@@ -775,8 +872,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
         try
         {
-            if (outputs.Values.Any(output => _frames.Any(frame => StackSourceIdentity.RefersToSameFile(output, frame.Path))))
-                throw new InvalidOperationException("An output cannot replace any input light, including excluded or unselected lights.");
+            if (outputs.Values.Any(output => _sourcePaths.Concat(_providedCalibration).Any(source => StackSourceIdentity.RefersToSameFile(output, source))))
+                throw new InvalidOperationException("An output cannot replace any input or calibration file, including excluded or unselected sources.");
             await VerifySkySourcesAsync(cancellation.Token);
             _rankedReferencePaths.Clear();
             if (AutomaticReferenceToggle.IsOn)
@@ -798,8 +895,23 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                 ? _alignmentReferencePath ?? _referencePaths.GetValueOrDefault(_groups[0].Id)
                     ?? _groups[0].Inputs[0]
                 : null;
-            using BatchCalibrationPreparation prepared = await PrepareCalibrationsAsync(
-                alignmentReference, cancellation.Token);
+            LibraryPreparedPlan? libraryPlan = null;
+            if (SelectedTag(CalibrationSourcePicker) == "Automatic")
+            {
+                if (!_graded.IsCurrent || _graded.Review is not { } review) throw new InvalidOperationException("Analyze calibration before stacking.");
+                var calibrationProgress = new Progress<LibraryProgress>(p =>
+                {
+                    if (!_closed) { ProgressMessageText.Text = "Preparing calibration: " + p.Phase.Replace('_', ' ');
+                        ProgressCountsText.Text = $"{p.Completed} / {p.Total}"; }
+                });
+                LibraryRequest execute = _graded.Request("execute", review.ReviewKey);
+                CalibrationLibraryPreferencesStore.Save(_graded.Preferences);
+                LibraryReview built = await CalibrationLibraryService.PerformAsync(execute, calibrationProgress, cancellation.Token);
+                libraryPlan = new LibraryPreparedPlan(built, execute.Lights);
+            }
+            using BatchCalibrationPreparation prepared = new(
+                _groups.ToDictionary(g => g.Id, _ => libraryPlan is null ? _calibration.Copy() : new ImageStackCalibration()),
+                libraryPlan?.Review.Warnings ?? [], []);
             FlatQualityReview[] reviews = prepared.Results.SelectMany(result => result.FlatQualityReviews).ToArray();
             if ((prepared.Warnings.Count > 0 || reviews.Length > 0) &&
                 !await ConfirmCalibrationWarningsAsync(prepared.Warnings, reviews))
@@ -822,6 +934,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                     .Concat(group.Inputs.Where(path =>
                         !string.Equals(path, reference, StringComparison.OrdinalIgnoreCase)))
                     .ToArray();
+                if (libraryPlan is not null) orderedInputs = libraryPlan.Inputs(orderedInputs, _graded.Preferences.Incomplete == "exclude");
+                if (orderedInputs.Length < 2) throw new InvalidOperationException($"{group.Title} needs two usable lights after calibration exclusions.");
                 jobs.Add(new ImageStackJob(
                     group,
                     new ImageStackRequest(
@@ -830,10 +944,13 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                         options,
                         prepared.ByGroup[group.Id])
                     {
+                        LibraryPlan = libraryPlan,
                         AlignmentReferencePath = alignmentReference,
                         ChannelReferenceCandidates = alignmentReference is not null && AutomaticReferenceToggle.IsOn &&
                             StackingCoreCapabilities.Current.SupportsReferenceImageCandidates
-                            ? _rankedReferencePaths.GetValueOrDefault(group.Id) ?? [reference]
+                            ? (_rankedReferencePaths.GetValueOrDefault(group.Id) ?? [reference])
+                                .Where(p => libraryPlan is null || _graded.Preferences.Incomplete != "exclude" || !libraryPlan.Review.Missing[libraryPlan.Index(p)])
+                                .Select(p => libraryPlan is null ? p : libraryPlan.Review.Paths[libraryPlan.Index(p)]).ToArray()
                             : [],
                     }));
             }
@@ -903,122 +1020,6 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         token.ThrowIfCancellationRequested();
     }
 
-    private async Task<BatchCalibrationPreparation> PrepareCalibrationsAsync(
-        string? alignmentReferencePath,
-        CancellationToken cancellationToken)
-    {
-        if (SelectedTag(CalibrationSourcePicker) != "Automatic")
-        {
-            return new BatchCalibrationPreparation(
-                _groups.ToDictionary(
-                    group => group.Id,
-                    _ => _calibration.Copy(),
-                    StringComparer.Ordinal),
-                [],
-                []);
-        }
-
-        string libraryPath = Path.GetFullPath(_calibrationLibraryPath!);
-        var quality = FlatQualityOptions.ReadOptions();
-        quality.Validate();
-        string cacheDirectory = CalibrationCachePaths.ForLibrary(libraryPath);
-        var service = new CalibrationPreparationService();
-        var calibrations = new Dictionary<string, ImageStackCalibration>(StringComparer.Ordinal);
-        var warnings = new List<string>();
-        var results = new List<CalibrationPreparationResult>();
-        var protectedMasterPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (alignmentReferencePath is not null)
-        {
-            protectedMasterPaths.Add(Path.GetFullPath(alignmentReferencePath));
-        }
-        try
-        {
-            for (int index = 0; index < _groups.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                ImageStackGroup group = _groups[index];
-                string referencePath =
-                    _referencePaths.GetValueOrDefault(group.Id) ?? group.Inputs[0];
-                ProgressMessageText.Text = $"{group.Title}: inspecting target light headers…";
-                ProgressCountsText.Text =
-                    $"Preparing calibration {index + 1} of {_groups.Count}";
-                StackProgressBar.IsIndeterminate = true;
-                (CalibrationFrameProbe[] probes, string[] probeWarnings) =
-                    await ProbeTargetLightsAsync(group.Inputs, cancellationToken);
-                warnings.AddRange(
-                    probeWarnings.Select(warning => $"{group.Title}: {warning}"));
-                CalibrationTargetSelection.Partition partition =
-                    CalibrationTargetSelection.Split(probes);
-                warnings.AddRange(
-                    partition.Warnings.Select(warning => $"{group.Title}: {warning}"));
-                if (partition.Eligible.Count == 0)
-                {
-                    warnings.Add(
-                        $"{group.Title}: no raw light frame could be inspected; " +
-                        "the stack runs without automatic calibration.");
-                    calibrations[group.Id] = new ImageStackCalibration();
-                    continue;
-                }
-                CalibrationFrameProbe reference = partition.Eligible.FirstOrDefault(probe =>
-                        string.Equals(
-                            Path.GetFullPath(probe.Path),
-                            Path.GetFullPath(referencePath),
-                            StringComparison.OrdinalIgnoreCase))
-                    ?? partition.Eligible[0];
-                var progress = new Progress<CalibrationPreparationProgress>(update =>
-                {
-                    if (_closed)
-                    {
-                        return;
-                    }
-                    ProgressMessageText.Text = $"{group.Title}: {update.Message}";
-                    StackProgressBar.IsIndeterminate = update.Total <= 0;
-                    StackProgressBar.Value = update.Total <= 0
-                        ? 0
-                        : Math.Clamp((double)update.Completed / update.Total, 0, 1);
-                });
-                CalibrationPreparationResult result = await service.PrepareAsync(
-                    new CalibrationPreparationRequest
-                    {
-                        Reference = reference,
-                        TargetLights = partition.Eligible,
-                        SourcePaths = [libraryPath],
-                        CacheDirectory = cacheDirectory,
-                        ProtectedMasterPaths = protectedMasterPaths.ToArray(),
-                        Options = new() { FlatQuality = quality },
-                    },
-                    progress,
-                    cancellationToken);
-                results.Add(result);
-                for (int reviewIndex = 0; reviewIndex < result.FlatQualityReviews.Length; reviewIndex++)
-                    result.FlatQualityReviews[reviewIndex] = result.FlatQualityReviews[reviewIndex] with { GroupTitle = group.Title };
-                calibrations[group.Id] = result.Calibration.Copy();
-                warnings.AddRange(result.Warnings.Select(warning => $"{group.Title}: {warning}"));
-                foreach (string masterPath in result.Summaries
-                             .Select(summary => summary.MasterPath)
-                             .OfType<string>())
-                {
-                    protectedMasterPaths.Add(masterPath);
-                }
-            }
-        }
-        catch
-        {
-            foreach (CalibrationPreparationResult result in results)
-            {
-                result.Dispose();
-            }
-            throw;
-        }
-        return new BatchCalibrationPreparation(calibrations, warnings, results);
-    }
-
-    /// <summary>
-    /// Probes a group's lights, tolerating unreadable files: an overnight
-    /// batch is not refused because one frame's header cannot be read. The
-    /// frame is still offered to the stacker, whose native admission decides
-    /// its fate.
-    /// </summary>
     private static async Task<(CalibrationFrameProbe[] Probes, string[] Warnings)>
         ProbeTargetLightsAsync(
             IReadOnlyList<string> paths,
@@ -1233,6 +1234,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     public void Dispose()
     {
+        _graded.Dispose();
+        _routingCancellation.Cancel();
         _stackCancellation?.Cancel();
         _stackCancellation?.Dispose();
         _stackCancellation = null;

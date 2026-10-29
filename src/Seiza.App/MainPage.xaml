@@ -12,6 +12,7 @@
 
     <Page.KeyboardAccelerators>
         <KeyboardAccelerator Invoked="NewWindow_Invoked" Key="N" Modifiers="Control" />
+        <KeyboardAccelerator Invoked="Inspector_Invoked" Key="I" Modifiers="Control,Menu" />
     </Page.KeyboardAccelerators>
 
     <Grid>
@@ -321,6 +322,11 @@
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE700;" />
                 </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarButton x:Name="InspectFlatButton" Label="Inspect Flat" Visibility="Collapsed" Click="InspectFlat_Click"
+                          ToolTipService.ToolTip="Measure the linear flat source and show its grade, dust and illumination">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE7B3;" /></AppBarButton.Icon>
             </AppBarButton>
 
             <AppBarSeparator />

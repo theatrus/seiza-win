@@ -175,13 +175,20 @@ This release adds parity with
 See [the parity comparison](docs/MAC-PR-91-PARITY.md) and the updated
 [mosaic guide](docs/MOSAIC-STACKING.md), or read the [0.8.8 release notes](docs/releases/v0.8.8.md).
 
-## In development: per-light calibration
+## In development: graded per-light calibration
 
-Windows foundations for [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
-and [Seiza #385](https://github.com/theatrus/seiza/pull/385) add native quality
-wrappers, shared reference fixtures and calibration-session/replay tests. The
-new workflow is not enabled: automatic preparation still uses one compatible
-set per output. See the [boundary and next steps](docs/STACKING-CALIBRATION-FOUNDATIONS.md).
+The current branch follows merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
+with published Seiza/C ABI **0.47.0**, calibration **0.11.0** and stacking **0.54.0**.
+Stack Images now has Inputs, Calibration, Processing and Review tabs. Supply
+calibration files, a recursive library folder, or both; review native grades,
+flat groups, per-light matches and master recipes before stacking. Each light's
+session applies during fixed/expanded planning, integration and replay. Mixed
+folders route calibration automatically, and the Inspector can measure linear
+flat sources with adjustable saturation and optics.
+
+Settings remain local until stacking starts. See the
+[Mac #92 comparison and workflow guide](docs/MAC-PR-92-PARITY.md).
+The download above remains the released Windows 0.8.8.
 
 ## Seiza for Windows 0.8.7: TXT and CSV image collections
 
@@ -494,7 +501,12 @@ core releases no longer force identical masters to be rebuilt.
 
 ## Flat quality review
 
-In directory or live stacking, choose automatic calibration and enable
+Directory stacking's graded workflow now measures and grades candidates through
+the shared coordinator; its Review tab shows exclusions, grouping, matching and
+master recipes. For a single flat, use **Inspect Flat** in the Inspector. See
+[the current calibration guide](docs/MAC-PR-92-PARITY.md).
+
+In live stacking (and released Windows 0.8.8's directory stacking), choose automatic calibration and enable
 **Review flat quality before stacking**. This follows the workflow in
 [Mac #76](https://github.com/theatrus/seiza-mac/pull/76): native Seiza measures
 the exact selected raw flats, even when the master is reused from cache.
@@ -538,24 +550,15 @@ discards the result; source identities are checked around the whole review.
 - Stacks can be split automatically by filename filter, with an independent
   reference frame for each filter group. Global or local normalization,
   delta-sigma rejection, registration limits, and calibration match the macOS
-  workflow. Choose existing masters or point Seiza at raw bias, dark,
-  dark-flat, and flat frames; the shared core matches camera metadata and
-  proves one safe calibration set against every target light in each group
-  before building the dependency chain. Matching uses target, proximity,
-  alternate-anchor, and coherent session passes; a recognized filename filter
-  can identify a target light whose FILTER header is missing, while an
-  unresolved target filter withholds flat calibration. Final native admission
-  reports every accepted input and every skipped input with its reason, and
-  Windows verifies that provenance before publishing or caching a master.
-  Windows then rechecks the written master so its preserved sensor and optics
-  metadata must still match every target light. A selected frame that cannot
-  be inspected, or that is not a raw light — a master, or an already
-  calibrated file — is set aside from matching with a warning; the stack
-  still runs, and native per-frame admission decides that frame's fate. Seiza names the readings
-  behind a refusal, accepts realistic rotator re-homing scatter with a
-  2-degree default tolerance, and
-  validates each future light against the active calibration epoch rather than
-  judging a master swap against the already-integrated reference.
+  workflow. Choose existing masters or **Graded calibration files or library**
+  in the Calibration tab. The shared native coordinator grades and matches
+  every light, prepares unique master dependencies, and applies complete
+  per-light sessions on either canvas. Review quality choices, measured flat
+  groups, matches and recipes in the same window. Flats and darks independently
+  support automatic grouping or one compatible set across nights. Stop, Keep
+  with available calibration and Exclude make incomplete coverage explicit.
+  Settings become saved defaults only after choosing an output and starting.
+  The existing live-acquisition calibration path is unchanged.
 - Stacking runs off the UI thread with per-frame progress, accepted/rejected
   counts, cancellation between frames, and automatic opening of the result.
   Measurements at progressively deeper checkpoints show SNR and achieved

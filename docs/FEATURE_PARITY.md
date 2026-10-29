@@ -30,19 +30,21 @@ test exist.
 | **Planned** | No usable Windows implementation yet. |
 | **Deferred** | Intentionally outside the first parity release. |
 
-## Calibration sessions in development
+## Mac #92 calibration parity (development branch)
 
-[Mac #92](https://github.com/theatrus/seiza-mac/pull/92) and
-[Seiza #385](https://github.com/theatrus/seiza/pull/385) add the foundations for
-per-light calibration. This is a scoped update after Windows 0.8.8, not a new
-audit of the older baseline above. See the
-[Windows boundary and implementation plan](STACKING-CALIBRATION-FOUNDATIONS.md).
+Scoped against merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
+head `3c09a71245505890352bd364597831c61d9fff62`, using published Seiza/C ABI
+0.47.0 (calibration 0.11.0, stacking 0.54.0). This supersedes the older
+single-set directory-calibration row below; the older global baseline has not
+been re-audited. See [the detailed comparison and validation](MAC-PR-92-PARITY.md).
 
-| Capability | Windows | Remaining acceptance criterion |
+| Capability | Windows branch | Scope |
 | --- | --- | --- |
-| Bias/dark evidence and native grading | **Partial** | Typed measurement/screening and captured PSF Guard peer fixtures pass; library-wide peer selection, eligibility/overrides and review UI remain. |
-| Shared measured flat grouping | **Planned** | Export-gated JSON bridge and unchanged core fixture are staged. The current pin lacks the export; its integration test is visibly skipped pending a released #385 contract. |
-| Per-light calibration on one output | **Partial** | Native fixed/expanded A→B→A integration/checkpoint/pixel replay is tested. Session-aware calibrated expanded planning, shared recipes and the Windows executor/UI remain; current automatic preparation still uses one set per output. |
+| Native graded file/library coordinator | Implemented | Direct C analyze → reviewed execute → source verify; native caches, quality choices, families, cohorts, recipes, retries, pedestal and corrections. |
+| Per-light fixed/expanded sessions | Implemented | A→B→A, session-aware raw planning, full gates and candidate-specific fixed references; transient replay, source/master protection. |
+| Calibration controls and review | Implemented | Inputs/Calibration/Processing/Review tabs; native global/per-rig settings, independent flat/dark modes, Stop/Keep/Exclude, quality/group/side choices and four evidence views. |
+| Mixed folders and flat inspection | Implemented | Native role routing leaves calibration browsable; linear flat levels, clipping, grade, dust/optics, vignetting and illumination. |
+| Full PSF Guard catalog UI and live acquisition migration | Outside Mac #92 | Existing Windows live workflow is retained; automatic cache eviction is absent on both hosts. |
 
 ## Viewer and navigation
 
