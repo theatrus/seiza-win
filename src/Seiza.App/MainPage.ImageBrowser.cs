@@ -26,6 +26,8 @@ public sealed partial class MainPage
     private bool _includeSubfolders = true;
     private bool _isScanningFolder;
     private bool _browserInitialized;
+    private CancellationTokenSource? _filterMetadataCancellation;
+    private IReadOnlyDictionary<string, string?> _browserFilters = new Dictionary<string, string?>();
 
     private bool CanBrowseImages => _browserRoot is not null || _browserStatus is not null || BrowserItems.Count > 1;
 
@@ -71,6 +73,7 @@ public sealed partial class MainPage
     private void CancelBrowserDiscovery()
     {
         _browserDiscoveryCancellation?.Cancel();
+        _filterMetadataCancellation?.Cancel();
         _browserDiscoveryCancellation = null;
         _isScanningFolder = false;
     }
@@ -218,6 +221,8 @@ public sealed partial class MainPage
         IReadOnlyList<ImagePathListIssue>? listIssues = null)
     {
         if (cancelDiscovery) CancelBrowserDiscovery();
+        _filterMetadataCancellation?.Cancel();
+        _browserFilters = new Dictionary<string, string?>();
         _thumbnailCancellation?.Cancel();
         _thumbnailCancellation = null;
         if (!string.Equals(_browserRoot, folderRoot, StringComparison.OrdinalIgnoreCase) ||
@@ -247,6 +252,7 @@ public sealed partial class MainPage
             _syncingBrowserSelection = false;
         }
         RebuildBrowserGroups(selectedPath);
+        _ = UpdateBrowserFiltersAsync();
         _isBrowserOpen = CanBrowseImages;
         RevealBrowserSelection();
         UpdateNavigationState();
@@ -257,7 +263,7 @@ public sealed partial class MainPage
     {
         ImageBrowserGroupingResult layout = ImageBrowserGroupingModel.Create(
             _browserListPaths ?? (IReadOnlyList<string>)_imagePaths, _browserRoot, _browserGrouping,
-            preserveInputOrder: _browserListPath is not null);
+            preserveInputOrder: _browserListPath is not null, filters: _browserFilters);
         var existing = BrowserItems.ToDictionary(item => item.Path, StringComparer.OrdinalIgnoreCase);
         _thumbnailCancellation?.Cancel();
         _syncingBrowserSelection = true;
@@ -319,6 +325,7 @@ public sealed partial class MainPage
         // has completed. Only an actual user change should persist a preference.
         if (grouping == _browserGrouping) return;
         _browserGrouping = grouping;
+        _ = UpdateBrowserFiltersAsync();
         try { CatalogSettingsStore.SaveBrowserGrouping(_browserGrouping); }
         catch (Exception exception) when (exception is IOException or UnauthorizedAccessException)
         {
@@ -329,6 +336,30 @@ public sealed partial class MainPage
         UpdateNavigationState();
         UpdateVisualState();
         _ = PrefetchThumbnailsAroundSelectionAsync();
+    }
+
+    private async Task UpdateBrowserFiltersAsync()
+    {
+        _filterMetadataCancellation?.Cancel();
+        if (_browserGrouping != ImageBrowserGrouping.Filter || _imagePaths.Count == 0) return;
+        var cancellation = new CancellationTokenSource();
+        _filterMetadataCancellation = cancellation;
+        try
+        {
+            var filters = await ImageSourceService.ReadFiltersAsync(_imagePaths, cancellation.Token);
+            if (_disposed || cancellation.IsCancellationRequested || !ReferenceEquals(_filterMetadataCancellation, cancellation)) return;
+            _browserFilters = filters;
+            string? selected = _selectedIndex >= 0 ? _imagePaths[_selectedIndex] : null;
+            RebuildBrowserGroups(selected);
+            RevealBrowserSelection(); UpdateNavigationState(); UpdateVisualState();
+            _ = PrefetchThumbnailsAroundSelectionAsync();
+        }
+        catch (OperationCanceledException) { }
+        finally
+        {
+            if (ReferenceEquals(_filterMetadataCancellation, cancellation)) _filterMetadataCancellation = null;
+            cancellation.Dispose();
+        }
     }
 
     private void BrowserGroup_Click(object sender, RoutedEventArgs e)
@@ -418,7 +449,7 @@ public sealed partial class MainPage
         ToolTipService.SetToolTip(BrowserRootText, root);
         BrowserSubfoldersCheckBox.Visibility = _browserRoot is not null ? Visibility.Visible : Visibility.Collapsed;
         BrowserGroupingHelpText.Text = _browserGrouping == ImageBrowserGrouping.Filter
-            ? "Filters detected from image filenames. Unrecognized files appear under Other."
+            ? "Filters from image headers, with filenames used when no filter is recorded. Unrecognized files appear under Other."
             : _browserGrouping == ImageBrowserGrouping.None ? string.Empty : "Select a group header to collapse or expand it.";
         BrowserStatusText.Text = _browserStatus ?? $"{BrowserItems.Count:N0} images";
         ToolTipService.SetToolTip(BrowserStatusText, _browserListPath);

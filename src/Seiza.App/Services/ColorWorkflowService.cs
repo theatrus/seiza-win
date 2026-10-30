@@ -21,10 +21,6 @@ internal static partial class ColorWorkflowService
     private static partial nint CalibrateFile(string request, out nint error);
     [LibraryImport("seiza_cabi", EntryPoint = "seiza_wcs_fits_header_json", StringMarshalling = StringMarshalling.Utf8)]
     private static partial nint WcsHeaders(string wcs, out nint error);
-    [LibraryImport("seiza_platform", EntryPoint = "seiza_win_color_calibrated", StringMarshalling = StringMarshalling.Utf8)]
-    private static partial int IsCalibratedFile(string path, out nint error);
-    [LibraryImport("seiza_platform", EntryPoint = "seiza_win_color_is_display", StringMarshalling = StringMarshalling.Utf8)]
-    private static partial int IsDisplayFile(string path, out nint error);
     [LibraryImport("seiza_platform", EntryPoint = "seiza_win_string_free")]
     private static partial void Free(nint value);
 
@@ -150,23 +146,17 @@ internal static partial class ColorWorkflowService
 
     public static FitsImageProcessingConfiguration ProcessingFor(string path, FitsImageProcessingConfiguration processing)
     {
-        if (Path.GetExtension(path).ToLowerInvariant() is not (".fits" or ".fit" or ".fts" or ".xisf")) return processing;
-        int calibrated = IsCalibratedFile(path, out nint error);
-        if (error != 0) Free(error); // The regular image reader reports invalid inputs.
-        var result = calibrated == 1 ? PreserveColor(processing) : processing.Clone();
-        result.PreserveDisplaySamples = HasDisplayTransfer(path);
+        ImageSourceHeader? header = ImageSourceService.TryReadHeader(path);
+        var result = header?.Text("SEIZAPCC") == "GAIA" ? PreserveColor(processing) : processing.Clone();
+        result.PreserveDisplaySamples = header?.Text("SEIZATRF") == "DISPLAY";
         return result;
     }
 
-    internal static bool HasDisplayTransfer(string path)
-    {
-        if (Path.GetExtension(path).ToLowerInvariant() is not (".fits" or ".fit" or ".fts" or ".xisf")) return false;
-        int display = IsDisplayFile(path, out nint error);
-        if (error != 0) Free(error);
-        return display == 1;
-    }
+    internal static bool HasDisplayTransfer(string path) => ImageSourceService.TryReadHeader(path)?.Text("SEIZATRF") == "DISPLAY";
 
-    internal static FitsImageProcessingConfiguration InitialProcessingFor(string path) => HasDisplayTransfer(path)
+    internal static FitsImageProcessingConfiguration InitialProcessingFor(string path) => InitialProcessingFromHeader(ImageSourceService.TryReadHeader(path));
+
+    internal static FitsImageProcessingConfiguration InitialProcessingFromHeader(ImageSourceHeader? header) => header?.Text("SEIZATRF") == "DISPLAY"
         ? new(new FitsStretchStack([FitsStretchConfiguration.CreateIdentity()]), null) { PreserveDisplaySamples = true }
         : FitsImageProcessingConfiguration.Default.Clone();
 }

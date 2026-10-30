@@ -122,7 +122,7 @@ internal static unsafe class SeizaCore
     }
 
     private static bool IsAstronomyImage(string path) =>
-        Path.GetExtension(path).ToLowerInvariant() is ".fits" or ".fit" or ".fts" or ".xisf";
+        ImageFileTypes.IsAstronomyImage(path);
 
     public static CatalogStatus GetCatalogStatus(string? catalogDirectory)
     {

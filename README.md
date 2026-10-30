@@ -94,6 +94,15 @@ camera and tour controls, encoder availability and export limits. Windows
 0.8.8 uses Seiza/C ABI 0.44.2, stacking 0.51.2, parallax
 0.19.2 and image-io 0.11.0 from published crates.
 
+## Development: shared image I/O
+
+The development branch adopts Seiza 0.48.0's shared header reads and bounded
+source-pixel windows. Browser and batch filter groups now prefer image headers,
+with filename fallback, matching live stacking. Inspector shows FITS commentary
+and offers an opt-in source-pixel readout before display processing.
+See [image I/O adoption notes](docs/IMAGE-IO-048.md) for the temporary exact
+release-review dependency pin, supported inputs and validation limits.
+
 ## Image viewing and folder review
 
 Use **Open image list** (Ctrl+Alt+O), regular Open, or drag/drop to browse images
@@ -138,7 +147,7 @@ to review only the selected folder. Changing grouping keeps the selected image
 and its cached thumbnail. Group headers collapse and expand their thumbnails;
 Previous/Next and keyboard navigation visit every image in grouped order,
 automatically expanding a collapsed destination group and revealing its card.
-Filter grouping uses the stacker's filename detection, with unrecognized files
+Filter grouping prefers image headers, falling back to filename detection, with unrecognized files
 under **Other**. Collapsing the current image's group does not close that image.
 Unreadable subfolders and linked folders are skipped with a count in the sidebar.
 Fit, pan, wheel-zoom, and pointer-anchored pinch-zoom a GPU-backed viewport;
@@ -547,7 +556,7 @@ discards the result; source identities are checked around the whole review.
   entire opened tree, including collapsed groups. Turn it off to limit inputs
   to the opened folder. Choose light frames in the stacking dialog; relative
   paths distinguish same-named files in its frame and reference lists.
-- Stacks can be split automatically by filename filter, with an independent
+- Stacks can be split automatically by header filter, with filename fallback, with an independent
   reference frame for each filter group. Global or local normalization,
   delta-sigma rejection, registration limits, and calibration match the macOS
   workflow. Choose existing masters or **Graded calibration files or library**
@@ -571,7 +580,7 @@ discards the result; source identities are checked around the whole review.
 Open a folder containing FITS or XISF light frames, then choose **Stack** from
 the toolbar. Select the exposures to include and a reference frame, then tune
 normalization, pixel rejection, registration limits, or automatic calibration
-library selection. When filenames contain multiple filter names, Seiza enables a
+library selection. When image headers or filenames identify multiple filters, Seiza enables a
 separate output per filter by default so incompatible channels are not mixed.
 
 ![Selecting light frames and a reference for directory image stacking](docs/images/directory-image-stacking.png)

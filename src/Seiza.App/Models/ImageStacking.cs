@@ -334,6 +334,12 @@ internal sealed record ImageFilenameFilter(string Id, string Title, string Filen
         @"[^\p{L}\p{N}]+",
         RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
+    public static ImageFilenameFilter? Resolve(string path, IReadOnlyDictionary<string, string?>? headers = null) =>
+        FromHeaderOrFilename(path, headers is not null && headers.TryGetValue(path, out string? filter) ? filter : null);
+
+    public static ImageFilenameFilter? FromHeaderOrFilename(string path, string? filter) =>
+        !string.IsNullOrWhiteSpace(filter) ? FromName(filter) : Detect(path);
+
     public static ImageFilenameFilter? Detect(string path)
     {
         string filename = Path.GetFileNameWithoutExtension(path)
@@ -462,8 +468,8 @@ internal sealed record ImageStackGroup(
 
 internal static class ImageStackGrouping
 {
-    public static bool HasMultipleDetectedFilters(IEnumerable<string> paths) =>
-        paths.Select(ImageFilenameFilter.Detect)
+    public static bool HasMultipleDetectedFilters(IEnumerable<string> paths, IReadOnlyDictionary<string, string?>? filters = null) =>
+        paths.Select(p => ImageFilenameFilter.Resolve(p, filters))
             .Where(filter => filter is not null)
             .Select(filter => filter!.Id)
             .Distinct(StringComparer.Ordinal)
@@ -472,9 +478,9 @@ internal static class ImageStackGrouping
 
     public static IReadOnlyList<ImageStackGroup> Groups(
         IReadOnlyList<string> paths,
-        bool splitByFilter)
+        bool splitByFilter, IReadOnlyDictionary<string, string?>? filters = null)
     {
-        if (!splitByFilter || !HasMultipleDetectedFilters(paths))
+        if (!splitByFilter || !HasMultipleDetectedFilters(paths, filters))
         {
             return [new ImageStackGroup("all", null, paths)];
         }
@@ -484,7 +490,7 @@ internal static class ImageStackGrouping
             StringComparer.Ordinal);
         foreach (string path in paths)
         {
-            ImageFilenameFilter? filter = ImageFilenameFilter.Detect(path);
+            ImageFilenameFilter? filter = ImageFilenameFilter.Resolve(path, filters);
             string key = filter?.Id ?? "other";
             if (!groups.TryGetValue(key, out var group))
             {

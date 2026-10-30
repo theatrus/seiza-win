@@ -1164,7 +1164,7 @@ public sealed partial class MainPage : Page, IDisposable
         }
         FitsImageProcessingConfiguration processing = processingOverride ??
             (isNewImage
-                ? ColorWorkflowService.InitialProcessingFor(path)
+                ? FitsImageProcessingConfiguration.Default.Clone()
                 : CurrentProcessing());
         if (!preserveSolution || ViewModel.IsSolving)
         {
@@ -1184,6 +1184,10 @@ public sealed partial class MainPage : Page, IDisposable
 
         try
         {
+            ImageSourceHeader? sourceHeader = await Task.Run(() => ImageSourceService.TryReadHeader(path), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (isNewImage && processingOverride is null)
+                processing = ColorWorkflowService.InitialProcessingFromHeader(sourceHeader);
             RenderedImageData image = await ImageRenderService.RenderAsync(
                 path,
                 processing,
@@ -1211,6 +1215,8 @@ public sealed partial class MainPage : Page, IDisposable
             }
             InspectorControl.ShowMetadata(image.Metadata, processing);
             InspectorControl.FlatInspection.SetSource(path);
+            InspectorControl.SourcePixels.SetSource(path);
+            InspectorControl.ShowSourceCommentary(sourceHeader);
             ViewModel.CompleteLoading(path, image.Metadata);
             _ownerWindow?.SetDocumentTitle(Path.GetFileName(path));
 
@@ -1447,6 +1453,14 @@ public sealed partial class MainPage : Page, IDisposable
 
     private void ImageCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
+        if (_isInspectorOpen && _currentPath is not null && _scale > 0)
+        {
+            var pointer = e.GetCurrentPoint(ImageCanvas).Position;
+            Vector2 source = (new Vector2((float)pointer.X, (float)pointer.Y) - _offset) / _scale;
+            if (source.X >= 0 && source.Y >= 0 && source.X < _sourceWidth && source.Y < _sourceHeight)
+                InspectorControl.SourcePixels.SetPoint((int)Math.Floor(source.X), (int)Math.Floor(source.Y));
+            else InspectorControl.SourcePixels.ClearPoint();
+        }
         if (!_isDragging)
         {
             return;

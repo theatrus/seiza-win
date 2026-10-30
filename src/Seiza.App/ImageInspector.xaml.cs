@@ -35,13 +35,24 @@ public sealed partial class ImageInspector : UserControl
     {
         InitializeComponent();
         InspectorSections.Children.Insert(0, FlatInspection);
+        InspectorSections.Children.Insert(1, SourcePixels);
     }
 
     internal FlatInspectionControl FlatInspection { get; } = new();
+    internal SourcePixelControl SourcePixels { get; } = new();
+
+    internal void ShowSourceCommentary(ImageSourceHeader? header)
+    {
+        if (header is null) return;
+        foreach (string line in header.History) _allHeaders.Add(new("HISTORY", line));
+        foreach (string line in header.Comments) _allHeaders.Add(new("COMMENT", line));
+        ApplyHeaderFilter();
+    }
 
     public void ClearMetadata()
     {
         FlatInspection.SetSource(null);
+        SourcePixels.SetSource(null);
         ImageDetails.Clear();
         SidebarAnalyzeStarsButton.IsEnabled = false;
         _allHeaders.Clear();

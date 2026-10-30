@@ -17,7 +17,7 @@ internal sealed record SkyPanelAnalysis(IReadOnlyList<SkyField> Fields,
     IReadOnlyList<SkySolveFailure> Failures, IReadOnlyDictionary<string, SkySourceStamp> Sources,
     IReadOnlyList<SkySolvedFrame> Solved, double[][] Overlaps)
 {
-    public IReadOnlyList<ImageStackGroup> SelectedGroups(IReadOnlyList<string> paths, bool splitByFilter)
+    public IReadOnlyList<ImageStackGroup> SelectedGroups(IReadOnlyList<string> paths, bool splitByFilter, IReadOnlyDictionary<string, string?>? filters = null)
     {
         var selected = paths.ToHashSet(StringComparer.OrdinalIgnoreCase);
         int[] indices = Enumerable.Range(0, Solved.Count).Where(i => selected.Contains(Solved[i].Path)).ToArray();
@@ -33,7 +33,7 @@ internal sealed record SkyPanelAnalysis(IReadOnlyList<SkyField> Fields,
             SkyField field = Fields[fieldIndex];
             string[] fieldPaths = field.Panels.SelectMany(panel => panel.Frames).Select(frame => frame.Path)
                 .Where(selected.Contains).ToArray();
-            foreach (ImageStackGroup filter in ImageStackGrouping.Groups(fieldPaths, splitByFilter))
+            foreach (ImageStackGroup filter in ImageStackGrouping.Groups(fieldPaths, splitByFilter, filters))
             {
                 int[] channel = filter.Inputs.Select(path => indexByPath[path]).ToArray();
                 var channelFrames = channel.Select(i => frames[i]).ToArray();
