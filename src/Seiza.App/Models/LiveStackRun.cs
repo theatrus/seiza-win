@@ -38,18 +38,9 @@ internal sealed record LiveStackFilterIdentity(
     {
         ArgumentNullException.ThrowIfNull(probe);
         string? headerFilter = NullIfWhiteSpace(probe.Signature.Filter);
-        if (headerFilter is not null)
-        {
-            return FromName(headerFilter, LiveStackFilterSource.Header);
-        }
-
-        ImageFilenameFilter? filenameFilter = ImageFilenameFilter.Detect(probe.Path);
-        return filenameFilter is null
-            ? Unspecified()
-            : new LiveStackFilterIdentity(
-                filenameFilter.Id,
-                filenameFilter.Title,
-                LiveStackFilterSource.Filename);
+        ImageFilenameFilter? filter = ImageFilenameFilter.FromHeaderOrFilename(probe.Path, headerFilter);
+        return filter is null ? Unspecified() : new(filter.Id, filter.Title,
+            headerFilter is null ? LiveStackFilterSource.Filename : LiveStackFilterSource.Header);
     }
 
     public static LiveStackFilterIdentity FromStoredName(string? name) =>

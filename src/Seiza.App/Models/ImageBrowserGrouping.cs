@@ -29,7 +29,7 @@ internal static class ImageBrowserGroupingModel
         IEnumerable<string> paths,
         string? rootFolder,
         ImageBrowserGrouping grouping,
-        bool preserveInputOrder = false)
+        bool preserveInputOrder = false, IReadOnlyDictionary<string, string?>? filters = null)
     {
         ArgumentNullException.ThrowIfNull(paths);
         if (!Enum.IsDefined(grouping))
@@ -76,7 +76,7 @@ internal static class ImageBrowserGroupingModel
         foreach (PathEntry entry in entries)
         {
             ImageFilenameFilter? filter = grouping == ImageBrowserGrouping.Filter
-                ? ImageFilenameFilter.Detect(entry.FullPath) : null;
+                ? ImageFilenameFilter.Resolve(entry.FullPath, filters) : null;
             string key = grouping switch
             {
                 ImageBrowserGrouping.Folder => entry.Directory,

@@ -637,38 +637,6 @@ pub unsafe extern "C" fn seiza_win_color_tools_json(
     .unwrap_or(std::ptr::null_mut())
 }
 
-/// Header-only transfer lookup: one for display, zero for linear/unspecified.
-/// # Safety
-/// path is a NUL-terminated UTF-8 path; error_out is null or writable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn seiza_win_color_is_display(
-    path: *const c_char,
-    error_out: *mut *mut c_char,
-) -> i32 {
-    crate::boundary(error_out, || {
-        if path.is_null() {
-            return Err("An image path is required.".into());
-        }
-        let path = PathBuf::from(
-            unsafe { CStr::from_ptr(path) }
-                .to_str()
-                .map_err(|e| e.to_string())?,
-        );
-        let headers = if path
-            .extension()
-            .is_some_and(|s| s.eq_ignore_ascii_case("xisf"))
-        {
-            seiza_xisf::read_header(&path).map_err(|e| e.to_string())?
-        } else {
-            seiza_fits::read_header(&path).map_err(|e| e.to_string())?
-        };
-        Ok(i32::from(headers.iter().any(|(key, value)| {
-            key == "SEIZATRF" && value.as_str() == Some("DISPLAY")
-        })))
-    })
-    .unwrap_or(-1)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

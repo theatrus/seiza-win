@@ -2,7 +2,7 @@ using Seiza.App.Models;
 
 namespace Seiza.App.Services;
 
-internal sealed record StackInputRoutingResult(string[] Lights, string[] Calibration, string[] Notes);
+internal sealed record StackInputRoutingResult(string[] Lights, string[] Calibration, string[] Notes, IReadOnlyDictionary<string, string?> Filters);
 internal static class StackInputRouting
 {
     public static async Task<StackInputRoutingResult> RouteAsync(IEnumerable<string> paths, CancellationToken token = default)
@@ -10,12 +10,14 @@ internal static class StackInputRouting
         var lights = new List<string>();
         var calibration = new List<string>();
         var notes = new List<string>();
+        var filters = new Dictionary<string, string?>(StringComparer.OrdinalIgnoreCase);
         foreach (string path in paths)
         {
             token.ThrowIfCancellationRequested();
             try
             {
                 CalibrationFrameProbe probe = await CalibrationService.ProbeAsync(path, token).ConfigureAwait(false);
+                filters[path] = probe.Signature.Filter;
                 if (probe.Role is "bias" or "dark" or "dark-flat" or "flat") calibration.Add(path);
                 else if (probe.IsMaster) notes.Add($"Set aside {Path.GetFileName(path)}: other master image.");
                 else
@@ -27,6 +29,6 @@ internal static class StackInputRouting
             catch (OperationCanceledException) { throw; }
             catch (Exception e) { notes.Add($"Set aside {Path.GetFileName(path)}: {e.Message}"); }
         }
-        return new(lights.ToArray(), calibration.ToArray(), notes.ToArray());
+        return new(lights.ToArray(), calibration.ToArray(), notes.ToArray(), filters);
     }
 }

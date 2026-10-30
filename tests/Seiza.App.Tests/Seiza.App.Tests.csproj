@@ -11,6 +11,11 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.ImageIo.cs" Link="Interop\NativeMethods.ImageIo.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ImageSourceData.cs" Link="Models\ImageSourceData.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ImageSourceService.cs" Link="Services\ImageSourceService.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Services\FlatInspectionService.cs" Link="Services\FlatInspectionService.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\CalibrationLibrary.cs" Link="Models\CalibrationLibrary.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationLibraryService.cs" Link="Services\CalibrationLibraryService.cs" />

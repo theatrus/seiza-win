@@ -11,8 +11,10 @@ internal static class ImageFileTypes
     private static readonly HashSet<string> SupportedExtensionSet =
         new(SupportedExtensions, StringComparer.OrdinalIgnoreCase);
 
+    public static IReadOnlyList<string> AstronomyExtensions { get; } = Array.AsReadOnly(new[] { ".fits", ".fit", ".fts", ".xisf" });
+
     private static readonly HashSet<string> AstronomyExtensionSet = new(
-        [".fits", ".fit", ".fts", ".xisf"],
+        AstronomyExtensions,
         StringComparer.OrdinalIgnoreCase);
 
     public static bool IsSupportedImage(string path) =>

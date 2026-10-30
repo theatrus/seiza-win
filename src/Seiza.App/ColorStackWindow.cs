@@ -78,7 +78,7 @@ public sealed class ColorStackWindow : Window, IDisposable
             try
             {
                 var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id);
-                foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" }) picker.FileTypeFilter.Add(extension);
+                foreach (string extension in ImageFileTypes.AstronomyExtensions) picker.FileTypeFilter.Add(extension);
                 var file = await picker.PickSingleFileAsync();
                 if (!_closed && file is not null) field.Text = file.Path;
             }

@@ -30,6 +30,16 @@ test exist.
 | **Planned** | No usable Windows implementation yet. |
 | **Deferred** | Intentionally outside the first parity release. |
 
+## Seiza 0.48 image I/O adoption (development branch)
+
+The app now uses published Seiza 0.48.0 crates, with no temporary Git pin.
+Shared header and bounded window reads, cache invalidation, header-first filter
+identity and Windows junction handling have native-backed application tests.
+Browser regrouping and Inspector source-pixel controls are implemented; their
+interactive validation remains **Partial** because the desktop helper returned
+an access-denied error before launching the isolated UI probe. See the
+[adoption guide](IMAGE-IO-048.md) for behavior, dependency provenance and limits.
+
 ## Mac #92 calibration parity (development branch)
 
 Scoped against merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)

@@ -13,6 +13,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 {
     private IReadOnlyList<StackFrameChoice> _frames;
     private readonly string[] _sourcePaths;
+    private IReadOnlyDictionary<string, string?> _filterNames = new Dictionary<string, string?>();
     private readonly List<string> _providedCalibration = [];
     private readonly CancellationTokenSource _routingCancellation = new();
     private bool _routing = true;
@@ -131,6 +132,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             FrameList.ItemsSource = _frames;
             foreach (var frame in _frames) FrameList.SelectedItems.Add(frame);
             _providedCalibration.AddRange(routed.Calibration);
+            _filterNames = routed.Filters;
             if (_providedCalibration.Count > 0) CalibrationSourcePicker.SelectedIndex = 1;
             RoutingNotes.Text = $"{routed.Lights.Length} lights · {routed.Calibration.Length} calibration files" +
                 (routed.Notes.Length > 0 ? Environment.NewLine + string.Join(Environment.NewLine, routed.Notes) : "");
@@ -368,17 +370,17 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     private void RefreshGroupsAndValidation()
     {
         IReadOnlyList<string> selected = SelectedPaths;
-        bool hasMultipleFilters = ImageStackGrouping.HasMultipleDetectedFilters(selected);
+        bool hasMultipleFilters = ImageStackGrouping.HasMultipleDetectedFilters(selected, _filterNames);
         SplitByFilterToggle.IsEnabled = hasMultipleFilters;
         // Keep the user's split preference while temporarily selecting no
         // lights or one filter. All/None must not silently turn splitting off.
         FilterHintText.Text = hasMultipleFilters
-            ? "Multiple filename filters were detected. Split mode creates one registered FITS stack for each filter."
-            : "Include at least two detected filename filters to create separate filter stacks.";
+            ? "Multiple filters were detected from headers or filenames. Split mode creates one registered FITS stack for each filter."
+            : "Include at least two detected filters to create separate filter stacks.";
 
         _groups = SkyGroupingToggle.IsOn && _skyAnalysis is not null
-            ? _skyAnalysis.SelectedGroups(selected, SplitByFilterToggle.IsOn)
-            : ImageStackGrouping.Groups(selected, SplitByFilterToggle.IsOn);
+            ? _skyAnalysis.SelectedGroups(selected, SplitByFilterToggle.IsOn, _filterNames)
+            : ImageStackGrouping.Groups(selected, SplitByFilterToggle.IsOn, _filterNames);
         SkyOutputSummary.Visibility = SkyGroupingToggle.IsOn && _skyAnalysis is not null ? Visibility.Visible : Visibility.Collapsed;
         SkyOutputSummary.Text = $"{selected.Count} lights selected → {_groups.Count} output(s). " +
             string.Join("; ", _groups.Take(8).Select(group => $"{group.Title}: {group.Inputs.Count} lights")) +
@@ -692,7 +694,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     private async void AddCalibrationFiles_Click(object sender, RoutedEventArgs e)
     {
         var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.PicturesLibrary };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" }) picker.FileTypeFilter.Add(extension);
+        foreach (string extension in ImageFileTypes.AstronomyExtensions) picker.FileTypeFilter.Add(extension);
         WinRT.Interop.InitializeWithWindow.Initialize(picker, WindowHandle);
         IReadOnlyList<StorageFile> files = await picker.PickMultipleFilesAsync();
         if (_closed) return;
@@ -740,7 +742,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
             ViewMode = PickerViewMode.List,
         };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" })
+        foreach (string extension in ImageFileTypes.AstronomyExtensions)
         {
             picker.FileTypeFilter.Add(extension);
         }
@@ -787,7 +789,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
             ViewMode = PickerViewMode.List,
         };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" })
+        foreach (string extension in ImageFileTypes.AstronomyExtensions)
         {
             picker.FileTypeFilter.Add(extension);
         }

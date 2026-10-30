@@ -181,7 +181,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
             ViewMode = PickerViewMode.List,
         };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" })
+        foreach (string extension in ImageFileTypes.AstronomyExtensions)
         {
             picker.FileTypeFilter.Add(extension);
         }
@@ -231,7 +231,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
             ViewMode = PickerViewMode.List,
         };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" })
+        foreach (string extension in ImageFileTypes.AstronomyExtensions)
         {
             picker.FileTypeFilter.Add(extension);
         }
