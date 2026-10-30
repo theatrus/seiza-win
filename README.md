@@ -100,8 +100,8 @@ The development branch adopts Seiza 0.48.0's shared header reads and bounded
 source-pixel windows. Browser and batch filter groups now prefer image headers,
 with filename fallback, matching live stacking. Inspector shows FITS commentary
 and offers an opt-in source-pixel readout before display processing.
-See [image I/O adoption notes](docs/IMAGE-IO-048.md) for the temporary exact
-release-review dependency pin, supported inputs and validation limits.
+See [image I/O adoption notes](docs/IMAGE-IO-048.md) for the published dependency
+versions, supported inputs and validation limits.
 
 ## Image viewing and folder review
 

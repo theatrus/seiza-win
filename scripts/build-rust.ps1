@@ -34,42 +34,44 @@ $metadata = $metadataJson | ConvertFrom-Json
 $nativePackages = @(
     $metadata.packages | Where-Object {
         $_.name -eq "seiza-cabi" -and
-        ($_.source -like "registry+*" -or $_.source -like "git+*")
+        $_.source -like "registry+*"
     }
 )
 if ($nativePackages.Count -ne 1) {
-    throw "Expected exactly one resolved seiza-cabi package, found $($nativePackages.Count)."
+    throw "Expected exactly one registry seiza-cabi package, found $($nativePackages.Count)."
 }
 
 $nativePackage = $nativePackages[0]
 $stackingPackages = @(
     $metadata.packages | Where-Object {
         $_.name -eq "seiza-stacking" -and
-        ($_.source -like "registry+*" -or $_.source -like "git+*")
+        $_.source -like "registry+*"
     }
 )
 if ($stackingPackages.Count -ne 1) {
-    throw "Expected exactly one resolved seiza-stacking package, found $($stackingPackages.Count)."
+    throw "Expected exactly one registry seiza-stacking package, found $($stackingPackages.Count)."
 }
 $stackingPackage = $stackingPackages[0]
 $parallaxPackages = @(
     $metadata.packages | Where-Object {
         $_.name -eq "seiza-parallax" -and
-        ($_.source -like "registry+*" -or $_.source -like "git+*")
+        $_.source -like "registry+*"
     }
 )
 if ($parallaxPackages.Count -ne 1) {
-    throw "Expected exactly one resolved seiza-parallax package, found $($parallaxPackages.Count)."
+    throw "Expected exactly one registry seiza-parallax package, found $($parallaxPackages.Count)."
 }
 $parallaxPackage = $parallaxPackages[0]
 $vcsInfoPath = Join-Path (Split-Path -Parent $nativePackage.manifest_path) ".cargo_vcs_info.json"
-if ($nativePackage.source -like "git+*") {
-    $resolvedRevision = ([string]$nativePackage.source -split '#')[-1]
-} else {
-    if (-not (Test-Path -LiteralPath $vcsInfoPath)) { throw "Published C ABI is missing Cargo VCS metadata." }
-    $resolvedRevision = [string](Get-Content -LiteralPath $vcsInfoPath -Raw | ConvertFrom-Json).git.sha1
+if (-not (Test-Path -LiteralPath $vcsInfoPath)) {
+    throw "The published seiza-cabi package does not contain Cargo VCS metadata."
 }
-if ($resolvedRevision -notmatch '^[0-9a-f]{40}$') { throw "The core must resolve to an exact source commit." }
+
+$vcsInfo = Get-Content -LiteralPath $vcsInfoPath -Raw | ConvertFrom-Json
+$resolvedRevision = [string]$vcsInfo.git.sha1
+if ($resolvedRevision -notmatch '^[0-9a-f]{40}$') {
+    throw "Could not read the Seiza source commit from '$vcsInfoPath'."
+}
 
 $cargoAction = if ($Test) { "test" } else { "build" }
 $releaseFlag = if ($Configuration -eq "Release") { " --release" } else { "" }
@@ -79,25 +81,21 @@ if ($Test) {
     # The 0.47.0 C ABI archive refers to sibling calibration fixtures. Stage
     # the unchanged published crate and fixtures from the matching published
     # calibration archive; never write into Cargo's registry cache or fetch a
-    # moving branch. Exact Git revisions already carry sibling fixtures in their
-    # workspace; registry archives use the staging helper. The shipped DLL is
-    # always built from the app lock below.
+    # moving branch. The production DLL is still built from the app lock below.
     $nativeTestManifest = $nativePackage.manifest_path
     $calibrationPackages = @($metadata.packages | Where-Object {
-        $_.name -eq "seiza-calibration" -and ($_.source -like "registry+*" -or $_.source -like "git+*")
+        $_.name -eq "seiza-calibration" -and $_.source -like "registry+*"
     })
     if ($calibrationPackages.Count -ne 1) {
-        throw "Expected exactly one resolved calibration package for native test fixtures."
+        throw "Expected exactly one published calibration package for native test fixtures."
     }
-    if ($nativePackage.source -like "registry+*") {
-        . (Join-Path $PSScriptRoot "native-test-manifest.ps1")
-        $nativeTestManifest = Get-SeizaNativeTestManifest `
-            -NativeManifest $nativePackage.manifest_path `
-            -CalibrationManifest $calibrationPackages[0].manifest_path `
-            -TargetDirectory $targetDirectory `
-            -SourceRevision $resolvedRevision
-    }
-    Write-Host "Testing resolved C ABI using $nativeTestManifest"
+    . (Join-Path $PSScriptRoot "native-test-manifest.ps1")
+    $nativeTestManifest = Get-SeizaNativeTestManifest `
+        -NativeManifest $nativePackage.manifest_path `
+        -CalibrationManifest $calibrationPackages[0].manifest_path `
+        -TargetDirectory $targetDirectory `
+        -SourceRevision $resolvedRevision
+    Write-Host "Testing published C ABI using $nativeTestManifest"
     # Cargo cannot run a dependency package's dev-targets from the consuming
     # workspace, so exercise the published crate's own locked test suite, then
     # exercise the exact stacking leaf selected by the application lock. The
@@ -109,7 +107,7 @@ if ($Test) {
     $cargoCommand = "$nativeTestCommand && $stackingTestCommand && $workspaceNativeBuildCommand"
 }
 else {
-    # Select the resolved dependency from this workspace so the application
+    # Select the registry dependency from this workspace so the application
     # lockfile, rather than the crate archive's release-time lockfile, controls
     # compatible transitive patches such as seiza-calibration bug fixes.
     $cargoCommand = $workspaceNativeBuildCommand

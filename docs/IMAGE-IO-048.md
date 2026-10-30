@@ -4,20 +4,27 @@ The development branch adopts Seiza 0.48.0's shared header and window readers
 from upstream PRs [407](https://github.com/theatrus/seiza/pull/407) and
 [408](https://github.com/theatrus/seiza/pull/408).
 
-## Dependency pin
+## Published dependencies
 
-Release [409](https://github.com/theatrus/seiza/pull/409) is not published at
-adoption time. All directly consumed Seiza crates share the exact release-review
-revision `723fb702eb01283ddf0343a7217f7a987f0d709a`, declared once in the root
-workspace manifest. No dependency follows a moving branch. The native build
-records the resolved commit and continues to support registry archives and
-their fixture-staging regression for the return to published crates.
+The app uses published crates.io releases, pinned centrally in the workspace
+manifest: Seiza/C ABI 0.48.0, image-io 0.12.0, FITS 0.7.0, XISF 0.8.0,
+stacking 0.55.0, stretch 0.3.2 and download 0.9.0. Parallax resolves to 0.19.6
+and calibration remains at 0.11.0. No Seiza Git dependency remains.
 
-After publishing, replace those Git entries with registry requirements at the
-same versions and regenerate the lockfile: Seiza/C ABI 0.48.0, image-io 0.12.0,
-FITS 0.7.0, XISF 0.8.0, stacking 0.55.0, stretch 0.3.2 and download 0.9.0.
-Parallax resolves to 0.19.6. Calibration stays at 0.11.0. This adoption does not
-cut a Windows release. Core's stacking/stretch output versions are unchanged.
+Release [409](https://github.com/theatrus/seiza/pull/409) was published from
+`350a5e79700e6997047adecd35c0939cbf9a4234`; its source tree is identical to the
+initial review pin `723fb702eb01283ddf0343a7217f7a987f0d709a`. The native build
+records the published C ABI's Cargo VCS revision. This adoption does not cut a
+Windows release. Core's stacking/stretch output versions are unchanged.
+
+Published C ABI tests refer to sibling calibration fixtures omitted from their
+archive. Staging uses the calibration crate from the same source revision, or,
+when that unchanged leaf came from an earlier release, extracts only fixtures
+from the exact calibration archive locked by the C ABI. The archive SHA-256,
+version and registry source are checked before extraction; links and escaping
+paths are refused. Cargo's registry sources remain untouched. Regression checks
+cover clean/repeated staging, mismatched versions/checksums, modified unpacked
+fixtures and archive path traversal.
 
 ## Header reads and filters
 

@@ -32,7 +32,7 @@ test exist.
 
 ## Seiza 0.48 image I/O adoption (development branch)
 
-The exact upstream release-review revision is pinned while 0.48.0 is pending.
+The app now uses published Seiza 0.48.0 crates, with no temporary Git pin.
 Shared header and bounded window reads, cache invalidation, header-first filter
 identity and Windows junction handling have native-backed application tests.
 Browser regrouping and Inspector source-pixel controls are implemented; their
