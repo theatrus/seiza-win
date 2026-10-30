@@ -56,6 +56,9 @@ try {
             $entry = [System.Formats.Tar.PaxTarEntry]::new([System.Formats.Tar.TarEntryType]::RegularFile, $EntryName)
             $entry.DataStream = $data
             $writer.WriteEntry($entry)
+            $empty = [System.Formats.Tar.PaxTarEntry]::new([System.Formats.Tar.TarEntryType]::RegularFile,
+                "seiza-calibration-0.11.0/tests/fixtures/library/empty.json")
+            $writer.WriteEntry($empty)
         }
         finally { $writer.Dispose(); $data.Dispose(); $gzip.Dispose(); $stream.Dispose() }
         return (Get-FileHash -LiteralPath $archivePath -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -75,6 +78,10 @@ checksum = "$Checksum"
     Get-SeizaNativeTestManifest @arguments | Out-Null
     if ([System.Convert]::ToHexString([System.IO.File]::ReadAllBytes($stagedFixture)) -ne [System.Convert]::ToHexString($fixtureBytes)) {
         throw "Fixtures must come from the verified archive, not a modified unpacked directory."
+    }
+    $emptyFixture = Join-Path (Split-Path -Parent $stagedFixture) "empty.json"
+    if (-not (Test-Path -LiteralPath $emptyFixture -PathType Leaf) -or (Get-Item -LiteralPath $emptyFixture).Length -ne 0) {
+        throw "Empty regular fixture files must be extracted too."
     }
     Write-TestLock "0.11.1" $checksum
     $refusedVersion = $false

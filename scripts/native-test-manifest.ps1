@@ -77,7 +77,7 @@ function Get-SeizaNativeTestManifest {
                 }
                 [System.IO.Directory]::CreateDirectory([System.IO.Path]::GetDirectoryName($destination)) | Out-Null
                 $output = [System.IO.File]::Create($destination)
-                try { $entry.DataStream.CopyTo($output) } finally { $output.Dispose() }
+                try { if ($entry.DataStream) { $entry.DataStream.CopyTo($output) } } finally { $output.Dispose() }
                 $extracted++
             }
             if ($extracted -eq 0) { throw "The locked calibration archive contains no fixtures." }
