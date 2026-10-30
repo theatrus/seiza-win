@@ -8,8 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.8.8 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.8/seiza-0.8.8-windows-x86_64.msi)
-· [0.8.8 release notes](docs/releases/v0.8.8.md)
+[Download Seiza for Windows 0.9.0 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.0/seiza-0.9.0-windows-x86_64.msi)
+· [0.9.0 release notes](docs/releases/v0.9.0.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.0/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -91,17 +92,24 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.8.8 uses Seiza/C ABI 0.44.2, stacking 0.51.2, parallax
-0.19.2 and image-io 0.11.0 from published crates.
+0.9.0 uses Seiza/C ABI 0.48.0, stacking 0.55.0, parallax
+0.19.6 and image-io 0.12.0 from published crates.
 
-## Development: shared image I/O
+## New in 0.9.0
 
-The development branch adopts Seiza 0.48.0's shared header reads and bounded
-source-pixel windows. Browser and batch filter groups now prefer image headers,
-with filename fallback, matching live stacking. Inspector shows FITS commentary
-and offers an opt-in source-pixel readout before display processing.
-See [image I/O adoption notes](docs/IMAGE-IO-048.md) for the published dependency
-versions, supported inputs and validation limits.
+- Grade calibration files, review per-light matches and master plans, and apply
+  each light's calibration on fixed or expanded stacking canvases.
+- Browse mixed light/calibration collections and inspect linear flats with
+  native grades, illumination and dust measurements.
+- Group browser and batch images by header filter, with filename fallback,
+  matching live stacking. Read shared FITS/XISF headers and commentary.
+- Enable **Show source values under pointer** in Inspector to read bounded
+  source-pixel windows, including large mosaics, before display processing.
+
+This release uses published Seiza/C ABI 0.48.0 and image-io 0.12.0. See the
+[release notes](docs/releases/v0.9.0.md),
+[graded calibration guide](docs/MAC-PR-92-PARITY.md) and
+[image I/O guide](docs/IMAGE-IO-048.md) for setup and supported inputs.
 
 ## Image viewing and folder review
 
@@ -184,10 +192,10 @@ This release adds parity with
 See [the parity comparison](docs/MAC-PR-91-PARITY.md) and the updated
 [mosaic guide](docs/MOSAIC-STACKING.md), or read the [0.8.8 release notes](docs/releases/v0.8.8.md).
 
-## In development: graded per-light calibration
+## Graded per-light calibration
 
-The current branch follows merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
-with published Seiza/C ABI **0.47.0**, calibration **0.11.0** and stacking **0.54.0**.
+Windows 0.9.0 follows merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
+with published Seiza/C ABI **0.48.0**, calibration **0.11.0** and stacking **0.55.0**.
 Stack Images now has Inputs, Calibration, Processing and Review tabs. Supply
 calibration files, a recursive library folder, or both; review native grades,
 flat groups, per-light matches and master recipes before stacking. Each light's
@@ -197,7 +205,6 @@ flat sources with adjustable saturation and optics.
 
 Settings remain local until stacking starts. See the
 [Mac #92 comparison and workflow guide](docs/MAC-PR-92-PARITY.md).
-The download above remains the released Windows 0.8.8.
 
 ## Seiza for Windows 0.8.7: TXT and CSV image collections
 
@@ -732,8 +739,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.8.8 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.8/seiza-0.8.8-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.8/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.9.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.0/seiza-0.9.0-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.0/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -799,7 +806,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.8.8
+  -p:SeizaVersion=0.9.0
 ```
 
 The installer is written to `dist`. See the
