@@ -117,11 +117,12 @@ version, or immutable historical release notes.
 ## Validate locally
 
 The release workflow is authoritative. Run the closest practical local subset
-before merging:
+before merging. Use the Release native profile, as CI and the production
+workflow do; the stacking Debug test binary exceeds MSVC's PDB size limit:
 
 ```powershell
 cargo fmt --all -- --check
-.\scripts\build-rust.ps1 -Test
+.\scripts\build-rust.ps1 -Configuration Release -Test
 dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
 dotnet build Seiza.slnx -c Release --no-restore
 dotnet test Seiza.slnx -c Release --no-build

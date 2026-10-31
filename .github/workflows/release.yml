@@ -126,8 +126,10 @@ jobs:
             throw "Production signing configuration is missing: $($missing -join ', ')"
           }
 
+      # Match CI and the shipped DLLs. Full Debug symbols exceed MSVC's PDB
+      # size limit for the stacking test binary on clean Windows runners.
       - name: Test Rust core
-        run: .\scripts\build-rust.ps1 -Test
+        run: .\scripts\build-rust.ps1 -Configuration Release -Test
 
       - name: Restore application
         run: dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
