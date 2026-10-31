@@ -17,6 +17,26 @@ a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza for Mac](https://github.com/theatrus/seiza-mac) ·
 [FITS and XISF for Photoshop](https://github.com/theatrus/xisf-photoshop)
 
+## Start a stack
+
+1. Open a folder of FITS/XISF exposures, then choose **File → Stack images…**
+   or **Stack…** in the toolbar. TXT/CSV image lists work too.
+2. On **Stack**, keep **Fixed reference** for one field, or choose
+   **Expanded mosaic** for overlapping fields. Lights are selected for you;
+   calibration files in a mixed collection are matched automatically.
+3. Choose **Stack…** and select an output. Seiza builds or reuses calibration
+   masters, combines the lights, and opens the saved linear FITS result.
+
+Wait for matching to finish. Complete calibration needs no review approval.
+The default stops for incomplete lights; resolve them in Calibration or Review,
+or explicitly choose a different incomplete-light policy. Frame selection,
+references, matching and processing controls remain available on the other tabs
+and in collapsed sections. These are settings, not required steps.
+
+The File menu and simplified Stack tab are on this development branch; the
+published 0.9.1 release uses the toolbar's **Stack** command. See the
+[stacking UI guide](docs/MAC-PR-96-PARITY.md) for the current layout.
+
 ## Features
 
 - **[Parallax videos and tours](#parallax-videos-and-tours)** — Turn an astrophoto into a depth-aware camera tour with painted dust and title cards, then export video or lossless PNG frames.
@@ -196,9 +216,10 @@ See [the parity comparison](docs/MAC-PR-91-PARITY.md) and the updated
 
 Windows 0.9.1 follows merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
 with published Seiza/C ABI **0.48.0**, calibration **0.11.0** and stacking **0.55.0**.
-Stack Images now has Inputs, Calibration, Processing and Review tabs. Supply
-calibration files, a recursive library folder, or both; review native grades,
-flat groups, per-light matches and master recipes before stacking. Each light's
+The development branch simplifies setup into Stack, Calibration, Processing and
+Review tabs. Supply calibration files, a recursive library folder, or both;
+matching starts automatically. Inspect native grades, flat groups, per-light
+matches and master recipes when needed; complete matches need no approval. Each light's
 session applies during fixed/expanded planning, integration and replay. Mixed
 folders route calibration automatically, and the Inspector can measure linear
 flat sources with adjustable saturation and optics.
@@ -566,7 +587,7 @@ discards the result; source identities are checked around the whole review.
 - Stacks can be split automatically by header filter, with filename fallback, with an independent
   reference frame for each filter group. Global or local normalization,
   delta-sigma rejection, registration limits, and calibration match the macOS
-  workflow. Choose existing masters or **Graded calibration files or library**
+  workflow. Choose existing masters or **Calibration files**
   in the Calibration tab. The shared native coordinator grades and matches
   every light, prepares unique master dependencies, and applies complete
   per-light sessions on either canvas. Review quality choices, measured flat
@@ -584,11 +605,12 @@ discards the result; source identities are checked around the whole review.
   kept in the first frames. If the stack cannot be read again, Seiza saves
   the ordinary stack and says why.
 
-Open a folder containing FITS or XISF light frames, then choose **Stack** from
-the toolbar. Select the exposures to include and a reference frame, then tune
-normalization, pixel rejection, registration limits, or automatic calibration
-library selection. When image headers or filenames identify multiple filters, Seiza enables a
-separate output per filter by default so incompatible channels are not mixed.
+Open a folder or image list and choose **File → Stack images…** or the toolbar's
+**Stack…**. Start directly from Stack after automatic matching completes. Expand
+**Light frames** to exclude exposures. **Processing → Registration reference**
+contains reference selection; its first selected light remains the default.
+When headers or filenames identify multiple filters, separate outputs are enabled
+by default. **Review matches** opens evidence and **Done** returns to Stack.
 
 ![Selecting light frames and a reference for directory image stacking](docs/images/directory-image-stacking.png)
 

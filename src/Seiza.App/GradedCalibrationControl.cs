@@ -12,7 +12,12 @@ namespace Seiza.App;
 // UI draft only. Core owns grading, matching, choices, recipes and cache publication.
 internal sealed class GradedCalibrationControl : StackPanel, IDisposable
 {
-    private readonly TextBlock _status = Text("Provide calibration files or a library folder to analyze.");
+    private readonly TextBlock _status = Text("No calibration files selected.", true);
+    private readonly TextBlock _coverage = Text("");
+    private readonly HyperlinkButton _reviewMatches = new() { Content = "Review matches", IsEnabled = false };
+    private readonly Button _retry = new() { Content = "Try again", Visibility = Visibility.Collapsed };
+    private readonly MenuFlyoutItem _refresh = new() { Text = "Refresh from files", IsEnabled = false };
+    private bool _enabled;
     private readonly StackPanel _settings = new() { Spacing = 12 };
     private readonly StackPanel[] _pages = Enumerable.Range(0, 4).Select(_ => new StackPanel { Spacing = 12 }).ToArray();
     private readonly ComboBox _scope = new() { Header = "Settings for", HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -32,15 +37,18 @@ internal sealed class GradedCalibrationControl : StackPanel, IDisposable
     public bool IsBusy { get; private set; }
     public event EventHandler? StateChanged;
     public UIElement SettingsView { get; }
-    public UIElement ReviewView => _review;
+    public UIElement SummaryView { get; }
+    public UIElement ReviewView { get; }
+    public string? AnalysisError { get; private set; }
+    public event EventHandler? ReviewRequested;
+    public event EventHandler? ReturnToStackRequested;
 
     public GradedCalibrationControl()
     {
         Spacing = 10;
-        Children.Add(Text("Frames are graded, grouped and matched by Seiza. Review the evidence here; masters are built when stacking starts."));
-        Children.Add(Choice("Flats", ["Group and match automatically", "Use all as one set"],
+        Children.Add(Choice("Flats", ["Automatic", "All compatible frames"],
             Preferences.FlatAssociation == "one_set" ? 1 : 0, i => { Preferences.FlatAssociation = i == 0 ? "automatic" : "one_set"; RenderSettings(); Changed(); }));
-        Children.Add(Choice("Darks", ["Group and match automatically", "Use all as one set"],
+        Children.Add(Choice("Darks", ["Automatic", "All compatible frames"],
             Preferences.DarkAssociation == "one_set" ? 1 : 0, i => { Preferences.DarkAssociation = i == 0 ? "automatic" : "one_set"; Changed(); }));
         Children.Add(Choice("Incomplete lights", ["Stop and review", "Keep with available calibration", "Exclude from stack"],
             Preferences.Incomplete switch { "keep" => 1, "exclude" => 2, _ => 0 }, i =>
@@ -49,13 +57,45 @@ internal sealed class GradedCalibrationControl : StackPanel, IDisposable
                 // Execution choice only: retain the current review and any in-flight analysis.
                 StateChanged?.Invoke(this, EventArgs.Empty);
             }));
-        Children.Add(_progress);
+        var summary = new StackPanel { Spacing = 8 };
+        summary.Children.Add(_status);
+        summary.Children.Add(_coverage);
+        summary.Children.Add(_progress);
+        var actions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        _reviewMatches.Click += (_, _) => ReviewRequested?.Invoke(this, EventArgs.Empty);
+        _retry.Click += (_, _) => Changed();
+        actions.Children.Add(_reviewMatches);
+        actions.Children.Add(_retry);
+        summary.Children.Add(actions);
+        SummaryView = summary;
         AutomationProperties.SetLiveSetting(_status, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Polite);
-        Children.Add(_status);
-        var again = new Button { Content = "Analyze again" };
-        again.Click += (_, _) => Changed();
-        Children.Add(again);
-        Children.Add(Text("Changes apply to this stack and become saved defaults when stacking starts."));
+        var reviewPage = new Grid { RowSpacing = 12 };
+        reviewPage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        reviewPage.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        reviewPage.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        var reviewActions = new StackPanel { Orientation = Orientation.Horizontal, Spacing = 8 };
+        var more = new DropDownButton { Content = "More", Flyout = new MenuFlyout { Items = { _refresh } } };
+        AutomationProperties.SetName(more, "More calibration options");
+        _refresh.Click += (_, _) => Changed();
+        var done = new Button { Content = "Done" };
+        done.Click += (_, _) => ReturnToStackRequested?.Invoke(this, EventArgs.Empty);
+        reviewActions.Children.Add(more);
+        reviewActions.Children.Add(done);
+        reviewPage.Children.Add(reviewActions);
+        // Mirror status through dependency-property bindings, without parenting controls twice.
+        var reviewStatus = new StackPanel { Spacing = 4 };
+        foreach (TextBlock source in new[] { _status, _coverage })
+        {
+            var label = Text("");
+            label.SetBinding(TextBlock.TextProperty, new Microsoft.UI.Xaml.Data.Binding
+                { Source = source, Path = new PropertyPath("Text") });
+            reviewStatus.Children.Add(label);
+        }
+        Grid.SetRow(reviewStatus, 1);
+        reviewPage.Children.Add(reviewStatus);
+        Grid.SetRow(_review, 2);
+        reviewPage.Children.Add(_review);
+        ReviewView = reviewPage;
         var settingsPanel = new StackPanel { Spacing = 12 };
         settingsPanel.Children.Add(_scope); settingsPanel.Children.Add(_settings);
         _scope.SelectionChanged += (_, _) =>
@@ -63,7 +103,7 @@ internal sealed class GradedCalibrationControl : StackPanel, IDisposable
             _scopeId = (_scope.SelectedItem as ComboBoxItem)?.Tag as string ?? "";
             RenderSettings();
         };
-        SettingsView = new Expander { Header = "Matching, grading and flat stability", Content = settingsPanel,
+        SettingsView = new Expander { Header = "Matching and grading", Content = settingsPanel,
             HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch };
         string[] labels = ["Calibration frames", "Light matches", "Master plan", "Flat groups"];
         for (int i = 0; i < labels.Length; i++) _review.Items.Add(new PivotItem { Header = labels[i],
@@ -87,26 +127,32 @@ internal sealed class GradedCalibrationControl : StackPanel, IDisposable
             Lights = nextLights, Provided = nextProvided }, LibraryJsonContext.Default.LibraryRequest);
         if (_inputKey == key) return;
         _inputKey = key; _library = library; _lights = nextLights; _provided = nextProvided;
-        Changed(enabled);
+        _enabled = enabled;
+        Changed();
     }
 
     public LibraryRequest Request(string operation, string? reviewKey = null) =>
         LibraryRequest.Create(operation, _library, _lights, _provided, Preferences, reviewKey);
 
-    private void Changed(bool enabled = true)
+    private void Changed()
     {
         _analysis?.Cancel();
         int generation = ++_generation;
-        IsCurrent = false; IsBusy = false;
+        IsCurrent = false; IsBusy = false; AnalysisError = null;
         _review.IsEnabled = false;
-        if (!enabled || _lights.Length < 2 || (_provided.Length == 0 && _library is null))
+        _reviewMatches.IsEnabled = false;
+        _retry.Visibility = Visibility.Collapsed;
+        _refresh.IsEnabled = false;
+        _coverage.Text = "";
+        if (!_enabled || _lights.Length < 2 || (_provided.Length == 0 && _library is null))
         {
-            _status.Text = "Choose at least two lights and provide calibration files or a library folder.";
+            _status.Text = _lights.Length < 2 ? "Select at least two light frames." : "No calibration files selected.";
             _progress.Visibility = Visibility.Collapsed;
             StateChanged?.Invoke(this, EventArgs.Empty);
             return;
         }
-        _status.Text = "Review needs analysis…";
+        _status.Text = "Matching calibration…";
+        IsBusy = true;
         _progress.Visibility = Visibility.Visible;
         var cancel = new CancellationTokenSource();
         _analysis = cancel;
@@ -129,16 +175,30 @@ internal sealed class GradedCalibrationControl : StackPanel, IDisposable
             if (_disposed || generation != _generation) return;
             Review = result; IsCurrent = true;
             _review.IsEnabled = true;
-            _status.Text = $"{result.Frames.Length} calibration frames · {result.SessionCount} calibration {(result.SessionCount == 1 ? "session" : "sessions")} · {result.Missing.Count(m => m)} incomplete lights";
+            int incomplete = result.Missing.Count(m => m);
+            _status.Text = incomplete == 0 ? "Matched" : "Incomplete calibration";
+            _coverage.Text = $"Calibration frames: {result.Frames.Length} · Matched lights: {result.Missing.Length - incomplete} of {result.Missing.Length}" +
+                (result.Warnings.Length > 0 ? $" · Warnings: {result.Warnings.Length}" : "");
+            _reviewMatches.IsEnabled = true;
             UpdateScopes(); RenderReview();
         }
         catch (OperationCanceledException) { }
-        catch (Exception e) { if (!_disposed && generation == _generation) _status.Text = e.Message; }
+        catch (Exception e)
+        {
+            if (!_disposed && generation == _generation)
+            {
+                AnalysisError = e.Message;
+                _status.Text = "Calibration matching failed";
+                _coverage.Text = e.Message;
+                _retry.Visibility = Visibility.Visible;
+            }
+        }
         finally
         {
             if (!_disposed && generation == _generation)
             {
                 IsBusy = false; _progress.Visibility = Visibility.Collapsed;
+                _refresh.IsEnabled = true;
                 StateChanged?.Invoke(this, EventArgs.Empty);
             }
             if (ReferenceEquals(_analysis, cancel)) _analysis = null;
