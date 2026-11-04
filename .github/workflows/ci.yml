@@ -60,6 +60,9 @@ jobs:
       - name: Build all-users MSI
         run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.9.1
 
+      - name: Test native loading without the VC++ runtime
+        run: .\.github\scripts\test-windows-native-loader.ps1 -Directory .\artifacts\publish\win-x64 -Msi .\dist\seiza-0.9.1-windows-x86_64.msi
+
       - name: Verify installer Finish launch action
         run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi .\dist\seiza-0.9.1-windows-x86_64.msi
 

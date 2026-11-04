@@ -142,6 +142,18 @@ try {
     if ($appProcess.HasExited) {
         throw "Installed Seiza app exited with code $($appProcess.ExitCode)"
     }
+    # A loader-error dialog can keep a process alive without starting Seiza.
+    # Confirm the real WinUI main window, rather than only process existence.
+    $deadline = [DateTime]::UtcNow.AddSeconds(20)
+    do {
+        $appProcess.Refresh()
+        if ($appProcess.HasExited) { throw "Installed Seiza app exited with code $($appProcess.ExitCode)" }
+        if ($appProcess.MainWindowTitle -eq "Seiza") { break }
+        Start-Sleep -Milliseconds 250
+    } while ([DateTime]::UtcNow -lt $deadline)
+    if ($appProcess.MainWindowTitle -ne "Seiza") {
+        throw "Installed Seiza did not create its main window. Last title: '$($appProcess.MainWindowTitle)'"
+    }
 }
 finally {
     if ($null -ne $appProcess -and -not $appProcess.HasExited) {

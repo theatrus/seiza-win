@@ -58,6 +58,7 @@
         Targets="Publish"
         Properties="Configuration=Release;Platform=x64;RuntimeIdentifier=win-x64;Version=$(SeizaVersion);SelfContained=true;WindowsPackageType=None;WindowsAppSDKSelfContained=true;PublishSingleFile=false;PublishReadyToRun=true;PublishTrimmed=false;DebugSymbols=false;DebugType=None;PublishDir=$(PublishDirectory)" />
     <Copy SourceFiles="@(InstallerDocumentation)" DestinationFolder="$(PublishDirectory)" />
+    <CallTarget Targets="VerifySeizaRuntimeDependencies" />
   </Target>
 
   <!-- Skipping the publish when nothing has been published would harvest an
@@ -67,5 +68,13 @@
     <Error
         Condition="!Exists('$(PublishDirectory)Seiza.App.exe')"
         Text="SeizaSkipPublish is set but $(PublishDirectory)Seiza.App.exe does not exist. Run the PublishSeizaApp target first." />
+    <CallTarget Targets="VerifySeizaRuntimeDependencies" />
+  </Target>
+
+  <!-- Inspect both ordinary and signed/skip-publish payloads before harvesting.
+       Merely having the VC++ package on the build agent must not hide a missing
+       end-user prerequisite. This reads binaries without changing signed bytes. -->
+  <Target Name="VerifySeizaRuntimeDependencies">
+    <Exec Command="powershell -NoProfile -ExecutionPolicy Bypass -File &quot;$(RepoRoot).github\scripts\test-windows-runtime-dependencies.ps1&quot; -Directory &quot;$(PublishDirectory).&quot;" />
   </Target>
 </Project>
