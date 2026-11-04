@@ -47,6 +47,11 @@ paths audit PE imports; production also tests the actual MSI's embedded Shell
 action in a loader process where VC runtime resolution is deliberately blocked.
 Preinstalled VC++ runtimes on the CI image must not mask a missing prerequisite.
 
+Major upgrades tolerate legacy post-commit Shell-notification errors only when
+the checked native removal guard confirms all previous products are gone. CI
+and production also install a related test product whose uninstall deliberately
+fails, and require the upgrade to stop before installing Seiza's files.
+
 The order matters and the workflow enforces it. Authenticode is applied to the
 binaries before WiX packages them, so the installed program carries publisher
 identity and not merely the installer; and to the MSI before the appcast is

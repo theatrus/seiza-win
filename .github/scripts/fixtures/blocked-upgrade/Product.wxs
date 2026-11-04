@@ -1,0 +1,22 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
+  <!-- Test-only related product: uninstall fails before modifying any state. -->
+  <Package Name="Seiza blocked upgrade test" Manufacturer="Seiza test"
+           Version="0.0.1" ProductCode="AD1A4DA0-DAF4-42B5-B989-332A9AB182DC"
+           UpgradeCode="9E48A749-B21A-4EB9-9417-B1A5AA61D2F6"
+           Language="1033" Scope="perMachine">
+    <Media Id="1" />
+    <StandardDirectory Id="ProgramFiles64Folder">
+      <Directory Id="TESTFOLDER" Name="Seiza upgrade test">
+        <Component Id="TestMarker" Guid="B9C0EF32-DAB5-45B8-9E4D-15B764E73486">
+          <RegistryValue Root="HKLM" Key="Software\SeizaUpgradeTest" Name="Installed"
+                         Type="integer" Value="1" KeyPath="yes" />
+        </Component>
+      </Directory>
+    </StandardDirectory>
+    <Feature Id="Main"><ComponentRef Id="TestMarker" /></Feature>
+    <CustomAction Id="BlockRemoval" Error="Deliberate uninstall failure for upgrade regression test." />
+    <InstallExecuteSequence>
+      <Custom Action="BlockRemoval" Before="InstallInitialize" Condition="REMOVE = &quot;ALL&quot; AND NOT SEIZA_TEST_ALLOW_REMOVE" />
+    </InstallExecuteSequence>
+  </Package>
+</Wix>

@@ -30,7 +30,7 @@ Build the installer from the repository root:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.1
+  -p:SeizaVersion=0.9.2
 ```
 
 `build-rust.ps1` uses an explicit `x86_64-pc-windows-msvc` target and
@@ -53,12 +53,12 @@ work in two:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.1 `
+  -p:SeizaVersion=0.9.2 `
   -t:PublishSeizaApp
 # sign artifacts\publish\win-x64 here
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.1 `
+  -p:SeizaVersion=0.9.2 `
   -p:SeizaSkipPublish=true
 ```
 
@@ -84,7 +84,7 @@ Run the same check locally after packaging:
 ```powershell
 .\.github\scripts\test-windows-native-loader.ps1 `
   -Directory .\artifacts\publish\win-x64 `
-  -Msi .\dist\seiza-0.9.1-windows-x86_64.msi
+  -Msi .\dist\seiza-0.9.2-windows-x86_64.msi
 ```
 
 The interactive installer's selected-by-default **Launch Seiza** option uses
@@ -97,12 +97,19 @@ host AppID and global handler-list registration, all thumbnail and preview
 extension mappings, the Shell-notification action, and complete registration
 removal on uninstall.
 
+Upgrades can recover from older installers that report a Shell-action failure
+after committing removal. A checked native action verifies that every previous
+product is gone before starting the new installation. CI and production run
+`test-windows-installer-upgrade.ps1` with a deliberately blocked uninstall to
+confirm genuine removal failures still stop setup. Like the smoke test, this
+requires a disposable clean machine with no existing Seiza installation.
+
 An elevated install/launch/uninstall smoke test is available for local and CI
 validation:
 
 ```powershell
 .\.github\scripts\test-windows-installer.ps1 `
-  -Msi .\dist\seiza-0.9.1-windows-x86_64.msi
+  -Msi .\dist\seiza-0.9.2-windows-x86_64.msi
 ```
 
 Tagged releases use `.github/workflows/release.yml` to build and smoke-test
