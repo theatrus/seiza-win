@@ -97,6 +97,13 @@ host AppID and global handler-list registration, all thumbnail and preview
 extension mappings, the Shell-notification action, and complete registration
 removal on uninstall.
 
+Upgrades can recover from older installers that report a Shell-action failure
+after committing removal. A checked native action verifies that every previous
+product is gone before starting the new installation. CI and production run
+`test-windows-installer-upgrade.ps1` with a deliberately blocked uninstall to
+confirm genuine removal failures still stop setup. Like the smoke test, this
+requires a disposable clean machine with no existing Seiza installation.
+
 An elevated install/launch/uninstall smoke test is available for local and CI
 validation:
 

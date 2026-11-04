@@ -122,4 +122,41 @@ if ($notifySequence.IntegerData(3) -le 6600) {
     throw "NotifyShellAssociations must run after InstallFinalize"
 }
 
-Write-Output "Installer Finish launch and Shell-association notification actions are correctly sequenced."
+$upgradeView = Open-MsiView @'
+SELECT `Attributes` FROM `Upgrade` WHERE `ActionProperty`='WIX_UPGRADE_DETECTED'
+'@
+$upgrade = Fetch-MsiRecord $upgradeView
+if ($null -eq $upgrade -or ($upgrade.IntegerData(1) -band 4) -eq 0) {
+    throw "Major upgrade must tolerate the legacy post-commit Shell notification failure"
+}
+
+$guardView = Open-MsiView @'
+SELECT `Type`, `Source`, `Target` FROM `CustomAction` WHERE `Action`='VerifyPreviousProductsRemoved'
+'@
+$guard = Fetch-MsiRecord $guardView
+if ($null -eq $guard -or $guard.IntegerData(1) -ne 1 -or
+    $guard.StringData(2) -ne "SeizaThumbnailProviderCustomActions" -or
+    $guard.StringData(3) -ne "VerifyPreviousProductsRemoved") {
+    throw "Legacy upgrade recovery requires a checked native removal guard"
+}
+
+$guardSequenceView = Open-MsiView @'
+SELECT `Condition`, `Sequence` FROM `InstallExecuteSequence` WHERE `Action`='VerifyPreviousProductsRemoved'
+'@
+$guardSequence = Fetch-MsiRecord $guardSequenceView
+$removeView = Open-MsiView @'
+SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action`='RemoveExistingProducts'
+'@
+$remove = Fetch-MsiRecord $removeView
+$initializeView = Open-MsiView @'
+SELECT `Sequence` FROM `InstallExecuteSequence` WHERE `Action`='InstallInitialize'
+'@
+$initialize = Fetch-MsiRecord $initializeView
+if ($null -eq $guardSequence -or $null -eq $remove -or $null -eq $initialize -or
+    $guardSequence.StringData(1) -ne "WIX_UPGRADE_DETECTED AND NOT Installed" -or
+    $guardSequence.IntegerData(2) -le $remove.IntegerData(1) -or
+    $guardSequence.IntegerData(2) -ge $initialize.IntegerData(1)) {
+    throw "Removal guard must run after old-product removal and before the new install transaction"
+}
+
+Write-Output "Installer Finish, Shell notification, and guarded legacy upgrade actions are correctly sequenced."

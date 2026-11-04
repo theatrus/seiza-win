@@ -2,6 +2,8 @@
 
 #[cfg(windows)]
 mod com_server;
+#[cfg(windows)]
+mod installer;
 mod limits;
 #[cfg(windows)]
 mod preview;

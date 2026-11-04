@@ -342,6 +342,9 @@ jobs:
       - name: Smoke-test Windows installer
         run: .\.github\scripts\test-windows-installer.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
 
+      - name: Reject upgrades when the previous uninstall fails
+        run: .\.github\scripts\test-windows-installer-upgrade.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
+
       - name: Hand the signed installer to the publishing job
         uses: actions/upload-artifact@v7
         with:

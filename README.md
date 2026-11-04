@@ -100,7 +100,8 @@ camera and tour controls, encoder availability and export limits. Windows
 The Windows installer and native DLLs now include their C runtime, so a separate
 Visual C++ Redistributable is no longer required. This fixes installer error
 1723 in the Shell-notification action on clean Windows installations. The
-installer also checks that the actual Seiza window starts after installation.
+installer also recovers from the state left by a failed 0.9.1 setup. A checked
+removal guard still stops upgrades if an older product cannot be removed.
 
 [0.9.2 release notes](docs/releases/v0.9.2.md)
 

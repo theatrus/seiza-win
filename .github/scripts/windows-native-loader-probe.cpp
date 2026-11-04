@@ -51,6 +51,8 @@ int wmain(int argc, wchar_t** argv)
         if (i >= 2) {
             auto notify = reinterpret_cast<UINT (WINAPI*)(UINT)>(GetProcAddress(module, "NotifyShellAssociations"));
             if (!notify || notify(0) != 0) return 5;
+            auto verify = reinterpret_cast<UINT (WINAPI*)(UINT)>(GetProcAddress(module, "VerifyPreviousProductsRemoved"));
+            if (!verify || verify(0) != ERROR_INSTALL_FAILURE) return 9;
         }
         for (auto runtime : runtimes) if (GetModuleHandleW(runtime)) return 6;
         FreeLibrary(module);
