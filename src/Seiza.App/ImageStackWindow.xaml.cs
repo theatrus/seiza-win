@@ -11,8 +11,8 @@ namespace Seiza.App;
 
 public sealed partial class ImageStackWindow : Window, IDisposable
 {
-    private IReadOnlyList<StackFrameChoice> _frames;
-    private readonly string[] _sourcePaths;
+    private StackFrameChoice[] _frames;
+    private string[] _sourcePaths;
     private IReadOnlyDictionary<string, string?> _filterNames = new Dictionary<string, string?>();
     private readonly List<string> _providedCalibration = [];
     private readonly CancellationTokenSource _routingCancellation = new();
@@ -134,7 +134,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             _providedCalibration.AddRange(routed.Calibration);
             _filterNames = routed.Filters;
             if (_providedCalibration.Count > 0) CalibrationSourcePicker.SelectedIndex = 1;
-            RoutingNotes.Text = $"{routed.Lights.Length} lights · {routed.Calibration.Length} calibration files" +
+            RoutingNotes.Text = (_sourcePaths.Length == 0 ? "Add frames to begin. You can choose images, a folder, or a TXT/CSV file list."
+                : $"{routed.Lights.Length} lights · {routed.Calibration.Length} calibration files") +
                 (routed.Notes.Length > 0 ? Environment.NewLine + string.Join(Environment.NewLine, routed.Notes) : "");
             RenderProvidedCalibration();
         }
@@ -164,7 +165,10 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             return panel;
         }
         StackPanel inputs = Page("Inputs", sections.Take(4).Append(sections[7]));
-        inputs.Children.Insert(1, RoutingNotes);
+        _addLightFrames = StackFramePicker.CreateButton("Add light frames", AddFramesAsync);
+        inputs.Children.Insert(1, _addLightFrames);
+        inputs.Children.Insert(2, RoutingNotes);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetLiveSetting(RoutingNotes, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Polite);
         UIElement calibrationContent = (UIElement)CalibrationExpander.Content;
         CalibrationExpander.Content = null;
         Page("Calibration", [calibrationContent]);
@@ -546,6 +550,12 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         ValidationInfoBar.Message = message ?? string.Empty;
         ValidationInfoBar.IsOpen = message is not null;
         StartButton.IsEnabled = !_running && !_solvingPanels && message is null;
+        _addLightFrames.IsEnabled = !_routing && !_running;
+        if (_frames.Length == 0 && !_routing)
+        {
+            ValidationInfoBar.IsOpen = false;
+            FooterHintText.Text = "Add light frames from images, a folder, or a TXT/CSV file list to get started.";
+        }
     }
 
     private string? ValidationMessage(ImageStackOptions options)
