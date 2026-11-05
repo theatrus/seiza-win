@@ -40,7 +40,16 @@ interactive validation remains **Partial** because the desktop helper returned
 an access-denied error before launching the isolated UI probe. See the
 [adoption guide](IMAGE-IO-048.md) for behavior, dependency provenance and limits.
 
-## Mac #92 calibration parity (development branch)
+## Mac #96 stacking UI parity (development branch)
+
+[Mac #96](https://github.com/theatrus/seiza-mac/pull/96) is followed by Windows'
+File → Stack images command, compact Stack summary and calibration progress,
+collapsed light selection, Processing-only references/memory limits, Review
+matches/Done navigation, failure-only retry and Review → More → Refresh from files.
+Native policies and processing defaults are unchanged. See the
+[comparison and validation](MAC-PR-96-PARITY.md).
+
+## Mac #92 calibration parity
 
 Scoped against merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
 head `3c09a71245505890352bd364597831c61d9fff62`, using published Seiza/C ABI
@@ -52,7 +61,7 @@ been re-audited. See [the detailed comparison and validation](MAC-PR-92-PARITY.m
 | --- | --- | --- |
 | Native graded file/library coordinator | Implemented | Direct C analyze → reviewed execute → source verify; native caches, quality choices, families, cohorts, recipes, retries, pedestal and corrections. |
 | Per-light fixed/expanded sessions | Implemented | A→B→A, session-aware raw planning, full gates and candidate-specific fixed references; transient replay, source/master protection. |
-| Calibration controls and review | Implemented | Inputs/Calibration/Processing/Review tabs; native global/per-rig settings, independent flat/dark modes, Stop/Keep/Exclude, quality/group/side choices and four evidence views. |
+| Calibration controls and review | Implemented | Stack/Calibration/Processing/Review tabs; native global/per-rig settings, independent flat/dark modes, Stop/Keep/Exclude, quality/group/side choices and four evidence views. |
 | Mixed folders and flat inspection | Implemented | Native role routing leaves calibration browsable; linear flat levels, clipping, grade, dust/optics, vignetting and illumination. |
 | Full PSF Guard catalog UI and live acquisition migration | Outside Mac #92 | Existing Windows live workflow is retained; automatic cache eviction is absent on both hosts. |
 

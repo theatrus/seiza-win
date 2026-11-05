@@ -183,6 +183,9 @@ public sealed partial class MainPage : Page, IDisposable
         try
         {
             ImageStackBatchResult? result = await window.Completion;
+            // Completion precedes result loading/dialogs; never reactivate the closed setup.
+            if (ReferenceEquals(_stackWindow, window)) _stackWindow = null;
+            if (!_disposed) UpdateVisualState();
             if (_disposed || result is null || result.OutputPaths.Count == 0)
             {
                 return;
@@ -1698,11 +1701,10 @@ public sealed partial class MainPage : Page, IDisposable
         CopyAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         PasteAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         ImageBrowserButton.IsEnabled = CanBrowseImages;
-        StackImagesButton.IsEnabled =
-            _stackWindow is null &&
-            !_isScanningFolder &&
-            !ViewModel.IsLoading &&
-            GetStackableBrowserPaths().Take(2).Count() >= 2;
+        StackImagesMenuItem.IsEnabled = StackImagesButton.IsEnabled =
+            _stackWindow is not null ||
+            (!_isScanningFolder && !ViewModel.IsLoading &&
+             GetStackableBrowserPaths().Take(2).Count() >= 2);
         ToolTipService.SetToolTip(StackImagesButton, _browserRoot is not null && _includeSubfolders
             ? "Choose FITS/XISF frames from this directory tree to stack (including collapsed groups)"
             : "Choose FITS/XISF frames from the current folder to stack");

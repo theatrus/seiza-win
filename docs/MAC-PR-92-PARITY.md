@@ -11,6 +11,10 @@ Mac's review pin `d11b570` preceded this published merge; Windows has no Git
 dependency or private calibration coordinator. Product release/version 0.8.8
 has not been changed by this work.
 
+The matching behavior below is retained. For the current simplified Stack tab,
+automatic status and action labels, see [Mac #96 UI parity](MAC-PR-96-PARITY.md).
+The screenshots and recorded validation here describe the original #92 layout.
+
 ## Setup
 
 1. Open a folder tree or image collection and choose **Stack**. Native FITS/XISF
