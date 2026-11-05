@@ -1608,7 +1608,7 @@ internal sealed class CalibrationPreparationService
         }
     }
 
-    private static void ValidateBuildResult(
+    internal static void ValidateBuildResult(
         CalibrationMasterBuildResult result,
         CalibrationMasterBuildRequest request,
         string output,
