@@ -594,6 +594,23 @@ discards the result; source identities are checked around the whole review.
   kept in the first frames. If the stack cannot be read again, Seiza saves
   the ordinary stack and says why.
 
+The toolbar's **Stack** and **Build masters** buttons open separate windows,
+even with no images open. Both windows offer **Add frames → Choose
+images… / Choose folder… / Choose file list…** (TXT/CSV). Folder imports use
+files directly inside that folder. Imports add to the current inputs, ignore
+duplicate paths, preserve selections, and report skipped entries. Existing
+viewer files prefill the workflows; importing here does not open viewer windows.
+
+To build calibration masters without stacking lights, choose **Build masters**
+in the toolbar. Choose **Bias**,
+**Dark / dark-flat**, or **Flat**, select at least two compatible frames, then
+choose **Build and save master…**. Use **Clear frames** to start a new set.
+Build one compatible set at a
+time; the result reports any frames skipped by the core. Darks can optionally
+use a master bias. Flats require a master bias or an uncalibrated master
+dark-flat matching their exposure. Masters are saved as FITS images without
+star alignment, and no light stack is started.
+
 Open a folder containing FITS or XISF light frames, then choose **Stack** from
 the toolbar. Select the exposures to include and a reference frame, then tune
 normalization, pixel rejection, registration limits, or automatic calibration
