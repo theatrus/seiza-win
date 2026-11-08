@@ -9,6 +9,13 @@ public sealed partial class ImageStackWindow
 {
     private DropDownButton _addLightFrames = null!;
 
+    private void SetImportNotes(string message, bool expand = false)
+    {
+        RoutingNotes.Text = message;
+        ImportNotesExpander.Visibility = string.IsNullOrWhiteSpace(message) ? Visibility.Collapsed : Visibility.Visible;
+        if (expand) ImportNotesExpander.IsExpanded = true;
+    }
+
     private async Task AddFramesAsync(string source)
     {
         if (_running || _routing || _closed) return;
@@ -24,7 +31,7 @@ public sealed partial class ImageStackWindow
             StackFrameImportResult? imported = await StackFramePicker.PickAsync(source, WindowHandle, cancellation.Token);
             if (imported is null) return;
             cancellation.Token.ThrowIfCancellationRequested();
-            status.Text = "Reading image roles…";
+            SetImportNotes("Reading image roles…", expand: true);
             string[] paths = imported.Paths;
             string[] notes = imported.Notes;
             string[] existing = _frames.Select(frame => frame.Path).Concat(_providedCalibration).ToArray();
@@ -59,10 +66,10 @@ public sealed partial class ImageStackWindow
                 }
                 messages.Insert(0, $"Added {routed.Lights.Length} lights and {routed.Calibration.Length} calibration files. {_frames.Length} lights available.");
             }
-            status.Text = string.Join(Environment.NewLine, messages);
+            SetImportNotes(string.Join(Environment.NewLine, messages));
         }
-        catch (OperationCanceledException) { if (!_closed) status.Text = previousStatus + "\nAdding frames cancelled; existing inputs kept."; }
-        catch (Exception exception) { if (!_closed) status.Text = exception.Message; }
+        catch (OperationCanceledException) { if (!_closed) SetImportNotes(previousStatus + "\nAdding frames cancelled; existing inputs kept.", expand: true); }
+        catch (Exception exception) { if (!_closed) SetImportNotes(exception.Message, expand: true); }
         finally
         {
             _running = false;

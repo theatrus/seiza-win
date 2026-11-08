@@ -1,9 +1,9 @@
 # Expanded mosaic stacking
 
-Expanded stacking shipped in Windows 0.8.6. This guide describes the Windows
-0.8.8 layout, including parity updates from Mac PR #91. The published
-Seiza/C ABI 0.44.2 and stacking 0.51.2 dependencies are unchanged; no Git or
-vendored core dependency is used.
+Expanded stacking shipped in Windows 0.8.6. The development branch follows
+[Mac #96's simplified setup](MAC-PR-96-PARITY.md), using the existing published
+Seiza/C ABI 0.48.0 and stacking 0.55.0 dependencies. The older screenshots below
+record the 0.8.8 layout; see the UI guide for the current tab and action names.
 
 ## GPU preference
 
@@ -34,10 +34,13 @@ session. Both preferences persist immediately and across app restarts.
 
 ## Stack selected lights on an expanding canvas
 
-1. Open images, a directory, or a TXT/CSV image list and choose **Stack**.
-2. At the top of the dialog, choose **Stacking mode → Expanded mosaic / dithered edges**.
-3. Select the lights, review filter splitting, calibration and the canvas memory
-   ceiling, then choose **Choose output and stack…**.
+1. Open images, a directory, or a TXT/CSV image list and choose **File → Stack images…**
+   or **Stack…** in the toolbar.
+2. On **Stack**, choose **Stacking mode → Expanded mosaic**. Automatic calibration
+   matching starts for mixed collections. No sky-panel analysis or review approval
+   is required when calibration is complete.
+3. Choose **Stack…**, then an output file or folder. The canvas memory ceiling is
+   under **Processing → Registration and memory limits** if you need to change it.
 
 Each output registers its selected lights onto one expanding canvas. Inputs can
 come from different folders, and panels can connect through other panels. No
@@ -54,23 +57,22 @@ checks selection admission and layout; it is not an integration benchmark.
 ## Optional sky-panel analysis
 
 1. Open a collection and choose **Stack**. Choose the stacking mode explicitly.
-2. Expand **Optional sky-panel analysis** and enable **Group lights by solved sky position**. In **Light frames —
-   select inputs**, select the FITS/XISF lights to analyze, then choose **Solve
-   and group selected lights**. The standard blind-solving catalogs must already
+2. Expand **Sky panels** and enable **Group by sky position**. In **Light frames**,
+   select the FITS/XISF lights to analyze, then choose **Analyze panels**. The standard blind-solving catalogs must already
    be installed through catalog setup. At least two lights are required.
 3. Review **Select panels to include**. Confirmed sky coordinates group repeated
    pointings into panels and connect overlapping panels into sky fields. Check
    a panel to include all its exposures, or expand it to select individual lights.
-   **All** includes only successfully solved lights in this mode; **None** clears
+   **Select all** includes only successfully solved lights in this mode; **Deselect all** clears
    the selection. Calibration, unsolved and unverified-header inputs are listed
    under **Excluded**, never silently included.
 4. Review the selected-light/output summary. Unrelated sky fields produce separate
-   outputs; filename-filter splitting remains available. Removing a connecting
+   outputs; header-first filter splitting remains available. Removing a connecting
    panel splits disconnected regions into separate outputs, including within
    each filter. Each output needs at least two selected lights (one exposure in
    each of two overlapping panels is sufficient).
-5. Analysis keeps the chosen **Fixed reference frame** or **Expanded mosaic / dithered edges** mode and any custom overlap. Review the
-   stacking/calibration options, then choose **Choose output and stack…**. For
+5. Analysis keeps the chosen **Fixed reference** or **Expanded mosaic** mode and any custom overlap. Review the
+   stacking/calibration options, then choose **Stack…**. For
    multiple outputs, choose a folder and base name; field/filter suffixes are
    appended. Registration still checks every selected light and reports failures.
 
@@ -93,9 +95,9 @@ preparation, between batches and during grouping. The full footprint matrix
 still uses time and memory proportional to the square of the solved-light
 count; removing the selection cap does not make this analysis linear.
 
-The development branch adds **Graded calibration files or library**, following
-[Mac #92](MAC-PR-92-PARITY.md). Review per-light sessions in the Calibration and
-Review tabs. The native session-aware opener calibrates each planning input
+The released graded **Calibration files** workflow follows
+[Mac #92](MAC-PR-92-PARITY.md). Calibration matches automatically; inspect per-light sessions in Review when
+needed. No separate analysis or master-building step is required. The native session-aware opener calibrates each planning input
 before detecting stars and planning its footprint, then retains those same
 assignments for integration and replay. Several flat/bias/dark sessions can
 contribute to one output. Windows 0.8.8's older one-set workflow remains the

@@ -194,6 +194,9 @@ public sealed partial class MainPage : Page, IDisposable
         try
         {
             ImageStackBatchResult? result = await window.Completion;
+            // Completion precedes result loading/dialogs; never reactivate the closed setup.
+            if (ReferenceEquals(_stackWindow, window)) _stackWindow = null;
+            if (!_disposed) UpdateVisualState();
             if (_disposed || result is null || result.OutputPaths.Count == 0)
             {
                 return;
@@ -1709,12 +1712,11 @@ public sealed partial class MainPage : Page, IDisposable
         CopyAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         PasteAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         ImageBrowserButton.IsEnabled = CanBrowseImages;
-        StackImagesButton.IsEnabled =
-            _stackWindow is null &&
-            !_isScanningFolder &&
-            !ViewModel.IsLoading;
-        BuildMastersButton.IsEnabled = _masterWindow is null && !_isScanningFolder && !ViewModel.IsLoading;
-        ToolTipService.SetToolTip(StackImagesButton, "Stack light frames; add images, a folder, or a file list");
+        StackImagesMenuItem.IsEnabled = StackImagesButton.IsEnabled =
+            _stackWindow is not null || (!_isScanningFolder && !ViewModel.IsLoading);
+        BuildMastersMenuItem.IsEnabled = BuildMastersButton.IsEnabled =
+            _masterWindow is not null || (!_isScanningFolder && !ViewModel.IsLoading);
+        ToolTipService.SetToolTip(StackImagesButton, "Stack light frames; add images, a folder, or an image list");
         LiveStackButton.IsEnabled = _liveStackWindow is null && !ViewModel.IsLoading;
         ParallaxVideoButton.IsEnabled = _currentPath is not null && _bitmap is not null && !ViewModel.IsLoading;
         ImageBrowserButton.Label = _isBrowserOpen ? "Hide images" : "Images";
