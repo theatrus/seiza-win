@@ -1,8 +1,8 @@
 name: CI
 
-# Windows CI runs on ephemeral 32-core runners from tfinfra/roots/github-runners.
-# Fork pull requests stay on GitHub-hosted runners. Check repository identity
-# explicitly so missing pull-request metadata also takes the hosted path.
+# GitHub-hosted CI is the default while tfinfra's Windows pool is disabled.
+# Opt in with SEIZA_SELF_HOSTED_WINDOWS_CI=true only after enabling that pool.
+# Fork PRs (including missing head metadata) always use GitHub-hosted runners.
 # Release builds and signing keep their existing GitHub-hosted runners.
 
 on:
@@ -19,7 +19,7 @@ concurrency:
 
 jobs:
   windows:
-    runs-on: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name != github.repository && 'windows-latest' || fromJSON('["self-hosted","windows","ghr-windows-x64"]') }}
+    runs-on: ${{ vars.SEIZA_SELF_HOSTED_WINDOWS_CI == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","windows","ghr-windows-x64"]') || 'windows-latest' }}
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
       DOTNET_NOLOGO: true
