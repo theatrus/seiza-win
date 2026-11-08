@@ -94,6 +94,10 @@ internal static class ImageDirectoryScanner
                     {
                         folderImages.Add(entry.FullName);
                     }
+                    else if (WindowsShortcutTarget.TryGetImagePath(entry.FullName) is { } targetPath)
+                    {
+                        folderImages.Add(targetPath);
+                    }
                 }
             }
             catch (Exception exception) when (
@@ -114,6 +118,8 @@ internal static class ImageDirectoryScanner
         }
 
         cancellationToken.ThrowIfCancellationRequested();
+        // Multiple shortcuts (or an image beside its shortcut) represent one image.
+        paths = paths.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         // Compare relative paths, not only basenames: duplicate names in
         // different folders have a stable place in both grouped and flat views.
         // The ordinal tie-break also stabilizes case-sensitive shares.

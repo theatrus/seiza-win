@@ -130,7 +130,7 @@ internal static class ThumbnailCacheService
             Path.GetFullPath(path).ToUpperInvariant(),
             file.Exists ? file.Length : 0,
             file.Exists ? file.LastWriteTimeUtc.Ticks : 0,
-            $"thumbnail-v1-{MaximumDimension}");
+            $"thumbnail-v2-{MaximumDimension}");
         return Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(signature)))
             .ToLowerInvariant();
     }

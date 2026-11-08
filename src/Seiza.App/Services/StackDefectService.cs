@@ -23,7 +23,7 @@ internal static partial class StackDefectService
         {
             token.ThrowIfCancellationRequested();
             nint value = Detect(json, calibration.BiasPath, null, calibration.FlatPath, 0,
-                "{\"sigma\":5,\"persistence\":0.6,\"maximum_frames\":16}", out nint error);
+                DetectionOptionsJson(options), out nint error);
             if (value == 0) throw NativeString.TakeError(error, "Could not learn sensor defects.");
             if (error != 0) NativeMethods.FreeString(error);
             using JsonDocument result = JsonDocument.Parse(NativeString.TakeOwned(value, string.Empty));
@@ -34,4 +34,7 @@ internal static partial class StackDefectService
         }, CancellationToken.None).ConfigureAwait(false);
         return prepared;
     }
+
+    internal static string DetectionOptionsJson(ImageStackOptions options) =>
+        "{\"sigma\":5,\"persistence\":0.6,\"maximum_frames\":16,\"gpu\":" + options.ToGpuJson() + "}";
 }

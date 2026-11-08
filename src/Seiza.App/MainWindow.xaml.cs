@@ -44,6 +44,10 @@ public sealed partial class MainWindow : Window
         ? page.OpenFolderAsync(path)
         : Task.CompletedTask;
 
+    internal Task OpenImageListAsync(string path) => RootFrame.Content is MainPage page
+        ? page.OpenImageListAsync(path)
+        : Task.CompletedTask;
+
     internal bool HasDocument => RootFrame.Content is MainPage { HasImage: true };
 
     internal string? CurrentPath => RootFrame.Content is MainPage page

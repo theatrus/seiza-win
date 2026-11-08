@@ -378,6 +378,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
     public FitsBackgroundConfiguration? BackgroundConfiguration { get; }
     public FitsDeconvolutionConfiguration? Deconvolution { get; }
     public bool InteractivePreview { get; }
+    public bool PreserveDisplaySamples { get; set; }
 
     public static FitsImageProcessingConfiguration Default { get; } = new(
         FitsStretchStack.Default,
@@ -387,7 +388,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         StretchStack,
         BackgroundConfiguration,
         Deconvolution,
-        interactivePreview ?? InteractivePreview);
+        interactivePreview ?? InteractivePreview) { PreserveDisplaySamples = PreserveDisplaySamples };
 
     public string ToJson()
     {
@@ -403,6 +404,21 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         using (var writer = new Utf8JsonWriter(stream))
         {
             writer.WriteStartObject();
+            if (PreserveDisplaySamples)
+            {
+                writer.WritePropertyName("sample_domain");
+                writer.WriteStartObject();
+                // File renders otherwise take the legacy normalized-u16 path.
+                // An explicit physical range reads the original f32 samples.
+                writer.WriteString("type", "physical-linear");
+                writer.WritePropertyName("normalization");
+                writer.WriteStartObject();
+                writer.WriteString("type", "explicit-range");
+                writer.WriteNumber("black", 0);
+                writer.WriteNumber("white", 1);
+                writer.WriteEndObject();
+                writer.WriteEndObject();
+            }
             writer.WritePropertyName("stretch");
             writer.WriteStartArray();
             foreach (FitsStretchConfiguration stage in StretchStack.Stages)
@@ -487,7 +503,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         StretchStack.Equals(other.StretchStack) &&
         Equals(BackgroundConfiguration, other.BackgroundConfiguration) &&
         Equals(Deconvolution, other.Deconvolution) &&
-        InteractivePreview == other.InteractivePreview;
+        InteractivePreview == other.InteractivePreview && PreserveDisplaySamples == other.PreserveDisplaySamples;
 
     public override bool Equals(object? obj) => Equals(obj as FitsImageProcessingConfiguration);
 
@@ -495,7 +511,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         StretchStack,
         BackgroundConfiguration,
         Deconvolution,
-        InteractivePreview);
+        InteractivePreview, PreserveDisplaySamples);
 
     private static FitsImageProcessingConfiguration FromJsonElement(JsonElement root)
     {
@@ -588,6 +604,12 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
             new FitsStretchStack(stages),
             backgroundConfiguration,
             deconvolution);
+        result.PreserveDisplaySamples = root.TryGetProperty("sample_domain", out JsonElement domain) &&
+            domain.TryGetProperty("type", out JsonElement type) && type.GetString() == "physical-linear" &&
+            domain.TryGetProperty("normalization", out JsonElement normalization) &&
+            normalization.TryGetProperty("type", out JsonElement normalizationType) && normalizationType.GetString() == "explicit-range" &&
+            normalization.TryGetProperty("black", out JsonElement black) && black.GetDouble() == 0 &&
+            normalization.TryGetProperty("white", out JsonElement white) && white.GetDouble() == 1;
         string? validationMessage = result.StretchStack.ValidationMessage ??
             result.BackgroundConfiguration?.ValidationMessage ??
             result.Deconvolution?.ValidationMessage;
@@ -711,9 +733,9 @@ internal sealed class FitsImageProcessingHistory
     public bool CanUndo => _undo.Count > 0;
     public bool CanRedo => _redo.Count > 0;
 
-    public void Reset()
+    public void Reset(FitsImageProcessingConfiguration? initial = null)
     {
-        Current = FitsImageProcessingConfiguration.Default.Clone();
+        Current = (initial ?? FitsImageProcessingConfiguration.Default).Clone();
         _undo.Clear();
         _redo.Clear();
     }

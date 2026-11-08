@@ -8,8 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.8.5 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.8.5/seiza-0.8.5-windows-x86_64.msi)
-· [0.8.5 release notes](docs/releases/v0.8.5.md)
+[Download Seiza for Windows 0.9.2 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.2/seiza-0.9.2-windows-x86_64.msi)
+· [0.9.2 release notes](docs/releases/v0.9.2.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.2/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -91,10 +92,70 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.8.5 uses Seiza/C ABI 0.39.0, stacking 0.42.0, parallax
-0.16.0, image-io 0.9.0, and stretch 0.3.1 from published crates.
+0.9.2 uses Seiza/C ABI 0.48.0, stacking 0.55.0, parallax
+0.19.6 and image-io 0.12.0 from published crates.
+
+## New in 0.9.2
+
+The Windows installer and native DLLs now include their C runtime, so a separate
+Visual C++ Redistributable is no longer required. This fixes installer error
+1723 in the Shell-notification action on clean Windows installations. The
+installer also recovers from the state left by a failed 0.9.1 setup. A checked
+removal guard still stops upgrades if an older product cannot be removed.
+
+[0.9.2 release notes](docs/releases/v0.9.2.md)
+
+## New in 0.9.1
+
+- Grade calibration files, review per-light matches and master plans, and apply
+  each light's calibration on fixed or expanded stacking canvases.
+- Browse mixed light/calibration collections and inspect linear flats with
+  native grades, illumination and dust measurements.
+- Group browser and batch images by header filter, with filename fallback,
+  matching live stacking. Read shared FITS/XISF headers and commentary.
+- Enable **Show source values under pointer** in Inspector to read bounded
+  source-pixel windows, including large mosaics, before display processing.
+
+This release uses published Seiza/C ABI 0.48.0 and image-io 0.12.0. See the
+[release notes](docs/releases/v0.9.1.md),
+[graded calibration guide](docs/MAC-PR-92-PARITY.md) and
+[image I/O guide](docs/IMAGE-IO-048.md) for setup and supported inputs.
 
 ## Image viewing and folder review
+
+Use **Open image list** (Ctrl+Alt+O), regular Open, or drag/drop to browse images
+named in a `.txt` or `.csv` file as one collection, including images from
+different folders. TXT files contain one path
+per line (optional surrounding quotes). CSV files use a `path`, `filepath`,
+`file_path`, `file`, or `filename` header (case-insensitive); without one, the first
+column contains the paths. Leading settings rows before a recognized header,
+such as those exported by PixInsight SubframeSelector, are ignored. All listed
+images are loaded, regardless of SubframeSelector's Approved flag. Quote CSV
+paths containing commas. Absolute paths are accepted, and relative paths resolve
+from the directory containing the list file. Duplicate paths appear once; the
+browser reports missing, invalid, or unsupported entries that were skipped.
+Expand **Skipped entries** for each source line and reason. Imports start
+grouped by source folder without changing your saved preference; **None**
+restores the original list order. Windows shortcuts and file aliases are
+deduplicated. UTF-8 and BOM-marked UTF-16 lists are supported; malformed quoting
+or invalid encoding reports an error.
+The sidebar identifies the source list by filename, with its full path in the
+tooltip, instead of displaying the first image's directory as the collection root.
+
+For example, a TXT list can contain:
+
+```text
+C:\Astro\night1\light001.fits
+night2\light002.xisf
+```
+
+Or a CSV list can contain:
+
+```csv
+path,rating
+C:\Astro\night1\light001.fits,5
+"night2\light,002.fits",4
+```
 
 Open FITS, XISF, PNG, JPEG, and TIFF images, folders, or dropped files. Browse
 naturally sorted image sets in a cached thumbnail rail without blocking the UI.
@@ -104,7 +165,7 @@ to review only the selected folder. Changing grouping keeps the selected image
 and its cached thumbnail. Group headers collapse and expand their thumbnails;
 Previous/Next and keyboard navigation visit every image in grouped order,
 automatically expanding a collapsed destination group and revealing its card.
-Filter grouping uses the stacker's filename detection, with unrecognized files
+Filter grouping prefers image headers, falling back to filename detection, with unrecognized files
 under **Other**. Collapsing the current image's group does not close that image.
 Unreadable subfolders and linked folders are skipped with a count in the sidebar.
 Fit, pan, wheel-zoom, and pointer-anchored pinch-zoom a GPU-backed viewport;
@@ -120,6 +181,116 @@ RGB histograms, searchable source headers, and processing provenance.
 | ![Native sidebar with nested relative paths, collapsible groups and synthetic sample thumbnails](docs/images/nested-browser/folder-path.png) | ![Native sidebar grouping synthetic sample images by filename filter, with relative labels distinguishing same-named files](docs/images/nested-browser/filter.png) |
 
 Native sidebar controls shown with synthetic sample images.
+
+## Seiza for Windows 0.8.8: image-list and mosaic workflow parity
+
+This release adds parity with
+[Seiza for Mac PR #91](https://github.com/theatrus/seiza-mac/pull/91):
+
+- Open TXT/CSV lists through the welcome button, regular Open, drag/drop or
+  command-line activation, as well as **Open image list** (Ctrl+Alt+O).
+- Start imported lists grouped by source directory without changing the saved
+  preference. **None** preserves the list's original order. Expand **Skipped
+  entries** for the source list, physical line and reason for each skipped image.
+- Choose **Stacking mode** first. Expanded mosaics work directly from the
+  selected lights; **Optional sky-panel analysis** is a separate selection aid
+  and retains the chosen mode. Shared fixed alignment cannot be newly selected
+  for expanded canvases, while an existing selection can be cleared.
+- Analyze more than 512 lights with bounded comparison batches and cancellation.
+  The full footprint matrix still grows quadratically with solved-light count.
+
+See [the parity comparison](docs/MAC-PR-91-PARITY.md) and the updated
+[mosaic guide](docs/MOSAIC-STACKING.md), or read the [0.8.8 release notes](docs/releases/v0.8.8.md).
+
+## Graded per-light calibration
+
+Windows 0.9.1 follows merged [Mac #92](https://github.com/theatrus/seiza-mac/pull/92)
+with published Seiza/C ABI **0.48.0**, calibration **0.11.0** and stacking **0.55.0**.
+Stack Images now has Inputs, Calibration, Processing and Review tabs. Supply
+calibration files, a recursive library folder, or both; review native grades,
+flat groups, per-light matches and master recipes before stacking. Each light's
+session applies during fixed/expanded planning, integration and replay. Mixed
+folders route calibration automatically, and the Inspector can measure linear
+flat sources with adjustable saturation and optics.
+
+Settings remain local until stacking starts. See the
+[Mac #92 comparison and workflow guide](docs/MAC-PR-92-PARITY.md).
+
+## Seiza for Windows 0.8.7: TXT and CSV image collections
+
+Open a saved TXT or CSV list as one collection across capture folders. Review
+thumbnails, change grouping, navigate images and use the collection for stacking.
+The sidebar shows the list filename and image count, reports skipped entries,
+and hides the folder-only root label and subfolder control. PixInsight
+SubframeSelector exports can include settings before their image table; all
+listed images are included regardless of the Approved flag.
+
+![Native image browser showing a CSV list source, skipped-entry count and images from two folders](docs/images/csv-image-list-sidebar.png)
+
+Native sidebar captured with synthetic sample images. See the
+[0.8.7 release notes](docs/releases/v0.8.7.md) for input formats and validation.
+
+## Seiza for Windows 0.8.6: GPU stacking, mosaics and color tools
+
+This release adopts published Seiza/C ABI **0.44.2**, stacking
+**0.51.2**, parallax **0.19.2**, and image-io **0.11.0**. Blind solving now uses
+Seiza's faster candidate search and full-catalog refinement. In an earlier local
+0.40.1 warm-cache comparison against 0.39.0, Tulip solved in **0.35 s instead of
+2.02 s**, and Big Q in **0.65 s instead of 2.67 s**, with lower RMS.
+Timings depend on the image, hardware and catalog.
+
+Batch stacking offers **automatic coordinate-based panel grouping**: select
+lights, enable **Group mosaic panels by solved coordinates**, then **Solve and
+group selected lights**. Review sky fields and check whole panels or individual
+exposures before stacking; unrelated fields and unsolved files stay separate.
+Manual selection offers **Fixed reference frame** or **Expanded mosaic /
+dithered edges**, with a canvas memory limit, a 5% default overlap, existing
+registration and normalization choices, and visible planning/lens notes. See the
+[mosaic stacking guide and validation notes](docs/MOSAIC-STACKING.md) for limits,
+measurements, and compatibility details.
+
+The viewer also opens mosaics wider or taller than 16,384 pixels
+using on-demand GPU tiles at full resolution. Clipboard and image exports avoid
+an oversized GPU bitmap, including when exporting overlays. CPU memory and
+output-format limits still apply.
+
+**Settings → Stacking performance → Use GPU for stacking** controls acceleration
+for new batch and live stacks, including defect learning and reintegration.
+It defaults to automatic GPU use; turn it off for CPU-only processing. Small
+frames and unavailable GPU operations fall back to the CPU. **GPU planning
+budget** lets you reserve room for other programs; 0 uses the device capacity.
+It controls accumulator placement and reintegration bands, rather than imposing
+a hard allocation ceiling. Active stacks keep their settings; resumed stacks
+use the current GPU mode and budget while preserving accumulated frames. Both
+preferences survive app restarts. GPU and CPU floating-point results need not
+be byte-identical.
+
+Expanded canvases reject **Local** normalization before planning; use **Local
+background**, **Global**, or **None**. The updated core also prepares planning
+frames ahead, scores blind registration candidates in parallel, and runs
+RC-Astro tools without opening console windows on Windows.
+
+| Solve and group input lights | Review panels and individual exposures |
+| --- | --- |
+| ![Native Windows stacking dialog with automatic coordinate grouping enabled and the Solve and group selected lights button](docs/images/mosaic-stacking/readme-panel-setup.png) | ![Solved mosaic panels with whole-panel checkboxes, individual light selection and an output summary](docs/images/mosaic-stacking/readme-panel-selection.png) |
+
+| Expanded canvas controls | Persistent GPU preference |
+| --- | --- |
+| ![Expanded mosaic canvas selection and memory ceiling in the native Windows stacking dialog](docs/images/mosaic-stacking/readme-canvas.png) | ![Native Windows Settings showing GPU acceleration and its planning budget](docs/images/stacking-gpu-budget-settings.png) |
+
+These are native UI captures of the released controls. The panel examples use
+crops and repeated copies of an M31 image to demonstrate selection, not
+independently captured mosaic exposures. No original exposures were modified.
+
+New [narrowband, continuum and RGB star tools](docs/COLOR-TOOLS.md) follow a
+preview-first flow with optional settings collapsed. Build HOO/SHO palettes,
+review stellar continuum fits before signed subtraction, and stretch or restore
+RGB star layers. A borderless 20,480 × 11,520 M31 upscale loaded and solved in
+the app in 1.17 s, with 456 matched stars and 0.468 arcsec RMS; it is resampled
+validation data. Folder browsing also follows Windows image shortcuts and
+deduplicates their targets. See the [0.8.6 release notes](docs/releases/v0.8.6.md).
+
+![Native color tools showing required sources and collapsed optional processing](docs/images/color-tools-sources.jpg)
 
 ## Seiza for Windows 0.8.5: multi-filter sessions, flat review and color stacking
 
@@ -304,7 +475,7 @@ without a Windows restart.
 | --- | --- |
 | ![Autostretched FITS content thumbnails in Windows File Explorer](docs/images/explorer-fits-thumbnails.png) | ![Mono and color XISF content thumbnails in Windows File Explorer](docs/images/explorer-xisf-thumbnails.png) |
 
-## Color stacking and calibration (development builds)
+## Color stacking and calibration
 
 Open **Color stacking** from the main toolbar to combine linear R, G and B
 stacks, optionally with luminance, or calibrate an existing RGB/OSC stack.
@@ -327,6 +498,21 @@ Seiza uses linked RGB or luminance-preserving stretches for marked files on
 reopen, preview and display export, keeping their calibrated color balance.
 An already marked image cannot be calibrated again; use its original stack.
 
+The **Narrowband, continuum and RGB stars…** button opens the new color tools:
+HOO/SHO display balance with optional broadband structure and green reduction,
+validated stellar continuum fitting and signed linear subtraction, independent
+RGB star stretching, and restoration of either linear-extracted or already
+prepared stars. Inputs must be registered FITS/XISF snapshots. Fits are reviewed
+before subtraction and saved plans are bound to exact source hashes.
+The dialog shows required sources first, with optional processing settings
+collapsed. **Build preview**, review the image, then **Save image…**;
+continuum analysis shows its fit before building the subtraction preview.
+Display results reopen with No Stretch and an explicit 0–1 range; continuum residuals
+remain linear, including negative values. See [Color tools](docs/COLOR-TOOLS.md)
+for the required input scales, clipping information and fit reports.
+Current adoption checks and smoke-test timings are recorded in
+[Windows validation](docs/SEIZA-0442-VALIDATION.md).
+
 Directory and live stacking also offer **Learn sensor defects from dithered
 lights (no master dark)**. This opt-in native hot/dead-pixel map needs at least
 three compatible lights and actual dithering or drift; stationary stars can
@@ -339,9 +525,14 @@ a new stack, so a learned correction cannot be combined with a new dark.
 Calibration-master caches use the native stacking-output version, so unrelated
 core releases no longer force identical masters to be rebuilt.
 
-## Flat quality review (development builds)
+## Flat quality review
 
-In directory or live stacking, choose automatic calibration and enable
+Directory stacking's graded workflow now measures and grades candidates through
+the shared coordinator; its Review tab shows exclusions, grouping, matching and
+master recipes. For a single flat, use **Inspect Flat** in the Inspector. See
+[the current calibration guide](docs/MAC-PR-92-PARITY.md).
+
+In live stacking (and released Windows 0.8.8's directory stacking), choose automatic calibration and enable
 **Review flat quality before stacking**. This follows the workflow in
 [Mac #76](https://github.com/theatrus/seiza-mac/pull/76): native Seiza measures
 the exact selected raw flats, even when the master is reused from cache.
@@ -382,27 +573,18 @@ discards the result; source identities are checked around the whole review.
   entire opened tree, including collapsed groups. Turn it off to limit inputs
   to the opened folder. Choose light frames in the stacking dialog; relative
   paths distinguish same-named files in its frame and reference lists.
-- Stacks can be split automatically by filename filter, with an independent
+- Stacks can be split automatically by header filter, with filename fallback, with an independent
   reference frame for each filter group. Global or local normalization,
   delta-sigma rejection, registration limits, and calibration match the macOS
-  workflow. Choose existing masters or point Seiza at raw bias, dark,
-  dark-flat, and flat frames; the shared core matches camera metadata and
-  proves one safe calibration set against every target light in each group
-  before building the dependency chain. Matching uses target, proximity,
-  alternate-anchor, and coherent session passes; a recognized filename filter
-  can identify a target light whose FILTER header is missing, while an
-  unresolved target filter withholds flat calibration. Final native admission
-  reports every accepted input and every skipped input with its reason, and
-  Windows verifies that provenance before publishing or caching a master.
-  Windows then rechecks the written master so its preserved sensor and optics
-  metadata must still match every target light. A selected frame that cannot
-  be inspected, or that is not a raw light — a master, or an already
-  calibrated file — is set aside from matching with a warning; the stack
-  still runs, and native per-frame admission decides that frame's fate. Seiza names the readings
-  behind a refusal, accepts realistic rotator re-homing scatter with a
-  2-degree default tolerance, and
-  validates each future light against the active calibration epoch rather than
-  judging a master swap against the already-integrated reference.
+  workflow. Choose existing masters or **Graded calibration files or library**
+  in the Calibration tab. The shared native coordinator grades and matches
+  every light, prepares unique master dependencies, and applies complete
+  per-light sessions on either canvas. Review quality choices, measured flat
+  groups, matches and recipes in the same window. Flats and darks independently
+  support automatic grouping or one compatible set across nights. Stop, Keep
+  with available calibration and Exclude make incomplete coverage explicit.
+  Settings become saved defaults only after choosing an output and starting.
+  The existing live-acquisition calibration path is unchanged.
 - Stacking runs off the UI thread with per-frame progress, accepted/rejected
   counts, cancellation between frames, and automatic opening of the result.
   Measurements at progressively deeper checkpoints show SNR and achieved
@@ -412,10 +594,27 @@ discards the result; source identities are checked around the whole review.
   kept in the first frames. If the stack cannot be read again, Seiza saves
   the ordinary stack and says why.
 
+The toolbar's **Stack** and **Build masters** buttons open separate windows,
+even with no images open. Both windows offer **Add frames → Choose
+images… / Choose folder… / Choose file list…** (TXT/CSV). Folder imports use
+files directly inside that folder. Imports add to the current inputs, ignore
+duplicate paths, preserve selections, and report skipped entries. Existing
+viewer files prefill the workflows; importing here does not open viewer windows.
+
+To build calibration masters without stacking lights, choose **Build masters**
+in the toolbar. Choose **Bias**,
+**Dark / dark-flat**, or **Flat**, select at least two compatible frames, then
+choose **Build and save master…**. Use **Clear frames** to start a new set.
+Build one compatible set at a
+time; the result reports any frames skipped by the core. Darks can optionally
+use a master bias. Flats require a master bias or an uncalibrated master
+dark-flat matching their exposure. Masters are saved as FITS images without
+star alignment, and no light stack is started.
+
 Open a folder containing FITS or XISF light frames, then choose **Stack** from
 the toolbar. Select the exposures to include and a reference frame, then tune
 normalization, pixel rejection, registration limits, or automatic calibration
-library selection. When filenames contain multiple filter names, Seiza enables a
+library selection. When image headers or filenames identify multiple filters, Seiza enables a
 separate output per filter by default so incompatible channels are not mixed.
 
 ![Selecting light frames and a reference for directory image stacking](docs/images/directory-image-stacking.png)
@@ -567,8 +766,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.8.5 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.8.5/seiza-0.8.5-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.8.5/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.9.2 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.2/seiza-0.9.2-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.2/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -619,7 +818,8 @@ Install:
 
 - Visual Studio with the **WinUI application development** workload
 - .NET 10 SDK
-- Rust 1.89 or newer with the `x86_64-pc-windows-msvc` target
+- Rust 1.99.1 with the `x86_64-pc-windows-msvc` target (pinned in
+  `rust-toolchain.toml`, CI and release builds)
 
 Then build the app and native core:
 
@@ -633,7 +833,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.8.5
+  -p:SeizaVersion=0.9.2
 ```
 
 The installer is written to `dist`. See the

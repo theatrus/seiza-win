@@ -4,4 +4,4 @@
 //! and builds the upstream `seiza-cabi` package directly. No ABI implementation
 //! is maintained in this repository.
 
-pub use seiza_cabi_upstream as upstream;
+pub use seiza_cabi as upstream;

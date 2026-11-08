@@ -12,7 +12,7 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
     private const int MaximumAttentionItems = 50;
     private static readonly TimeSpan TransientProgressInterval = TimeSpan.FromMilliseconds(500);
     private readonly LiveStackRunConfiguration _configuration;
-    private readonly string _optionsJson;
+    private string _optionsJson;
     private readonly TimeProvider _timeProvider;
     private readonly LiveStackSessionStore _store;
     private readonly StackFolderMonitor _monitor;
@@ -810,7 +810,7 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
                     continue;
                 }
                 candidateSession = await ImageStackSession
-                    .ResumeAsync(candidate.ContextPath, cancellationToken)
+                    .ResumeAsync(candidate.ContextPath, _configuration.Options, cancellationToken)
                     .ConfigureAwait(false);
                 LiveStackNativeState nativeState = await candidateSession
                     .GetStateAsync(cancellationToken)
@@ -839,8 +839,13 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
                         candidate.State,
                         nativeState,
                         cancellationToken).ConfigureAwait(false);
+                string restoredOptionsJson = _configuration.Options.ApplyGpuToSavedOptions(candidate.State.StackOptionsJson);
+                bool gpuPolicyChanged = !_configuration.Options.MatchesSavedGpuPolicy(candidate.State.StackOptionsJson);
                 _session = candidateSession;
                 candidateSession = null;
+                _optionsJson = restoredOptionsJson;
+                if (gpuPolicyChanged)
+                    AddAttention("Resumed stack uses current GPU settings; accumulated frames are preserved.");
                 RestoreState(candidate, nativeState, referenceSignature);
                 _alignmentReferencePath = nativeState.ReferenceImagePath;
                 SeedCalibrationPaths(_calibration);
@@ -2071,7 +2076,7 @@ internal sealed class LiveStackCoordinator : IAsyncDisposable
         PathsEqual(state.WatchFolder, _configuration.WatchFolder) &&
         state.IncludesSubdirectories == _configuration.IncludeSubdirectories &&
         state.LearnDefects == _configuration.Options.LearnDefects &&
-        string.Equals(state.StackOptionsJson, _optionsJson, StringComparison.Ordinal);
+        ImageStackOptions.SameProcessingOptions(state.StackOptionsJson, _optionsJson);
 
     private void MarkCheckpointDirtyLocked()
     {

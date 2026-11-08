@@ -5,6 +5,19 @@ namespace Seiza.App.Services;
 
 internal static class ImageFileService
 {
+    public static async Task<string?> PickImageListAsync(nint ownerWindow)
+    {
+        FileOpenPicker picker = new()
+        {
+            SuggestedStartLocation = PickerLocationId.DocumentsLibrary,
+            ViewMode = PickerViewMode.List,
+        };
+        picker.FileTypeFilter.Add(".txt");
+        picker.FileTypeFilter.Add(".csv");
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, ownerWindow);
+        return (await picker.PickSingleFileAsync())?.Path;
+    }
+
     public static async Task<IReadOnlyList<string>> PickImagesAsync(nint ownerWindow)
     {
         FileOpenPicker picker = new()
@@ -17,6 +30,8 @@ internal static class ImageFileService
         {
             picker.FileTypeFilter.Add(extension);
         }
+        picker.FileTypeFilter.Add(".txt");
+        picker.FileTypeFilter.Add(".csv");
 
         WinRT.Interop.InitializeWithWindow.Initialize(picker, ownerWindow);
         IReadOnlyList<StorageFile> files = await picker.PickMultipleFilesAsync();

@@ -22,7 +22,7 @@ pub fn render_thumbnail(bytes: &[u8], max_dimension: u32) -> Result<RenderedThum
         FitsImage::from_bytes(bytes).map_err(|error| error.to_string())?
     };
 
-    render_image(&image, max_dimension, max_dimension)
+    render_image(image, max_dimension, max_dimension)
 }
 
 #[cfg(any(windows, test))]
@@ -42,11 +42,11 @@ pub(crate) fn render_preview(
         FitsImage::from_bytes(bytes).map_err(|error| error.to_string())?
     };
 
-    render_image(&image, max_width, max_height)
+    render_image(image, max_width, max_height)
 }
 
 fn render_image(
-    image: &FitsImage,
+    image: FitsImage,
     max_width: u32,
     max_height: u32,
 ) -> Result<RenderedThumbnail, String> {
@@ -57,6 +57,41 @@ fn render_image(
     }
 
     let (output_width, output_height) = fitted_dimensions(width, height, max_width, max_height);
+    if image
+        .headers
+        .iter()
+        .any(|(key, value)| key == "SEIZATRF" && value.as_str() == Some("DISPLAY"))
+    {
+        if !matches!(image.planes, 1 | 3) {
+            return Err("invalid display image channels".into());
+        }
+        // Keep display samples on their saved 0..1 scale. The regular FITS
+        // RGB helpers normalize floats before autostretching linear images.
+        let planes = image.planes;
+        let count = image
+            .width
+            .checked_mul(image.height)
+            .ok_or("image is too large")?;
+        let data = image.into_physical_f32();
+        if data.len() != count.saturating_mul(planes) {
+            return Err("invalid display image buffer".into());
+        }
+        return Ok(sample_bgra(
+            width,
+            height,
+            output_width,
+            output_height,
+            |index| {
+                let at =
+                    |channel: usize| data[index + if planes == 3 { channel * count } else { 0 }];
+                let values = [at(2), at(1), at(0)];
+                if values.iter().any(|value| !value.is_finite()) {
+                    return [0, 0, 0, u8::MAX];
+                }
+                [byte(values[0]), byte(values[1]), byte(values[2]), u8::MAX]
+            },
+        ));
+    }
     let params = StretchParams::default();
 
     if let Some(rgb) = image.debayer().or_else(|| image.rgb_planes()) {
@@ -73,7 +108,7 @@ fn render_image(
             Vec::with_capacity(pixel_count),
             Vec::with_capacity(pixel_count),
         ];
-        for pixel in rgb.data.chunks_exact(3) {
+        for pixel in rgb.data.as_chunks::<3>().0 {
             channels[0].push(pixel[0]);
             channels[1].push(pixel[1]);
             channels[2].push(pixel[2]);
@@ -118,6 +153,10 @@ fn render_image(
             },
         ))
     }
+}
+
+fn byte(value: f32) -> u8 {
+    (value.clamp(0., 1.) * 255.).round() as u8
 }
 
 fn fitted_dimensions(width: u32, height: u32, max_width: u32, max_height: u32) -> (u32, u32) {
@@ -183,6 +222,46 @@ mod tests {
     use crate::{test_fits, test_xisf};
 
     #[test]
+    fn display_files_keep_saved_colors_in_shell_thumbnail_and_preview() {
+        use seiza_fits::{F32ImageData, HeaderValue, WriteHeaderCard};
+        let cards = [WriteHeaderCard::new(
+            "SEIZATRF",
+            HeaderValue::String("DISPLAY".into()),
+        )];
+        let pixels = [0.28, 0.52, 0.72];
+        for xisf in [false, true] {
+            let mut bytes = Vec::new();
+            if xisf {
+                seiza_xisf::write_f32_image_to(
+                    &mut bytes,
+                    1,
+                    1,
+                    F32ImageData::RgbInterleaved(&pixels),
+                    &cards,
+                )
+                .unwrap();
+            } else {
+                seiza_fits::write_f32_image_to(
+                    &mut bytes,
+                    1,
+                    1,
+                    F32ImageData::RgbInterleaved(&pixels),
+                    &cards,
+                )
+                .unwrap();
+            }
+            assert_eq!(
+                render_thumbnail(&bytes, 32).unwrap().bgra,
+                [184, 133, 71, 255]
+            );
+            assert_eq!(
+                render_preview(&bytes, 32, 32).unwrap().bgra,
+                [184, 133, 71, 255]
+            );
+        }
+    }
+
+    #[test]
     fn dimensions_preserve_aspect_ratio_without_upscaling() {
         assert_eq!(fitted_dimensions(4000, 2000, 256, 256), (256, 128));
         assert_eq!(fitted_dimensions(2000, 4000, 256, 256), (128, 256));
@@ -197,7 +276,7 @@ mod tests {
         assert_eq!((thumbnail.width, thumbnail.height), (2, 1));
         assert_eq!(thumbnail.bgra.len(), 8);
         assert!(
-            thumbnail.bgra.chunks_exact(4).all(|pixel| {
+            thumbnail.bgra.as_chunks::<4>().0.iter().all(|pixel| {
                 pixel[0] == pixel[1] && pixel[1] == pixel[2] && pixel[3] == u8::MAX
             })
         );
@@ -246,13 +325,17 @@ mod tests {
         assert_eq!((compressed.width, compressed.height), (32, 16));
         let minimum = compressed
             .bgra
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|pixel| pixel[0])
             .min()
             .unwrap();
         let maximum = compressed
             .bgra
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .map(|pixel| pixel[0])
             .max()
             .unwrap();
@@ -260,7 +343,14 @@ mod tests {
             maximum - minimum > 100,
             "low-contrast floats must be stretched"
         );
-        assert!(compressed.bgra.chunks_exact(4).all(|pixel| pixel[3] == 255));
+        assert!(
+            compressed
+                .bgra
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|pixel| pixel[3] == 255)
+        );
     }
 
     #[test]

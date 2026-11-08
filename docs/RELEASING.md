@@ -42,6 +42,16 @@ environments and a job can only be in one:
   [`UpdateController.cs`](../src/Seiza.App/Services/UpdateController.cs). Never
   print, copy into logs, or commit it.
 
+The Rust DLLs must use the static C runtime. Native builds and both packaging
+paths audit PE imports; production also tests the actual MSI's embedded Shell
+action in a loader process where VC runtime resolution is deliberately blocked.
+Preinstalled VC++ runtimes on the CI image must not mask a missing prerequisite.
+
+Major upgrades tolerate legacy post-commit Shell-notification errors only when
+the checked native removal guard confirms all previous products are gone. CI
+and production also install a related test product whose uninstall deliberately
+fails, and require the upgrade to stop before installing Seiza's files.
+
 The order matters and the workflow enforces it. Authenticode is applied to the
 binaries before WiX packages them, so the installed program carries publisher
 identity and not merely the installer; and to the MSI before the appcast is
@@ -117,11 +127,12 @@ version, or immutable historical release notes.
 ## Validate locally
 
 The release workflow is authoritative. Run the closest practical local subset
-before merging:
+before merging. Use the Release native profile, as CI and the production
+workflow do; the stacking Debug test binary exceeds MSVC's PDB size limit:
 
 ```powershell
 cargo fmt --all -- --check
-.\scripts\build-rust.ps1 -Test
+.\scripts\build-rust.ps1 -Configuration Release -Test
 dotnet restore Seiza.slnx -r win-x64 -p:Configuration=Release
 dotnet build Seiza.slnx -c Release --no-restore
 dotnet test Seiza.slnx -c Release --no-build
@@ -129,6 +140,9 @@ dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
   -p:SeizaVersion=MAJOR.MINOR.PATCH
 .\.github\scripts\test-windows-installer-launch.ps1 `
+  -Msi .\dist\seiza-MAJOR.MINOR.PATCH-windows-x86_64.msi
+.\.github\scripts\test-windows-native-loader.ps1 `
+  -Directory .\artifacts\publish\win-x64 `
   -Msi .\dist\seiza-MAJOR.MINOR.PATCH-windows-x86_64.msi
 ```
 

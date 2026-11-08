@@ -38,18 +38,9 @@ internal sealed record LiveStackFilterIdentity(
     {
         ArgumentNullException.ThrowIfNull(probe);
         string? headerFilter = NullIfWhiteSpace(probe.Signature.Filter);
-        if (headerFilter is not null)
-        {
-            return FromName(headerFilter, LiveStackFilterSource.Header);
-        }
-
-        ImageFilenameFilter? filenameFilter = ImageFilenameFilter.Detect(probe.Path);
-        return filenameFilter is null
-            ? Unspecified()
-            : new LiveStackFilterIdentity(
-                filenameFilter.Id,
-                filenameFilter.Title,
-                LiveStackFilterSource.Filename);
+        ImageFilenameFilter? filter = ImageFilenameFilter.FromHeaderOrFilename(probe.Path, headerFilter);
+        return filter is null ? Unspecified() : new(filter.Id, filter.Title,
+            headerFilter is null ? LiveStackFilterSource.Filename : LiveStackFilterSource.Header);
     }
 
     public static LiveStackFilterIdentity FromStoredName(string? name) =>
@@ -238,6 +229,8 @@ internal sealed record LiveStackRunConfiguration
         }
         ArgumentNullException.ThrowIfNull(Options);
         ArgumentNullException.ThrowIfNull(Calibration);
+        if (Options.CanvasMode == StackCanvasMode.Expanded)
+            throw new ArgumentException("Expanded mosaics require a complete input list. Use batch stacking, not live acquisition.", nameof(Options));
         if (Options.ValidationMessage is string optionsError)
         {
             throw new ArgumentException(optionsError, nameof(Options));

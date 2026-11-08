@@ -23,20 +23,34 @@
             </TitleBar.IconSource>
         </TitleBar>
 
-        <ScrollViewer
+        <Grid
             Grid.Row="1"
-            Margin="24"
-            HorizontalScrollBarVisibility="Disabled"
-            VerticalScrollBarVisibility="Auto">
-            <StackPanel Spacing="18">
-                <StackPanel x:Name="ConfigurationPanel" Spacing="18">
+            Margin="24,8">
+            <Grid>
+                <ContentControl x:Name="ConfigurationHost" HorizontalContentAlignment="Stretch" VerticalContentAlignment="Stretch">
+                <Grid x:Name="ConfigurationPanel">
                     <StackPanel Spacing="4">
-                        <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="Directory image stacking" />
+                        <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="Image stacking" />
                         <TextBlock
                             Foreground="{ThemeResource TextFillColorSecondaryBrush}"
                             Text="Register and combine selected FITS or XISF light frames into an unstretched 32-bit floating-point FITS image."
                             TextWrapping="Wrap" />
                     </StackPanel>
+
+                    <Border Padding="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+                        <StackPanel Spacing="10">
+                            <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Stacking mode" />
+                            <ComboBox x:Name="CanvasModePicker" AutomationProperties.Name="Stacking mode" HorizontalAlignment="Stretch" SelectionChanged="CanvasMode_Changed">
+                                <ComboBoxItem Content="Fixed reference frame" Tag="Reference" IsSelected="True" />
+                                <ComboBoxItem Content="Expanded mosaic / dithered edges" Tag="Expanded" />
+                            </ComboBox>
+                            <TextBlock x:Name="CanvasModeHelpText" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            <StackPanel x:Name="MosaicOptionsPanel" Visibility="Collapsed" Spacing="8">
+                                <NumberBox x:Name="CanvasLimitBox" Header="Maximum canvas (million samples, pixels × channels)" Minimum="1" Maximum="1024" SmallChange="16" Value="256" ValueChanged="Options_ValueChanged" />
+                                <TextBlock Text="Memory can peak near 40 bytes per sample: a 256-million-sample limit permits about 10 GB. Disconnected lights are reported, not silently included. Bayer drizzle and shared fixed alignment are unavailable on expanded canvases." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
 
                     <Border
                         Padding="16"
@@ -51,7 +65,7 @@
                                     <ColumnDefinition Width="Auto" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Light frames" VerticalAlignment="Center" />
+                                <TextBlock x:Name="LightSelectionTitle" Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Light frames — select inputs" VerticalAlignment="Center" />
                                 <Button Grid.Column="1" Click="SelectAll_Click" Content="All" />
                                 <Button Grid.Column="2" Click="SelectNone_Click" Content="None" />
                             </Grid>
@@ -61,6 +75,19 @@
                                 DisplayMemberPath="DisplayName"
                                 SelectionChanged="FrameList_SelectionChanged"
                                 SelectionMode="Multiple" />
+                            <Expander Header="Optional sky-panel analysis" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                <StackPanel Spacing="8">
+                                    <TextBlock Text="Review pointings and separate unrelated sky fields before stacking. This is optional for an expanded mosaic and keeps your chosen stacking mode. Comparing all solved footprints uses time and memory proportional to the square of the light count." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <ToggleSwitch x:Name="SkyGroupingToggle" Header="Group lights by solved sky position" IsOn="False" Toggled="SkyGrouping_Toggled" OnContent="Review sky panels before stacking" OffContent="Use selected lights directly" />
+                                    <StackPanel x:Name="SkyGroupingControls" Visibility="Collapsed" Spacing="8">
+                                        <TextBlock Text="Select at least two input lights, then solve. Repeated pointings become panels; overlapping panels form a sky field. Review panels before stacking. Different fields produce separate outputs; unsolved lights are excluded." TextWrapping="Wrap" />
+                                        <Button x:Name="SolvePanelsButton" Content="Solve and group selected lights" Click="SolvePanels_Click" />
+                                        <TextBlock x:Name="SkyGroupingStatus" Text="Uses your installed plate-solving catalogs. No source files are changed." TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </Expander>
+                            <StackPanel x:Name="SkyPanelReview" Visibility="Collapsed" Spacing="8" />
+                            <TextBlock x:Name="SkyOutputSummary" Visibility="Collapsed" TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                             <ToggleSwitch
                                 x:Name="SplitByFilterToggle"
                                 Header="Split stacks by filename filter"
@@ -85,7 +112,7 @@
                             <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Reference frames" />
                             <TextBlock
                                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                Text="Each filter's channel reference sets its brightness normalization and noise weighting. Automatic selection scores the selected raw lights and chooses a sharp frame with a flat sky."
+                                Text="Each output's channel reference sets its brightness normalization and noise weighting. Automatic selection scores the selected raw lights and chooses a sharp frame with a flat sky."
                                 TextWrapping="Wrap" />
                             <ToggleSwitch x:Name="AutomaticReferenceToggle" Header="Choose reference frames automatically" IsOn="False" Toggled="Options_Changed" />
                             <StackPanel x:Name="ReferencePanel" Spacing="8" />
@@ -107,8 +134,8 @@
                                     TextWrapping="Wrap" />
                                 <TextBlock x:Name="AlignmentReferenceText" Text="First stack's channel reference" TextWrapping="Wrap" />
                                 <StackPanel Orientation="Horizontal" Spacing="8">
-                                    <Button Click="ChooseAlignmentReference_Click" Content="Choose image…" />
-                                    <Button Click="ClearAlignmentReference_Click" Content="Use first stack's reference" />
+                                    <Button x:Name="ChooseAlignmentReferenceButton" Click="ChooseAlignmentReference_Click" Content="Choose image…" />
+                                    <Button x:Name="ClearAlignmentReferenceButton" Click="ClearAlignmentReference_Click" Content="Use first stack's reference" />
                                 </StackPanel>
                             </StackPanel>
                         </StackPanel>
@@ -140,7 +167,7 @@
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Normalization" VerticalAlignment="Center" />
-                                <ComboBox x:Name="NormalizationPicker" Grid.Column="1" AutomationProperties.Name="Normalization" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed" ToolTipService.ToolTip="Local background matches sky gradients while retaining one gain per channel; Local also fits gains per tile.">
+                                <ComboBox x:Name="NormalizationPicker" Grid.Column="1" AutomationProperties.Name="Normalization" HorizontalAlignment="Stretch" SelectionChanged="OptionsSelection_Changed" ToolTipService.ToolTip="Local background matches sky gradients while retaining one gain per channel; Local also fits gains per tile and requires a fixed reference canvas.">
                                     <ComboBoxItem Content="None" Tag="None" />
                                     <ComboBoxItem Content="Global" Tag="Global" IsSelected="True" />
                                     <ComboBoxItem Content="Local" Tag="Local" />
@@ -255,14 +282,14 @@
                         </StackPanel>
                     </Border>
 
-                    <Expander Header="Calibration">
+                    <Expander x:Name="CalibrationExpander" Header="Calibration">
                         <StackPanel Margin="0,12,0,0" Spacing="10">
                             <Grid ColumnSpacing="12">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="160" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock Text="Source" VerticalAlignment="Center" />
+                                <TextBlock Text="Calibration source" VerticalAlignment="Center" />
                                 <ComboBox
                                     x:Name="CalibrationSourcePicker"
                                     Grid.Column="1"
@@ -270,7 +297,7 @@
                                     HorizontalAlignment="Stretch"
                                     SelectionChanged="CalibrationSource_Changed">
                                     <ComboBoxItem Content="None or existing masters" Tag="Masters" IsSelected="True" />
-                                    <ComboBoxItem Content="Build from calibration frames" Tag="Automatic" />
+                                    <ComboBoxItem Content="Graded calibration files or library" Tag="Automatic" />
                                 </ComboBox>
                             </Grid>
                             <StackPanel x:Name="ManualCalibrationPanel" Spacing="10">
@@ -324,7 +351,7 @@
                             <StackPanel x:Name="AutomaticCalibrationPanel" Spacing="10" Visibility="Collapsed">
                                 <TextBlock
                                     Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                                    Text="Seiza proves one compatible calibration set across every selected light, builds bias, dark, dark-flat, and flat masters in dependency order, and caches them for reuse."
+                                    Text="Provide files, a recursive library folder, or both. Seiza grades and matches each light, then builds reusable masters when stacking. A mosaic can use several calibration sessions in one output."
                                     TextWrapping="Wrap" />
                                 <Grid ColumnSpacing="8">
                                     <Grid.ColumnDefinitions>
@@ -335,7 +362,16 @@
                                     <Button AutomationProperties.Name="Choose calibration library folder" Grid.Column="1" Click="ChooseCalibrationLibrary_Click" Content="Choose…" />
                                 </Grid>
                                 <TextBlock x:Name="AutomaticCalibrationHintText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap" />
-                                <local:FlatQualityOptionsControl x:Name="FlatQualityOptions" />
+                                <Expander x:Name="ProvidedCalibrationExpander" Header="Included calibration files" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                    <ScrollViewer MaxHeight="220" HorizontalScrollBarVisibility="Disabled">
+                                        <StackPanel x:Name="ProvidedCalibrationPanel" Spacing="6" />
+                                    </ScrollViewer>
+                                </Expander>
+                                <StackPanel Orientation="Horizontal" Spacing="8">
+                                    <Button Click="AddCalibrationFiles_Click" Content="Add files…" AutomationProperties.Name="Add calibration files" />
+                                    <Button x:Name="RemoveCalibrationLibraryButton" IsEnabled="False" Click="RemoveCalibrationLibrary_Click" Content="Remove folder" AutomationProperties.Name="Remove calibration library folder" />
+                                </StackPanel>
+                                <StackPanel x:Name="GradedCalibrationHost" Spacing="10" />
                             </StackPanel>
                         </StackPanel>
                     </Expander>
@@ -352,11 +388,12 @@
                     <StackPanel x:Name="SplitOutputPanel" Spacing="6" Visibility="Collapsed">
                         <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Output base name" />
                         <TextBox x:Name="OutputBaseNameBox" Text="stacked" TextChanged="OutputBaseNameBox_TextChanged" />
-                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Filter names are appended automatically; you will choose the output folder next." TextWrapping="Wrap" />
+                        <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="Sky-field and filter names are appended automatically; you will choose the output folder next." TextWrapping="Wrap" />
                     </StackPanel>
 
                     <InfoBar x:Name="ValidationInfoBar" IsClosable="False" IsOpen="False" Severity="Error" />
-                </StackPanel>
+                </Grid>
+                </ContentControl>
 
                 <StackPanel x:Name="ProgressPanel" Spacing="12" Visibility="Collapsed">
                     <TextBlock Style="{ThemeResource SubtitleTextBlockStyle}" Text="Stacking images" />
@@ -364,8 +401,8 @@
                     <TextBlock x:Name="ProgressMessageText" TextWrapping="Wrap" />
                     <TextBlock x:Name="ProgressCountsText" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 </StackPanel>
-            </StackPanel>
-        </ScrollViewer>
+            </Grid>
+        </Grid>
 
         <Grid
             Grid.Row="2"

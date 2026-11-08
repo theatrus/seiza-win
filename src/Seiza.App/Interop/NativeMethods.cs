@@ -129,6 +129,18 @@ internal static partial class NativeMethods
         string optionsJson,
         out nint error);
 
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_open_fits_expanding", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint OpenLiveStackerExpanding(
+        string pathsJson, string? biasPath, string? darkPath, string? flatPath,
+        double darkExposureSeconds, string optionsJson, nuint maximumCanvasMegasamples,
+        SafeCancelSignalHandle cancel, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_expansion_planning_notes_json")]
+    internal static partial nint GetStackExpansionNotesJson(nint stacker, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_live_stacker_expanded_lens_json")]
+    internal static partial nint GetStackExpandedLensJson(nint stacker, out nint error);
+
     [LibraryImport(
         LibraryName,
         EntryPoint = "seiza_live_stacker_open_fits_with_reference_image",
@@ -172,6 +184,12 @@ internal static partial class NativeMethods
         EntryPoint = "seiza_live_stacker_open_context",
         StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint OpenLiveStackerContext(string contextPath, out nint error);
+
+    [LibraryImport(
+        LibraryName,
+        EntryPoint = "seiza_live_stacker_open_context_with_gpu",
+        StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint OpenLiveStackerContextWithGpu(string contextPath, string gpuJson, out nint error);
 
     [LibraryImport(
         LibraryName,
@@ -369,4 +387,6 @@ internal unsafe struct NativeSnrSample
     public double Snr;
     public nuint ChannelCount;
     public fixed double ChannelNoise[MaximumChannels];
+    // Appended in core 0.40; the native writer needs the full 80-byte structure.
+    public uint BinFactor;
 }

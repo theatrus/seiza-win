@@ -11,7 +11,7 @@ public partial class MainPageViewModel : ObservableObject
     public partial string FileName { get; set; } = "No image open";
 
     [ObservableProperty]
-    public partial string StatusText { get; set; } = "Open an image or a folder to begin.";
+    public partial string StatusText { get; set; } = "Open an image, folder, or image list to begin.";
 
     [ObservableProperty]
     public partial string? ErrorMessage { get; set; }

@@ -54,6 +54,9 @@ public sealed class ColorStackWindow : Window, IDisposable
         _calibrate.Unchecked += (_, _) => _solve.IsEnabled = false;
         var root = new StackPanel { Spacing = 16, Padding = new Thickness(24) };
         root.Children.Add(new TextBlock { Text = "Compose and calibrate color", FontSize = 24 });
+        var advanced = new Button { Content = "Narrowband, continuum and RGB stars…" };
+        advanced.Click += (_, _) => App.ShowColorTools();
+        root.Children.Add(advanced);
         _inputHost.Content = _inputs;
         root.Children.Add(_inputHost); root.Children.Add(_progress); root.Children.Add(_status); root.Children.Add(_open);
         Content = new ScrollViewer { Content = root };
@@ -75,7 +78,7 @@ public sealed class ColorStackWindow : Window, IDisposable
             try
             {
                 var picker = new Microsoft.Windows.Storage.Pickers.FileOpenPicker(AppWindow.Id);
-                foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" }) picker.FileTypeFilter.Add(extension);
+                foreach (string extension in ImageFileTypes.AstronomyExtensions) picker.FileTypeFilter.Add(extension);
                 var file = await picker.PickSingleFileAsync();
                 if (!_closed && file is not null) field.Text = file.Path;
             }

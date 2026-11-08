@@ -100,7 +100,7 @@ internal sealed record LiveStackNativeState
     /// Null only for contexts written before this additive live-state field.
     /// </summary>
     public CalibrationFrameProbe? ReferenceFrame { get; init; }
-    /// <summary>Null in older cores, where the reference was always integrated.</summary>
+    /// <summary>Null in older cores. False for shared geometry or an empty expanded canvas.</summary>
     public bool? ReferenceIntegrated { get; init; }
     /// <summary>Separate geometry-only image, retained even when it is not a light.</summary>
     public string? ReferenceImagePath { get; init; }

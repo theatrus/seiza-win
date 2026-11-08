@@ -10,6 +10,7 @@ namespace Seiza.App.Models;
 [JsonSerializable(typeof(CatalogSetupProgress))]
 [JsonSerializable(typeof(SolveResult))]
 [JsonSerializable(typeof(StackOptionsPayload))]
+[JsonSerializable(typeof(StackGpuPayload))]
 [JsonSerializable(typeof(StackReferenceSelection))]
 [JsonSerializable(typeof(StackAlignmentReferenceSelection))]
 [JsonSerializable(typeof(ImageStackDisposition))]

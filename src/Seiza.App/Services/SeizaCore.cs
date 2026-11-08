@@ -22,7 +22,7 @@ internal static unsafe class SeizaCore
         uint maxDimension = 0,
         FitsImageProcessingConfiguration? processing = null)
     {
-        processing = ColorWorkflowService.ProcessingFor(path, processing ?? FitsImageProcessingConfiguration.Default);
+        processing = ColorWorkflowService.ProcessingFor(path, processing ?? ColorWorkflowService.InitialProcessingFor(path));
         nint error = 0;
         nint rawHandle = IsAstronomyImage(path)
             ? NativeMethods.OpenRenderedImageWithStretchConfiguration(
@@ -80,7 +80,7 @@ internal static unsafe class SeizaCore
         string path,
         FitsImageProcessingConfiguration? processing = null)
     {
-        processing = ColorWorkflowService.ProcessingFor(path, processing ?? FitsImageProcessingConfiguration.Default);
+        processing = ColorWorkflowService.ProcessingFor(path, processing ?? ColorWorkflowService.InitialProcessingFor(path));
         nint error = 0;
         nint rawHandle = NativeMethods.OpenRenderedImage16WithStretchConfiguration(
             path,
@@ -122,7 +122,7 @@ internal static unsafe class SeizaCore
     }
 
     private static bool IsAstronomyImage(string path) =>
-        Path.GetExtension(path).ToLowerInvariant() is ".fits" or ".fit" or ".fts" or ".xisf";
+        ImageFileTypes.IsAstronomyImage(path);
 
     public static CatalogStatus GetCatalogStatus(string? catalogDirectory)
     {

@@ -1,4 +1,4 @@
-using Microsoft.Graphics.Canvas;
+using Seiza.App.Models;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Graphics.Imaging;
 using Windows.Storage;
@@ -14,12 +14,12 @@ internal static class ClipboardService
     private const int MaximumProcessingJsonLength = 1_048_576;
     private static InMemoryRandomAccessStream? _copiedImageStream;
 
-    public static async Task CopyImageAsync(CanvasBitmap image)
+    public static async Task CopyImageAsync(RenderedImageData image)
     {
         var stream = new InMemoryRandomAccessStream();
         try
         {
-            await image.SaveAsync(stream, CanvasBitmapFileFormat.Png, 1.0f);
+            await Bgra8Encoder.WriteAsync(stream, image.Bgra, image.Width, image.Height, BitmapEncoder.PngEncoderId);
             stream.Seek(0);
 
             var package = new DataPackage

@@ -10,7 +10,10 @@
       Scope="perMachine"
       Compressed="yes">
     <SummaryInformation Description="Seiza native astronomy image viewer and plate solver" />
-    <MajorUpgrade DowngradeErrorMessage="A newer version of Seiza for Windows is already installed." />
+    <!-- Older packages may fail their Shell notification after uninstall has
+         committed. The checked action below must confirm removal before we
+         accept that failure; genuine uninstall failures still stop setup. -->
+    <MajorUpgrade IgnoreRemoveFailure="yes" DowngradeErrorMessage="A newer version of Seiza for Windows is already installed." />
     <MediaTemplate EmbedCab="yes" />
 
     <StandardDirectory Id="ProgramFiles64Folder">
@@ -125,12 +128,19 @@
         Id="SeizaThumbnailProviderCustomActions"
         SourceFile="$(var.PublishDir)SeizaThumbnailProvider.dll" />
     <CustomAction
+        Id="VerifyPreviousProductsRemoved"
+        BinaryRef="SeizaThumbnailProviderCustomActions"
+        DllEntry="VerifyPreviousProductsRemoved"
+        Execute="immediate"
+        Return="check" />
+    <CustomAction
         Id="NotifyShellAssociations"
         BinaryRef="SeizaThumbnailProviderCustomActions"
         DllEntry="NotifyShellAssociations"
         Execute="immediate"
         Return="check" />
     <InstallExecuteSequence>
+      <Custom Action="VerifyPreviousProductsRemoved" After="RemoveExistingProducts" Condition="WIX_UPGRADE_DETECTED AND NOT Installed" />
       <Custom Action="NotifyShellAssociations" After="InstallFinalize" />
     </InstallExecuteSequence>
 

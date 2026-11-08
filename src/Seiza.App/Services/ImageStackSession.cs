@@ -33,18 +33,94 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
 
     public string? SelectedReferencePath { get; }
     public StackAlignmentReferenceSelection? ReferenceSelection { get; }
+    public string? CanvasNote { get; private init; }
+
+    /// <summary>Plans a mosaic from all selected lights; no light is integrated implicitly.</summary>
+    public static Task<ImageStackSession> OpenExpandedAsync(IReadOnlyList<string> paths, ImageStackOptions options,
+        ImageStackCalibration calibration, CancellationToken cancellationToken = default) =>
+        OpenExpandedAsync(paths, options, calibration, null, cancellationToken);
+
+    public static Task<ImageStackSession> OpenExpandedAsync(
+        IReadOnlyList<string> paths, ImageStackOptions options,
+        ImageStackCalibration calibration, LibraryPreparedPlan? plan, CancellationToken cancellationToken)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+        ArgumentNullException.ThrowIfNull(options);
+        ArgumentNullException.ThrowIfNull(calibration);
+        if (paths.Count < 2) throw new ArgumentException("Choose at least two mosaic lights.", nameof(paths));
+        if (options.CanvasMode != StackCanvasMode.Expanded)
+            throw new ArgumentException("Choose an expanded canvas.", nameof(options));
+        string[] fullPaths = paths.Select(Path.GetFullPath).ToArray();
+        if (fullPaths.Distinct(StringComparer.OrdinalIgnoreCase).Count() != fullPaths.Length)
+            throw new ArgumentException("Mosaic lights must be distinct.", nameof(paths));
+        string configurationJson = options.ToJson();
+        string pathsJson = JsonSerializer.Serialize(fullPaths, SeizaJsonSerializerContext.Default.StringArray);
+        nuint limit = checked((nuint)options.MaximumCanvasMegasamples);
+        NativeCalibration masters = NativeCalibration.From(calibration);
+        string? sessionsJson = plan is null ? null : JsonSerializer.Serialize(plan.Review.FileSessions, LibraryJsonContext.Default.LibraryFileSessionArray);
+        string? assignmentsJson = plan is null ? null : JsonSerializer.Serialize(fullPaths.Select(p => plan.Assignments[plan.Index(p)]).ToArray(), LibraryJsonContext.Default.Int32Array);
+        return Task.Run(() =>
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            StackingCoreCapabilities.Current.RequireExpandedCanvas();
+            using var signal = new SafeCancelSignalHandle(NativeMethods.CreateCancelSignal());
+            if (signal.IsInvalid) throw new SeizaCoreException("Could not create the mosaic cancellation signal.");
+            using var registration = cancellationToken.UnsafeRegister(
+                static value => ((SafeCancelSignalHandle)value!).Cancel(), signal);
+            nint error;
+            nint rawHandle = plan is not null
+                ? NativeMethods.OpenLiveStackerExpandingSessions(pathsJson, sessionsJson!, assignmentsJson!, configurationJson, limit, signal, out error)
+                : NativeMethods.OpenLiveStackerExpanding(pathsJson,
+                masters.BiasPath, masters.DarkPath, masters.FlatPath, masters.DarkExposureSeconds,
+                configurationJson, limit, signal, out error);
+            // Own native allocations before observing cancellation, including cancelled opens.
+            var handle = new SafeLiveStackerHandle(rawHandle);
+            try
+            {
+                Exception? failure = error == 0 ? null : NativeString.TakeError(error, "Could not plan the mosaic canvas.");
+                cancellationToken.ThrowIfCancellationRequested();
+                if (handle.IsInvalid) throw failure ?? new SeizaCoreException("Could not plan the mosaic canvas.");
+                LiveStackNativeState state = ReadState(handle);
+                if (state.AcceptedFrames != 0 || state.RejectedFrames != 0)
+                    throw new SeizaCoreException("Seiza returned a nonempty mosaic plan.");
+                nint notesJson = NativeMethods.GetStackExpansionNotesJson(handle.DangerousGetHandle(), out error);
+                if (notesJson == 0) throw NativeString.TakeError(error, "Could not read mosaic planning notes.");
+                FreeUnexpectedError(error);
+                string[] notes = JsonSerializer.Deserialize(NativeString.TakeOwned(notesJson, "Invalid mosaic notes."),
+                    SeizaJsonSerializerContext.Default.StringArray) ?? [];
+                nint lensJson = NativeMethods.GetStackExpandedLensJson(handle.DangerousGetHandle(), out error);
+                if (lensJson == 0) throw NativeString.TakeError(error, "Could not read mosaic lens information.");
+                FreeUnexpectedError(error);
+                using JsonDocument lens = JsonDocument.Parse(NativeString.TakeOwned(lensJson, "Invalid mosaic lens information."));
+                string lensNote = lens.RootElement.ValueKind == JsonValueKind.Null ? string.Empty
+                    : FormattableString.Invariant($" Lens correction: {lens.RootElement.GetProperty("largestShiftPixels").GetDouble():0.##} sensor pixels maximum shift.");
+                string summary = $"Expanded mosaic canvas: {state.Width:N0} × {state.Height:N0}, {state.Channels} channel(s)." + lensNote;
+                if (notes.Length > 0) summary += " " + string.Join(" ", notes);
+                cancellationToken.ThrowIfCancellationRequested();
+                return new ImageStackSession(handle, fullPaths[0]) { CanvasNote = summary };
+            }
+            catch { handle.Dispose(); throw; }
+        }, cancellationToken);
+    }
+
+    public static Task<ImageStackSession> OpenAsync(string referencePath, ImageStackOptions options,
+        ImageStackCalibration calibration, CancellationToken cancellationToken = default) =>
+        OpenAsync(referencePath, options, calibration, null, cancellationToken);
 
     public static Task<ImageStackSession> OpenAsync(
         string referencePath,
         ImageStackOptions options,
         ImageStackCalibration calibration,
-        CancellationToken cancellationToken = default)
+        LibraryFileSession? fileSession, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(referencePath);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(calibration);
 
-        string configurationJson = options.ToJson();
+        if (options.CanvasMode == StackCanvasMode.Expanded)
+            throw new ArgumentException("Use mosaic planning with the complete light list for an expanded canvas.", nameof(options));
+
+        string configurationJson = fileSession?.OptionsJson(options) ?? options.ToJson();
         NativeCalibration nativeCalibration = NativeCalibration.From(calibration);
         string fullReferencePath = Path.GetFullPath(referencePath);
 
@@ -74,12 +150,17 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
     /// Opens an empty stack on a shared geometry-only image. The selected
     /// channel light must be pushed first, followed by every other light.
     /// </summary>
+    public static Task<ImageStackReferenceOpenResult> OpenWithReferenceImageAsync(string referenceImagePath,
+        IReadOnlyList<string> channelReferencePaths, ImageStackOptions options,
+        ImageStackCalibration calibration, CancellationToken cancellationToken = default) =>
+        OpenWithReferenceImageAsync(referenceImagePath, channelReferencePaths, options, calibration, null, cancellationToken);
+
     public static Task<ImageStackReferenceOpenResult> OpenWithReferenceImageAsync(
         string referenceImagePath,
         IReadOnlyList<string> channelReferencePaths,
         ImageStackOptions options,
         ImageStackCalibration calibration,
-        CancellationToken cancellationToken = default)
+        LibraryFileSession? fileSession, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(referenceImagePath);
         ArgumentNullException.ThrowIfNull(channelReferencePaths);
@@ -89,6 +170,8 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
         {
             throw new ArgumentException("Choose at least one channel reference light.", nameof(channelReferencePaths));
         }
+        if (options.CanvasMode == StackCanvasMode.Expanded)
+            throw new ArgumentException("Expanded mosaics cannot use a shared fixed alignment image.", nameof(options));
         string fullReferenceImagePath = Path.GetFullPath(referenceImagePath);
         string[] fullChannelPaths = channelReferencePaths.Select(path =>
         {
@@ -99,7 +182,7 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
         {
             throw new ArgumentException("Channel reference candidates must be distinct.", nameof(channelReferencePaths));
         }
-        string configurationJson = options.ToJson();
+        string configurationJson = fileSession?.OptionsJson(options) ?? options.ToJson();
         NativeCalibration nativeCalibration = NativeCalibration.From(calibration);
         string channelPathsJson = JsonSerializer.Serialize(fullChannelPaths, SeizaJsonSerializerContext.Default.StringArray);
 
@@ -162,23 +245,34 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
 
     public static Task<ImageStackSession> ResumeAsync(
         string contextPath,
+        CancellationToken cancellationToken = default) => ResumeAsync(contextPath, null, cancellationToken);
+
+    public static Task<ImageStackSession> ResumeAsync(
+        string contextPath,
+        ImageStackOptions? gpuOptions,
         CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(contextPath);
         string fullContextPath = Path.GetFullPath(contextPath);
+        string? gpuJson = gpuOptions?.ToGpuJson();
 
         return Task.Run(() =>
         {
-            nint error = 0;
-            nint rawHandle = NativeMethods.OpenLiveStackerContext(fullContextPath, out error);
-            if (rawHandle == 0)
+            cancellationToken.ThrowIfCancellationRequested();
+            if (gpuJson is not null) StackingCoreCapabilities.Current.RequireGpuResume();
+            nint error;
+            nint rawHandle = gpuJson is null
+                ? NativeMethods.OpenLiveStackerContext(fullContextPath, out error)
+                : NativeMethods.OpenLiveStackerContextWithGpu(fullContextPath, gpuJson, out error);
+            var handle = new SafeLiveStackerHandle(rawHandle);
+            try
             {
-                throw NativeString.TakeError(
-                    error,
-                    "The Seiza core could not resume the saved stack.");
+                Exception? failure = error == 0 ? null : NativeString.TakeError(error, "The Seiza core could not resume the saved stack.");
+                cancellationToken.ThrowIfCancellationRequested();
+                if (handle.IsInvalid) throw failure ?? new SeizaCoreException("The Seiza core could not resume the saved stack.");
+                return new ImageStackSession(handle);
             }
-            FreeUnexpectedError(error);
-            return new ImageStackSession(new SafeLiveStackerHandle(rawHandle));
+            catch { handle.Dispose(); throw; }
         }, cancellationToken);
     }
 
@@ -216,6 +310,45 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
         string fullPath = Path.GetFullPath(path);
         return RunAsync(handle => PushFrame(handle, fullPath), cancellationToken);
+    }
+
+    public Task<ImageStackPushResult> PushCalibratedFrameAsync(string path, LibraryPreparedPlan plan,
+        bool expanded, CancellationToken token = default) => RunAsync(handle =>
+    {
+        plan.VerifyActive(path);
+        if (!expanded) ApplyFileSession(handle, plan.Session(path));
+        // Gate replacement and push share this handle's exclusive executor.
+        return PushFrame(handle, path);
+    }, token);
+
+    private static unsafe void ApplyFileSession(SafeLiveStackerHandle handle, LibraryFileSession session)
+    {
+        if (session.Pedestal is not null || session.NormalizedFullScale is not null)
+            throw new InvalidOperationException("This session requires the session-aware opener.");
+        NativeMethods.GetDefaultMatchTolerances(out NativeMatchTolerances gate);
+        gate.Known = 0x7f;
+        double Value(string key, double fallback) => session.Tolerances[key]?.GetValue<double>() ?? fallback;
+        gate.ExposureSeconds = Value("exposureSeconds", gate.ExposureSeconds);
+        gate.ExposureFraction = Value("exposureFraction", gate.ExposureFraction);
+        gate.DarkTemperatureC = Value("darkTemperatureC", gate.DarkTemperatureC);
+        gate.MasterTemperatureC = Value("masterTemperatureC", gate.MasterTemperatureC);
+        gate.RotationDeg = Value("rotationDeg", gate.RotationDeg);
+        gate.FocalLengthMm = Value("focalLengthMm", gate.FocalLengthMm);
+        gate.FlatSessionSeconds = checked((ulong)Value("flatSessionSeconds", gate.FlatSessionSeconds));
+        if (session.Tolerances["allowFlatGainOffsetMismatch"]?.GetValue<bool>() == true) gate.Known |= 0x80;
+        nint native = handle.DangerousGetHandle();
+        if (!NativeMethods.SetLiveStackerMatchTolerances(native, &gate, out nint error))
+            throw NativeString.TakeError(error, "Could not apply the calibration matching gate.");
+        FreeUnexpectedError(error);
+        var rotation = session.Tolerances["lightRotation"];
+        uint basis = rotation?["basis"]?.GetValue<string>() switch { "measured" => 1u, "unknown" => 2u, _ => 0u };
+        if (!NativeMethods.SetLiveStackerLightRotation(native, basis, rotation?["degrees"]?.GetValue<double>() ?? 0, out error))
+            throw NativeString.TakeError(error, "Could not apply the calibration rotation gate.");
+        FreeUnexpectedError(error);
+        if (!NativeMethods.SetLiveStackerCalibration(native, session.Bias, session.Dark, session.Flat,
+            session.DarkExposureSeconds ?? 0, out error))
+            throw NativeString.TakeError(error, "Could not apply the calibration masters.");
+        FreeUnexpectedError(error);
     }
 
     public Task<ImageStackPipelineResult> PushFramesAsync(
@@ -296,6 +429,9 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
         }, cancellationToken);
     }
 
+    /// <summary>Replaces masters after validating geometry/layout. Each subsequent light
+    /// must match its active masters' sensor/optical metadata. This does not recalibrate
+    /// expanded planning references or make separate gate setters one transaction.</summary>
     public Task SetCalibrationAsync(
         ImageStackCalibration calibration,
         CancellationToken cancellationToken = default)
@@ -628,16 +764,17 @@ internal sealed class ImageStackSession : IDisposable, IAsyncDisposable
     internal static void ValidateNativeState(LiveStackNativeState state)
     {
         ArgumentNullException.ThrowIfNull(state);
-        bool externalReference = state.ReferenceIntegrated == false;
+        bool unintegratedReference = state.ReferenceIntegrated == false;
         if (state.SchemaVersion != LiveStackNativeState.CurrentSchemaVersion ||
             string.IsNullOrWhiteSpace(state.CoreVersion) ||
             state.Width <= 0 ||
             state.Height <= 0 ||
             state.Channels is not (1 or 3) ||
             state.AcceptedFrames < 0 || state.RejectedFrames < 0 ||
-            (state.AcceptedFrames == 0 && !externalReference) ||
-            (externalReference && string.IsNullOrWhiteSpace(state.ReferenceImagePath)) ||
-            (!externalReference && state.ReferenceImagePath is not null) ||
+            (state.AcceptedFrames == 0 && !unintegratedReference) ||
+            // An expanded canvas starts empty without an external fixed image.
+            (state.ReferenceImagePath is not null && string.IsNullOrWhiteSpace(state.ReferenceImagePath)) ||
+            (!unintegratedReference && state.ReferenceImagePath is not null) ||
             string.IsNullOrWhiteSpace(state.ConfigurationFingerprint) ||
             state.ConfigurationFingerprint.Length != 64 ||
             state.ConfigurationFingerprint.Any(character =>

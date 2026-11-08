@@ -12,10 +12,11 @@ internal static class CommandLineActivationRelay
 {
     private const string PipePrefix = "Seiza.Activation";
 
-    public static string[] GetSupportedPaths() => Environment.GetCommandLineArgs()
-        .Skip(1)
+    public static string[] GetSupportedPaths() => GetSupportedPaths(Environment.GetCommandLineArgs().Skip(1));
+
+    internal static string[] GetSupportedPaths(IEnumerable<string> arguments) => arguments
         .Select(argument => argument.Trim().Trim('"'))
-        .Where(path => File.Exists(path) && ImageFileService.IsSupportedImage(path))
+        .Where(path => File.Exists(path) && ImageFileTypes.IsOpenableFile(path))
         .Select(Path.GetFullPath)
         .ToArray();
 
@@ -60,7 +61,7 @@ internal static class CommandLineActivationRelay
                     try
                     {
                         string path = Encoding.UTF8.GetString(Convert.FromBase64String(encoded));
-                        if (File.Exists(path) && ImageFileService.IsSupportedImage(path))
+                        if (File.Exists(path) && ImageFileTypes.IsOpenableFile(path))
                         {
                             paths.Add(Path.GetFullPath(path));
                         }

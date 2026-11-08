@@ -7,6 +7,8 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <WindowsAppSDKSelfContained>true</WindowsAppSDKSelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <RepositoryRoot>$([System.IO.Path]::GetFullPath('$(MSBuildProjectDirectory)\..\..'))\</RepositoryRoot>
     <RustProfile Condition="'$(Configuration)' == 'Release'">release</RustProfile>
     <RustProfile Condition="'$(Configuration)' != 'Release'">debug</RustProfile>
@@ -22,6 +24,7 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
+    <PackageReference Include="Microsoft.Graphics.Win2D" Version="1.4.0" />
     <PackageReference Include="xunit" Version="2.9.2" />
     <PackageReference Include="xunit.runner.visualstudio" Version="3.0.1">
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -31,6 +34,13 @@
 
   <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Services\ThumbnailPngReader.cs" Link="Services\ThumbnailPngReader.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\Bgra8Encoder.cs" Link="Services\Bgra8Encoder.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\ImageTileLayout.cs" Link="Rendering\ImageTileLayout.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\CanvasDisplayImage.cs" Link="Rendering\CanvasDisplayImage.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\BgraBitmapStream.cs" Link="Rendering\BgraBitmapStream.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\TiledOverlayRasterizer.cs" Link="Rendering\TiledOverlayRasterizer.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\RenderedImageData.cs" Link="Models\RenderedImageData.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ImageMetadata.cs" Link="Models\ImageMetadata.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ParallaxRasterSnapshot.cs" Link="Services\ParallaxRasterSnapshot.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ParallaxDustMapSnapshot.cs" Link="Services\ParallaxDustMapSnapshot.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ParallaxVideoExporter.cs" Link="Services\ParallaxVideoExporter.cs" />

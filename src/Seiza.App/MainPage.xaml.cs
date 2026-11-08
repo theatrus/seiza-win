@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Microsoft.Graphics.Canvas;
 using Microsoft.Graphics.Canvas.UI.Xaml;
 using Microsoft.UI.Xaml;
+using System.Text.Json;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Seiza.App.Models;
@@ -12,14 +13,13 @@ using Seiza.App.Services;
 using Seiza.App.ViewModels;
 using Windows.ApplicationModel.DataTransfer;
 using Windows.Foundation;
-using Windows.Graphics.DirectX;
 using Windows.Storage;
 
 namespace Seiza.App;
 
 public sealed partial class MainPage : Page, IDisposable
 {
-    private const float MinimumScale = 0.01f;
+    private const float MinimumScale = 0.000001f;
     private const float MaximumScale = 64.0f;
 
     private readonly List<string> _imagePaths = [];
@@ -27,8 +27,8 @@ public sealed partial class MainPage : Page, IDisposable
     private readonly OverlayScene _overlayScene = new();
     private readonly FitsImageProcessingHistory _processingHistory = new();
 
-    private CanvasBitmap? _bitmap;
-    private CanvasBitmap? _committedBitmap;
+    private CanvasDisplayImage? _bitmap;
+    private CanvasDisplayImage? _committedBitmap;
     private CancellationTokenSource? _loadCancellation;
     private CancellationTokenSource? _solveCancellation;
     private CancellationTokenSource? _starAnalysisCancellation;
@@ -56,6 +56,7 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _disposed;
     private FitsStretchWindow? _stretchWindow;
     private ImageStackWindow? _stackWindow;
+    private CalibrationMasterWindow? _masterWindow;
     private LiveStackWindow? _liveStackWindow;
     private MainWindow? _ownerWindow;
 
@@ -81,8 +82,11 @@ public sealed partial class MainPage : Page, IDisposable
         InspectorControl.SolveRequested += InspectorControl_SolveRequested;
         InspectorControl.ExportWcsRequested += InspectorControl_ExportWcsRequested;
         InspectorControl.StarAnalysisRequested += InspectorControl_StarAnalysisRequested;
+        InspectorControl.FlatInspection.AvailabilityChanged += (_, _) => InspectFlatButton.Visibility =
+            InspectorControl.FlatInspection.IsAvailable ? Visibility.Visible : Visibility.Collapsed;
         Loaded += MainPage_Loaded;
         Unloaded += MainPage_Unloaded;
+        UpdateVisualState();
     }
 
     private async void MainPage_Loaded(object sender, RoutedEventArgs e)
@@ -96,7 +100,8 @@ public sealed partial class MainPage : Page, IDisposable
         await App.Updates.CheckForUpdatesAsync(this, userInitiated: false);
     }
 
-    internal Task OpenPathAsync(string path) => OpenImageAndDiscoverSiblingsAsync(path);
+    internal Task OpenPathAsync(string path) => ImagePathList.IsSupported(path)
+        ? OpenImageListAsync(path) : OpenImageAndDiscoverSiblingsAsync(path);
 
     private async void OpenImage_Click(object sender, RoutedEventArgs e)
     {
@@ -104,6 +109,22 @@ public sealed partial class MainPage : Page, IDisposable
         if (paths.Count > 0)
         {
             await App.OpenDocumentPathsAsync(paths, _ownerWindow);
+        }
+    }
+
+    private async void OpenImageList_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            string? path = await ImageFileService.PickImageListAsync(OwnerWindowHandle);
+            if (path is not null && !_disposed)
+            {
+                await App.OpenImageListInWindowAsync(path, _ownerWindow);
+            }
+        }
+        catch (Exception exception)
+        {
+            if (!_disposed) ViewModel.ErrorMessage = DescribeException(exception);
         }
     }
 
@@ -143,6 +164,20 @@ public sealed partial class MainPage : Page, IDisposable
         await session.InitializeAsync();
     }
 
+    private void BuildMasters_Click(object sender, RoutedEventArgs e)
+    {
+        if (_masterWindow is not null) { _masterWindow.Activate(); return; }
+        var window = new CalibrationMasterWindow(GetStackableBrowserPaths().ToArray());
+        _masterWindow = window;
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_masterWindow, window)) _masterWindow = null;
+            UpdateVisualState();
+        };
+        UpdateVisualState();
+        window.Activate();
+    }
+
     private async void StackImages_Click(object sender, RoutedEventArgs e)
     {
         if (_stackWindow is not null)
@@ -152,11 +187,6 @@ public sealed partial class MainPage : Page, IDisposable
         }
 
         string[] paths = GetStackableBrowserPaths().ToArray();
-        if (paths.Length < 2)
-        {
-            return;
-        }
-
         var window = new ImageStackWindow(paths, _browserRoot);
         _stackWindow = window;
         UpdateVisualState();
@@ -218,6 +248,14 @@ public sealed partial class MainPage : Page, IDisposable
                         Foreground = (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[
                             "TextFillColorSecondaryBrush"],
                         Text = string.Join(Environment.NewLine, analysisWarnings),
+                        TextWrapping = TextWrapping.Wrap,
+                    });
+                }
+                foreach (ImageStackResult item in result.Results.Where(item => item.CanvasNote is not null))
+                {
+                    content.Children.Add(new TextBlock
+                    {
+                        Text = $"{Path.GetFileName(item.OutputPath)}: {item.CanvasNote}",
                         TextWrapping = TextWrapping.Wrap,
                     });
                 }
@@ -540,6 +578,14 @@ public sealed partial class MainPage : Page, IDisposable
         UpdateVisualState();
     }
 
+    private void Inspector_Invoked(KeyboardAccelerator sender, KeyboardAcceleratorInvokedEventArgs args)
+    {
+        if (!ViewModel.HasImage) return;
+        _isInspectorOpen = !_isInspectorOpen;
+        UpdateVisualState();
+        args.Handled = true;
+    }
+
     private void CloseInspector_Click(object sender, RoutedEventArgs e)
     {
         _isInspectorOpen = false;
@@ -557,6 +603,12 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void AnalyzeStars_Click(object sender, RoutedEventArgs e) =>
         await AnalyzeCurrentStarsAsync();
+
+    private async void InspectFlat_Click(object sender, RoutedEventArgs e)
+    {
+        _isInspectorOpen = true; UpdateVisualState();
+        await InspectorControl.FlatInspection.InspectAsync();
+    }
 
     private async void InspectorControl_SolveRequested(object? sender, EventArgs e) =>
         await SolveCurrentAsync();
@@ -862,7 +914,7 @@ public sealed partial class MainPage : Page, IDisposable
 
         try
         {
-            await ClipboardService.CopyImageAsync(_bitmap);
+            await ClipboardService.CopyImageAsync(_bitmap.Snapshot());
         }
         catch (Exception exception)
         {
@@ -958,7 +1010,7 @@ public sealed partial class MainPage : Page, IDisposable
             return;
         }
 
-        CanvasBitmap committedBitmap = _committedBitmap;
+        CanvasDisplayImage committedBitmap = _committedBitmap;
         string sourcePath = _currentPath;
         int sourceWidth = _sourceWidth;
         int sourceHeight = _sourceHeight;
@@ -1002,42 +1054,36 @@ public sealed partial class MainPage : Page, IDisposable
                     processing);
                 if (request.IncludeVisibleOverlays)
                 {
-                    byte[] overlay = RenderFullResolutionOverlay(
-                        overlayScene,
-                        overlayOptions,
-                        sourceWidth,
-                        sourceHeight);
-                    Rgba16Compositor.CompositePremultipliedBgra8(
-                        MemoryMarshal.Cast<byte, ushort>(rendered.RgbaBytes.AsSpan()),
-                        overlay);
+                    TiledOverlayRasterizer.Draw(ImageCanvas, sourceWidth, sourceHeight,
+                        drawing => overlayScene.Draw(drawing, overlayOptions, 1, 1, Vector2.Zero),
+                        (region, overlay) => {
+                            for (int row = 0; row < region.Height; row++)
+                                Rgba16Compositor.CompositePremultipliedBgra8(
+                                    MemoryMarshal.Cast<byte, ushort>(rendered.RgbaBytes.AsSpan()).Slice(
+                                        ((region.Y + row) * sourceWidth + region.X) * 4, region.Width * 4),
+                                    overlay.AsSpan(row * region.Width * 4, region.Width * 4));
+                        });
                 }
                 await ImageExportService.Save16Async(rendered, destination);
                 return;
             }
 
-            // Snapshot the display pixels synchronously into an export-owned
-            // target. Navigation or a processing reload may dispose the page's
-            // committed bitmap while the asynchronous encoder is still saving.
-            using CanvasRenderTarget renderTarget = new(
-                ImageCanvas,
-                sourceWidth,
-                sourceHeight,
-                96);
-            using (CanvasDrawingSession drawingSession = renderTarget.CreateDrawingSession())
+            // The CPU snapshot survives navigation without another full-image
+            // GPU allocation. Only overlay exports need a mutable pixel copy.
+            RenderedImageData display = committedBitmap.Snapshot();
+            if (request.IncludeVisibleOverlays)
             {
-                drawingSession.Clear(Windows.UI.Color.FromArgb(255, 0, 0, 0));
-                drawingSession.DrawImage(committedBitmap);
-                if (request.IncludeVisibleOverlays)
-                {
-                    overlayScene.Draw(
-                        drawingSession,
-                        overlayOptions,
-                        1,
-                        1,
-                        Vector2.Zero);
-                }
+                display = display with { Bgra = (byte[])display.Bgra.Clone() };
+                TiledOverlayRasterizer.Draw(ImageCanvas, sourceWidth, sourceHeight,
+                    drawing => overlayScene.Draw(drawing, overlayOptions, 1, 1, Vector2.Zero),
+                    (region, overlay) => {
+                        for (int row = 0; row < region.Height; row++)
+                            Bgra8Compositor.CompositePremultiplied(
+                                display.Bgra.AsSpan(((region.Y + row) * sourceWidth + region.X) * 4, region.Width * 4),
+                                overlay.AsSpan(row * region.Width * 4, region.Width * 4));
+                    });
             }
-            await ImageExportService.Save8Async(renderTarget, destination);
+            await ImageExportService.Save8Async(display, destination);
         }
         catch (Exception exception)
         {
@@ -1047,37 +1093,6 @@ public sealed partial class MainPage : Page, IDisposable
         {
             ViewModel.IsExporting = false;
         }
-    }
-
-    private byte[] RenderFullResolutionOverlay(
-        OverlayScene overlayScene,
-        OverlayOptions overlayOptions,
-        int sourceWidth,
-        int sourceHeight)
-    {
-        if (!overlayScene.HasVisibleOverlays(overlayOptions))
-        {
-            throw new InvalidOperationException("No visible overlays are available to export.");
-        }
-
-        using CanvasRenderTarget overlay = new(
-            ImageCanvas,
-            sourceWidth,
-            sourceHeight,
-            96,
-            DirectXPixelFormat.B8G8R8A8UIntNormalized,
-            CanvasAlphaMode.Premultiplied);
-        using (CanvasDrawingSession drawingSession = overlay.CreateDrawingSession())
-        {
-            drawingSession.Clear(Windows.UI.Color.FromArgb(0, 0, 0, 0));
-            overlayScene.Draw(
-                drawingSession,
-                overlayOptions,
-                1,
-                1,
-                Vector2.Zero);
-        }
-        return overlay.GetPixelBytes();
     }
 
     private async void About_Click(object sender, RoutedEventArgs e)
@@ -1160,7 +1175,7 @@ public sealed partial class MainPage : Page, IDisposable
         }
         FitsImageProcessingConfiguration processing = processingOverride ??
             (isNewImage
-                ? FitsImageProcessingConfiguration.Default
+                ? FitsImageProcessingConfiguration.Default.Clone()
                 : CurrentProcessing());
         if (!preserveSolution || ViewModel.IsSolving)
         {
@@ -1180,6 +1195,10 @@ public sealed partial class MainPage : Page, IDisposable
 
         try
         {
+            ImageSourceHeader? sourceHeader = await Task.Run(() => ImageSourceService.TryReadHeader(path), cancellationToken);
+            cancellationToken.ThrowIfCancellationRequested();
+            if (isNewImage && processingOverride is null)
+                processing = ColorWorkflowService.InitialProcessingFromHeader(sourceHeader);
             RenderedImageData image = await ImageRenderService.RenderAsync(
                 path,
                 processing,
@@ -1190,14 +1209,11 @@ public sealed partial class MainPage : Page, IDisposable
                 return false;
             }
 
-            CanvasBitmap nextBitmap = CanvasBitmap.CreateFromBytes(
-                ImageCanvas,
-                image.Bgra,
-                image.Width,
-                image.Height,
-                DirectXPixelFormat.B8G8R8A8UIntNormalized,
-                96.0f,
-                CanvasAlphaMode.Ignore);
+            // A command-line/list activation can finish rendering before the
+            // CanvasControl's first resource event. It uses this shared device
+            // too; creating the bitmap directly avoids that startup race.
+            CanvasDisplayImage nextBitmap = await CanvasDisplayImage.CreateAsync(CanvasDevice.GetSharedDevice(), image, cancellationToken: cancellationToken);
+            if (_disposed || generation != _loadGeneration) { nextBitmap.Dispose(); return false; }
 
             SetCommittedBitmap(nextBitmap);
             _sourceWidth = image.Width;
@@ -1206,9 +1222,12 @@ public sealed partial class MainPage : Page, IDisposable
             _currentMetadata = image.Metadata;
             if (isNewImage && processingOverride is null)
             {
-                _processingHistory.Reset();
+                _processingHistory.Reset(processing);
             }
             InspectorControl.ShowMetadata(image.Metadata, processing);
+            InspectorControl.FlatInspection.SetSource(path);
+            InspectorControl.SourcePixels.SetSource(path);
+            InspectorControl.ShowSourceCommentary(sourceHeader);
             ViewModel.CompleteLoading(path, image.Metadata);
             _ownerWindow?.SetDocumentTitle(Path.GetFileName(path));
 
@@ -1253,14 +1272,9 @@ public sealed partial class MainPage : Page, IDisposable
             return;
         }
 
-        CanvasBitmap nextBitmap = CanvasBitmap.CreateFromBytes(
-            ImageCanvas,
-            image.Bgra,
-            image.Width,
-            image.Height,
-            DirectXPixelFormat.B8G8R8A8UIntNormalized,
-            96.0f,
-            CanvasAlphaMode.Ignore);
+        CanvasDisplayImage nextBitmap = await CanvasDisplayImage.CreateAsync(CanvasDevice.GetSharedDevice(), image, cancellationToken: request.CancellationToken);
+        if (_stretchWindow is null || !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+        { nextBitmap.Dispose(); return; }
         if (!ReferenceEquals(_bitmap, _committedBitmap))
         {
             _bitmap?.Dispose();
@@ -1269,10 +1283,15 @@ public sealed partial class MainPage : Page, IDisposable
         ImageCanvas.Invalidate();
     }
 
-    private FitsImageProcessingConfiguration CurrentProcessing(bool interactivePreview = false) =>
-        _processingHistory.Current.Clone(interactivePreview);
+    private FitsImageProcessingConfiguration CurrentProcessing(bool interactivePreview = false)
+    {
+        var processing = _processingHistory.Current.Clone(interactivePreview);
+        processing.PreserveDisplaySamples = _currentMetadata?.Headers.TryGetValue("SEIZATRF", out JsonElement transfer) == true &&
+            transfer.ValueKind == JsonValueKind.String && transfer.GetString() == "DISPLAY";
+        return processing;
+    }
 
-    private void SetCommittedBitmap(CanvasBitmap bitmap)
+    private void SetCommittedBitmap(CanvasDisplayImage bitmap)
     {
         if (!ReferenceEquals(_bitmap, _committedBitmap))
         {
@@ -1306,17 +1325,12 @@ public sealed partial class MainPage : Page, IDisposable
             _sourceWidth * _scale,
             _sourceHeight * _scale);
         CanvasImageInterpolation interpolation = ImageSampling.NeedsFiltering(
-            _bitmap.SizeInPixels.Width, _bitmap.SizeInPixels.Height,
+            _bitmap.Width, _bitmap.Height,
             _sourceWidth, _sourceHeight,
             destination.Width, destination.Height, sender.Dpi / 96.0)
             ? CanvasImageInterpolation.HighQualityCubic
             : CanvasImageInterpolation.NearestNeighbor;
-        args.DrawingSession.DrawImage(
-            _bitmap,
-            destination,
-            _bitmap.Bounds,
-            1.0f,
-            interpolation);
+        _bitmap.Draw(args.DrawingSession, destination, interpolation);
         _overlayScene.Draw(args.DrawingSession, _overlayOptions, _scale, _scale, _offset);
     }
 
@@ -1417,8 +1431,8 @@ public sealed partial class MainPage : Page, IDisposable
             return false;
         }
 
-        int bitmapWidth = checked((int)_committedBitmap.SizeInPixels.Width);
-        int bitmapHeight = checked((int)_committedBitmap.SizeInPixels.Height);
+        int bitmapWidth = _committedBitmap.Width;
+        int bitmapHeight = _committedBitmap.Height;
         int centerX = Math.Min(
             (int)Math.Floor(imagePoint.X * bitmapWidth / _sourceWidth),
             bitmapWidth - 1);
@@ -1450,6 +1464,14 @@ public sealed partial class MainPage : Page, IDisposable
 
     private void ImageCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
+        if (_isInspectorOpen && _currentPath is not null && _scale > 0)
+        {
+            var pointer = e.GetCurrentPoint(ImageCanvas).Position;
+            Vector2 source = (new Vector2((float)pointer.X, (float)pointer.Y) - _offset) / _scale;
+            if (source.X >= 0 && source.Y >= 0 && source.X < _sourceWidth && source.Y < _sourceHeight)
+                InspectorControl.SourcePixels.SetPoint((int)Math.Floor(source.X), (int)Math.Floor(source.Y));
+            else InspectorControl.SourcePixels.ClearPoint();
+        }
         if (!_isDragging)
         {
             return;
@@ -1690,11 +1712,9 @@ public sealed partial class MainPage : Page, IDisposable
         StackImagesButton.IsEnabled =
             _stackWindow is null &&
             !_isScanningFolder &&
-            !ViewModel.IsLoading &&
-            GetStackableBrowserPaths().Take(2).Count() >= 2;
-        ToolTipService.SetToolTip(StackImagesButton, _browserRoot is not null && _includeSubfolders
-            ? "Choose FITS/XISF frames from this directory tree to stack (including collapsed groups)"
-            : "Choose FITS/XISF frames from the current folder to stack");
+            !ViewModel.IsLoading;
+        BuildMastersButton.IsEnabled = _masterWindow is null && !_isScanningFolder && !ViewModel.IsLoading;
+        ToolTipService.SetToolTip(StackImagesButton, "Stack light frames; add images, a folder, or a file list");
         LiveStackButton.IsEnabled = _liveStackWindow is null && !ViewModel.IsLoading;
         ParallaxVideoButton.IsEnabled = _currentPath is not null && _bitmap is not null && !ViewModel.IsLoading;
         ImageBrowserButton.Label = _isBrowserOpen ? "Hide images" : "Images";
@@ -1901,8 +1921,8 @@ public sealed partial class MainPage : Page, IDisposable
             case StorageFolder folder:
                 await OpenFolderAsync(folder.Path);
                 break;
-            case StorageFile file when ImageFileService.IsSupportedImage(file.Path):
-                await OpenImageAndDiscoverSiblingsAsync(file.Path);
+            case StorageFile file when ImageFileTypes.IsOpenableFile(file.Path):
+                await OpenPathAsync(file.Path);
                 break;
         }
     }
@@ -1935,6 +1955,8 @@ public sealed partial class MainPage : Page, IDisposable
         _stretchWindow = null;
         _stackWindow?.Close();
         _stackWindow = null;
+        _masterWindow?.Close();
+        _masterWindow = null;
         _liveStackWindow?.Close();
         _liveStackWindow = null;
         if (!ReferenceEquals(_bitmap, _committedBitmap))

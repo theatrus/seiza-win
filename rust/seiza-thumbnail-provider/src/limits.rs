@@ -79,7 +79,7 @@ fn inspect_fits(bytes: &[u8]) -> Result<ImageLayout, String> {
     let header_limit = bytes.len().min(MAX_HEADER_BYTES);
     let mut found_end = false;
 
-    for card in bytes[..header_limit].chunks_exact(80) {
+    for card in bytes[..header_limit].as_chunks::<80>().0 {
         // The decoder trims the end of ordinary keywords, not the start.
         let mut keyword = std::str::from_utf8(&card[..8])
             .map_err(|_| "FITS header keyword is not UTF-8")?

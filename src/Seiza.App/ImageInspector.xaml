@@ -9,7 +9,7 @@
     <ScrollViewer
         HorizontalScrollBarVisibility="Disabled"
         VerticalScrollBarVisibility="Auto">
-        <StackPanel Padding="16,4,16,20" Spacing="20">
+        <StackPanel x:Name="InspectorSections" Padding="16,4,16,20" Spacing="20">
             <StackPanel Spacing="8">
                 <TextBlock
                     Style="{StaticResource SubtitleTextBlockStyle}"

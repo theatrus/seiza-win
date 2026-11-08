@@ -5,6 +5,18 @@ namespace Seiza.App.Tests;
 
 public sealed class ImageBrowserGroupingTests
 {
+    [Fact]
+    public void ImportedListsRetainInputOrderUnderNoneWhileFolderViewsStillSort()
+    {
+        string[] paths = [Image("night2", "frame10.fits"), Image("night1", "frame2.fits"), Image("night2", "frame1.fits")];
+        var list = ImageBrowserGroupingModel.Create(paths, null, ImageBrowserGrouping.None, preserveInputOrder: true);
+        Assert.Equal(paths, list.OrderedPaths);
+        var folder = ImageBrowserGroupingModel.Create(paths, null, ImageBrowserGrouping.None);
+        Assert.Equal(new[] { paths[2], paths[1], paths[0] }, folder.OrderedPaths);
+        var grouped = ImageBrowserGroupingModel.Create(paths, null, ImageBrowserGrouping.Folder, preserveInputOrder: true);
+        Assert.Equal(new[] { paths[1], paths[2], paths[0] }, grouped.OrderedPaths);
+    }
+
     [Theory]
     [InlineData((int)ImageBrowserGrouping.None)]
     [InlineData((int)ImageBrowserGrouping.Folder)]

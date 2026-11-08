@@ -5,6 +5,59 @@ namespace Seiza.App.Tests;
 
 public sealed class ImageDirectoryScannerTests
 {
+    [Fact]
+    public async Task FolderOfWindowsShortcutsLoadsTargetsOnWorkerThread()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using Fixture source = new();
+        using Fixture links = new();
+        string fits = source.File("images/frame.FITS");
+        string xisf = source.File("frame.xisf");
+        CreateShortcut(links.PathFor("first.lnk"), fits);
+        CreateShortcut(links.PathFor("duplicate.LNK"), fits);
+        CreateShortcut(links.PathFor("nested/second.lnk"), xisf);
+        CreateShortcut(links.PathFor("missing.lnk"), source.PathFor("missing.fits"));
+        CreateShortcut(links.PathFor("text.lnk"), source.File("notes.txt"));
+        CreateShortcut(links.PathFor("folder.lnk"), source.Root);
+        links.File("corrupt.lnk");
+
+        ImageDirectoryScanResult top = await Task.Run(() => ImageDirectoryScanner.Scan(links.Root, false));
+        Assert.Equal(fits, Assert.Single(top.Paths));
+        ImageDirectoryScanResult recursive = await Task.Run(() => ImageDirectoryScanner.Scan(links.Root, true));
+        Assert.Equal(2, recursive.Paths.Count);
+        Assert.Contains(fits, recursive.Paths);
+        Assert.Contains(xisf, recursive.Paths);
+    }
+
+    [Fact]
+    public void ImageBesideItsShortcutAppearsOnce()
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        using Fixture fixture = new();
+        string fits = fixture.File("frame.fit");
+        CreateShortcut(fixture.PathFor("frame.lnk"), fits);
+        Assert.Equal(fits, Assert.Single(ImageDirectoryScanner.Scan(fixture.Root, false).Paths));
+    }
+
+    [System.Runtime.Versioning.SupportedOSPlatform("windows")]
+    private static void CreateShortcut(string path, string target)
+    {
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        object shell = Activator.CreateInstance(Type.GetTypeFromProgID("WScript.Shell", true)!)!;
+        object? shortcut = null;
+        try
+        {
+            shortcut = ((dynamic)shell).CreateShortcut(path);
+            ((dynamic)shortcut).TargetPath = target;
+            ((dynamic)shortcut).Save();
+        }
+        finally
+        {
+            if (shortcut is not null) System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shortcut);
+            System.Runtime.InteropServices.Marshal.FinalReleaseComObject(shell);
+        }
+    }
+
     private static readonly string[] ExpectedRecursivePaths =
     [
         "cover.png", "night2/light1.fits", "night2/narrowband/light2.xisf",

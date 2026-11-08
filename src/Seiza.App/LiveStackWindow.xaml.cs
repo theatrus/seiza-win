@@ -48,9 +48,13 @@ public sealed partial class LiveStackWindow : Window, IDisposable
     private bool _closed;
     private bool _allowClose;
     private bool _closeInProgress;
+    private readonly Func<bool> _useGpuSetting;
+    private readonly Func<int?> _gpuMemorySetting;
 
-    internal LiveStackWindow(string initialFolder)
+    internal LiveStackWindow(string initialFolder, Func<bool>? useGpuSetting = null, Func<int?>? gpuMemorySetting = null)
     {
+        _useGpuSetting = useGpuSetting ?? (() => CatalogSettingsStore.LoadUseGpuForStacking());
+        _gpuMemorySetting = gpuMemorySetting ?? (() => CatalogSettingsStore.LoadStackingGpuMemoryMib());
         InitializeComponent();
         MinimumWeightBox.Value = new ImageStackOptions().MinimumWeight;
         WatchFolderTextBox.Text = Path.GetFullPath(initialFolder);
@@ -177,7 +181,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
             ViewMode = PickerViewMode.List,
         };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" })
+        foreach (string extension in ImageFileTypes.AstronomyExtensions)
         {
             picker.FileTypeFilter.Add(extension);
         }
@@ -227,7 +231,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
             ViewMode = PickerViewMode.List,
         };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" })
+        foreach (string extension in ImageFileTypes.AstronomyExtensions)
         {
             picker.FileTypeFilter.Add(extension);
         }
@@ -354,6 +358,8 @@ public sealed partial class LiveStackWindow : Window, IDisposable
 
     private ImageStackOptions CreateOptions() => new()
     {
+        UseGpu = _useGpuSetting(),
+        GpuMemoryMib = _gpuMemorySetting(),
         RegistrationModel = SelectedTag(RegistrationModelPicker) switch
         {
             "Affine" => StackRegistrationModel.Affine,

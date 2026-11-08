@@ -81,6 +81,34 @@ internal static class CatalogSettingsStore
         }
     }
 
+    public static bool LoadUseGpuForStacking(string? path = null)
+    {
+        lock (SyncRoot) return LoadSettings(path).UseGpuForStacking;
+    }
+
+    public static void SaveUseGpuForStacking(bool value, string? path = null)
+    {
+        lock (SyncRoot)
+            SaveSettings(LoadSettings(path) with { UseGpuForStacking = value }, path);
+    }
+
+    public static int? LoadStackingGpuMemoryMib(string? path = null)
+    {
+        lock (SyncRoot)
+        {
+            int? value = LoadSettings(path).StackingGpuMemoryMib;
+            return value is >= 1 and <= ImageStackOptions.MaximumGpuMemoryMib ? value : null;
+        }
+    }
+
+    public static void SaveStackingGpuMemoryMib(int? value, string? path = null)
+    {
+        if (value is < 1 or > ImageStackOptions.MaximumGpuMemoryMib)
+            throw new ArgumentOutOfRangeException(nameof(value));
+        lock (SyncRoot)
+            SaveSettings(LoadSettings(path) with { StackingGpuMemoryMib = value }, path);
+    }
+
     public static void SaveAutomaticallyCheckForUpdates(bool value)
     {
         lock (SyncRoot)
@@ -150,6 +178,8 @@ internal static class CatalogSettingsStore
         public string? CatalogDirectory { get; init; }
         public string? RcAstroExecutable { get; init; }
         public string BrowserGrouping { get; init; } = "Folder";
+        public bool UseGpuForStacking { get; init; } = true;
+        public int? StackingGpuMemoryMib { get; init; }
 
         public bool AutomaticallyCheckForUpdates { get; init; } = true;
 

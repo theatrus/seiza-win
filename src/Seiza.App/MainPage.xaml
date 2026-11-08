@@ -12,6 +12,7 @@
 
     <Page.KeyboardAccelerators>
         <KeyboardAccelerator Invoked="NewWindow_Invoked" Key="N" Modifiers="Control" />
+        <KeyboardAccelerator Invoked="Inspector_Invoked" Key="I" Modifiers="Control,Menu" />
     </Page.KeyboardAccelerators>
 
     <Grid>
@@ -35,26 +36,41 @@
             </CommandBar.SecondaryCommands>
 
             <AppBarButton
-                Click="OpenImage_Click"
-                Label="Open image"
-                ToolTipService.ToolTip="Open image (Ctrl+O)">
+                Label="Open"
+                AutomationProperties.Name="Open"
+                ToolTipService.ToolTip="Open an image, folder, or image file list">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE8E5;" />
                 </AppBarButton.Icon>
-                <AppBarButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="O" Modifiers="Control" />
-                </AppBarButton.KeyboardAccelerators>
-            </AppBarButton>
-            <AppBarButton
-                Click="OpenFolder_Click"
-                Label="Open folder"
-                ToolTipService.ToolTip="Open folder (Ctrl+Shift+O)">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE8B7;" />
-                </AppBarButton.Icon>
-                <AppBarButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="O" Modifiers="Control,Shift" />
-                </AppBarButton.KeyboardAccelerators>
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Click="OpenImage_Click" Text="Open image…">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE8E5;" />
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="O" Modifiers="Control" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Click="OpenFolder_Click" Text="Open folder…">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE8B7;" />
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="O" Modifiers="Control,Shift" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Click="OpenImageList_Click" Text="Open file list…"
+                            ToolTipService.ToolTip="Open images listed in a TXT or CSV file">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE8A5;" />
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="O" Modifiers="Control,Menu" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
             </AppBarButton>
 
             <AppBarButton
@@ -62,9 +78,19 @@
                 Click="StackImages_Click"
                 IsEnabled="False"
                 Label="Stack"
-                ToolTipService.ToolTip="Register and stack the FITS or XISF images in this folder">
+                ToolTipService.ToolTip="Register and stack the FITS or XISF images in this collection">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE8FD;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarButton
+                x:Name="BuildMastersButton"
+                Click="BuildMasters_Click"
+                Label="Build masters"
+                ToolTipService.ToolTip="Build bias, dark, or flat calibration masters without light frames">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE9E9;" />
                 </AppBarButton.Icon>
             </AppBarButton>
 
@@ -311,6 +337,11 @@
                 </AppBarButton.Icon>
             </AppBarButton>
 
+            <AppBarButton x:Name="InspectFlatButton" Label="Inspect Flat" Visibility="Collapsed" Click="InspectFlat_Click"
+                          ToolTipService.ToolTip="Measure the linear flat source and show its grade, dust and illumination">
+                <AppBarButton.Icon><FontIcon Glyph="&#xE7B3;" /></AppBarButton.Icon>
+            </AppBarButton>
+
             <AppBarSeparator />
 
             <AppBarButton
@@ -456,6 +487,11 @@
                                         Click="BrowserCancelScan_Click"
                                         Padding="6,2" />
                                 </Grid>
+                                <Expander x:Name="BrowserListIssuesExpander" Header="Skipped entries" Visibility="Collapsed" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                    <ScrollViewer MaxHeight="180" HorizontalScrollBarVisibility="Disabled">
+                                        <TextBlock x:Name="BrowserListIssuesText" FontSize="11" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
+                                    </ScrollViewer>
+                                </Expander>
                             </StackPanel>
                             <ListView
                                 x:Name="ImageBrowserList"
@@ -599,9 +635,10 @@
                 <TextBlock
                     HorizontalAlignment="Center"
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"
-                    Text="Open a FITS, XISF, or standard image; choose a folder; or drop one here."
+                    Text="Open an image, folder, or TXT/CSV image list; or drop one here."
                     TextAlignment="Center"
                     TextWrapping="Wrap" />
+                <Button Content="Open image list…" Click="OpenImageList_Click" HorizontalAlignment="Center" />
                 <TextBlock
                     HorizontalAlignment="Center"
                     Foreground="{ThemeResource TextFillColorTertiaryBrush}"

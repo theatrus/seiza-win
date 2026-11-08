@@ -11,8 +11,17 @@ namespace Seiza.App;
 
 public sealed partial class ImageStackWindow : Window, IDisposable
 {
-    private readonly IReadOnlyList<StackFrameChoice> _frames;
+    private StackFrameChoice[] _frames;
+    private string[] _sourcePaths;
+    private IReadOnlyDictionary<string, string?> _filterNames = new Dictionary<string, string?>();
+    private readonly List<string> _providedCalibration = [];
+    private readonly CancellationTokenSource _routingCancellation = new();
+    private bool _routing = true;
+    private readonly GradedCalibrationControl _graded = new();
     private readonly string? _browserRoot;
+    private readonly Func<bool> _useGpuSetting;
+    private readonly Func<int?> _gpuMemorySetting;
+    private readonly string _sharedAlignmentHint;
     private readonly Dictionary<string, string> _referencePaths = new(StringComparer.Ordinal);
     private readonly Dictionary<string, string[]> _rankedReferencePaths = new(StringComparer.Ordinal);
     private readonly TaskCompletionSource<ImageStackBatchResult?> _completion = new(
@@ -27,16 +36,30 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     private bool _initializing = true;
     private bool _loaded;
     private bool _running;
+    private bool _hasCustomOverlap;
+    private SkyPanelAnalysis? _skyAnalysis;
+    private IReadOnlyList<string>? _skyInputs;
+    private bool _solvingPanels;
+    private bool _updatingPanelSelection;
+    private readonly Dictionary<string, CheckBox> _skyFrameChecks = new(StringComparer.OrdinalIgnoreCase);
+    private readonly List<(CheckBox Check, IReadOnlyList<string> Paths)> _skyPanelChecks = [];
     private string? _calibrationLibraryPath;
     private string? _alignmentReferencePath;
 
-    internal ImageStackWindow(IReadOnlyList<string> paths, string? browserRoot = null)
+    internal ImageStackWindow(IReadOnlyList<string> paths, string? browserRoot = null, Func<bool>? useGpuSetting = null,
+        Func<int?>? gpuMemorySetting = null)
     {
+        _useGpuSetting = useGpuSetting ?? (() => CatalogSettingsStore.LoadUseGpuForStacking());
+        _gpuMemorySetting = gpuMemorySetting ?? (() => CatalogSettingsStore.LoadStackingGpuMemoryMib());
         InitializeComponent();
+        BuildSetupTabs();
+        GradedCalibrationHost.Children.Add(_graded);
+        GradedCalibrationHost.Children.Add(_graded.SettingsView);
+        _graded.StateChanged += (_, _) => { if (!_closed && !_initializing) UpdateOptionsAndValidation(); };
         _browserRoot = browserRoot;
         MinimumWeightBox.Value = new ImageStackOptions().MinimumWeight;
         SharedAlignmentToggle.IsEnabled = StackingCoreCapabilities.Current.SupportsReferenceImage;
-        SharedAlignmentAvailabilityText.Text = StackingCoreCapabilities.Current.SupportsReferenceImage
+        _sharedAlignmentHint = StackingCoreCapabilities.Current.SupportsReferenceImage
             ? StackingCoreCapabilities.Current.SupportsReferenceImageCandidates
                 ? "A common grid keeps separate filter outputs aligned for color combination."
                 : "This core supports a common grid, but not automatic alignment fallback. Only the chosen channel light is tried."
@@ -51,6 +74,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .Select(path => new StackFrameChoice(path, ImageStackFrameLabel.DisplayName(path, _browserRoot)))
             .ToArray();
+        _sourcePaths = _frames.Select(f => f.Path).ToArray();
         FrameList.ItemsSource = _frames;
         foreach (StackFrameChoice frame in _frames)
         {
@@ -81,9 +105,9 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         .Select(frame => frame.Path)
         .ToArray();
 
-    private bool SplitsOutput => SplitByFilterToggle.IsOn && _groups.Count > 1;
+    private bool SplitsOutput => _groups.Count > 1;
 
-    private void ContentRoot_Loaded(object sender, RoutedEventArgs e)
+    private async void ContentRoot_Loaded(object sender, RoutedEventArgs e)
     {
         if (_loaded)
         {
@@ -94,17 +118,72 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         RectInt32 workArea = display.WorkArea;
         double scale = ContentRoot.XamlRoot.RasterizationScale;
         int margin = Math.Max(24, (int)Math.Round(24 * scale));
-        int width = Math.Min((int)Math.Round(720 * scale), workArea.Width - (margin * 2));
+        int width = Math.Min((int)Math.Round(1040 * scale), workArea.Width - (margin * 2));
         int height = Math.Min((int)Math.Round(860 * scale), workArea.Height - (margin * 2));
         int x = workArea.X + workArea.Width - width - margin;
         int y = workArea.Y + ((workArea.Height - height) / 2);
         AppWindow.MoveAndResize(new RectInt32(x, y, width, height));
+        try
+        {
+            StackInputRoutingResult routed = await StackInputRouting.RouteAsync(_sourcePaths, _routingCancellation.Token);
+            if (_closed) return;
+            _initializing = true;
+            _frames = routed.Lights.Select(p => new StackFrameChoice(p, ImageStackFrameLabel.DisplayName(p, _browserRoot))).ToArray();
+            FrameList.ItemsSource = _frames;
+            foreach (var frame in _frames) FrameList.SelectedItems.Add(frame);
+            _providedCalibration.AddRange(routed.Calibration);
+            _filterNames = routed.Filters;
+            if (_providedCalibration.Count > 0) CalibrationSourcePicker.SelectedIndex = 1;
+            RoutingNotes.Text = (_sourcePaths.Length == 0 ? "Add frames to begin. You can choose images, a folder, or a TXT/CSV file list."
+                : $"{routed.Lights.Length} lights · {routed.Calibration.Length} calibration files") +
+                (routed.Notes.Length > 0 ? Environment.NewLine + string.Join(Environment.NewLine, routed.Notes) : "");
+            RenderProvidedCalibration();
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception exception) { if (!_closed) RoutingNotes.Text = exception.Message; }
+        finally
+        {
+            _routing = false; _initializing = false;
+            if (!_closed) RefreshGroupsAndValidation();
+        }
+    }
+
+    private readonly TextBlock RoutingNotes = new() { Text = "Reading FITS/XISF image roles…", TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true };
+    private void BuildSetupTabs()
+    {
+        UIElement[] sections = ConfigurationPanel.Children.ToArray();
+        ConfigurationPanel.Children.Clear();
+        ConfigurationPanel.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        ConfigurationPanel.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var tabs = new TabView { IsAddTabButtonVisible = false, CanDragTabs = false, CanReorderTabs = false };
+        StackPanel Page(string title, IEnumerable<UIElement> children)
+        {
+            var panel = new StackPanel { Spacing = 18, Padding = new Thickness(0, 16, 12, 16) };
+            foreach (UIElement child in children) panel.Children.Add(child);
+            tabs.TabItems.Add(new TabViewItem { Header = title, IsClosable = false, Content = new ScrollViewer
+                { Content = panel, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } });
+            return panel;
+        }
+        StackPanel inputs = Page("Inputs", sections.Take(4).Append(sections[7]));
+        _addLightFrames = StackFramePicker.CreateButton("Add light frames", AddFramesAsync);
+        inputs.Children.Insert(1, _addLightFrames);
+        inputs.Children.Insert(2, RoutingNotes);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetLiveSetting(RoutingNotes, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Polite);
+        UIElement calibrationContent = (UIElement)CalibrationExpander.Content;
+        CalibrationExpander.Content = null;
+        Page("Calibration", [calibrationContent]);
+        Page("Processing", [sections[4], sections[6]]);
+        tabs.TabItems.Add(new TabViewItem { Header = "Review", IsClosable = false, Content = _graded.ReviewView });
+        ConfigurationPanel.Children.Add(tabs);
+        Grid.SetRow(ValidationInfoBar, 1); ConfigurationPanel.Children.Add(ValidationInfoBar);
     }
 
     private void SelectAll_Click(object sender, RoutedEventArgs e)
     {
+        if (_skyAnalysis is not null) { SelectSkyPaths(_skyAnalysis.Sources.Keys.ToArray(), true); return; }
         foreach (StackFrameChoice frame in _frames)
         {
+            if (_skyAnalysis is not null && !_skyAnalysis.Sources.ContainsKey(frame.Path)) continue;
             if (!FrameList.SelectedItems.Contains(frame))
             {
                 FrameList.SelectedItems.Add(frame);
@@ -120,6 +199,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         if (!_initializing)
         {
             RefreshGroupsAndValidation();
+            SyncSkySelection();
         }
     }
 
@@ -131,22 +211,184 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         }
     }
 
+    private void SkyGrouping_Toggled(object sender, RoutedEventArgs e)
+    {
+        if (_initializing) return;
+        _skyAnalysis = null;
+        _skyInputs = null;
+        _skyFrameChecks.Clear();
+        _skyPanelChecks.Clear();
+        SkyPanelReview.Children.Clear();
+        SkyPanelReview.Visibility = Visibility.Collapsed;
+        FrameList.Visibility = Visibility.Visible;
+        LightSelectionTitle.Text = "Light frames — select inputs";
+        SkyGroupingControls.Visibility = SkyGroupingToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
+        SkyGroupingStatus.Text = "Uses your installed plate-solving catalogs. No source files are changed.";
+        SolvePanelsButton.Content = "Solve and group selected lights";
+        RefreshGroupsAndValidation();
+    }
+
+    private async void SolvePanels_Click(object sender, RoutedEventArgs e)
+    {
+        if (_running || _closed) return;
+        string[] paths = (_skyInputs ?? SelectedPaths).ToArray();
+        _solvingPanels = _running = true;
+        ConfigurationHost.IsEnabled = false;
+        StartButton.IsEnabled = false;
+        var cancellation = new CancellationTokenSource();
+        _stackCancellation = cancellation;
+        try
+        {
+            var progress = new Progress<string>(message =>
+            {
+                if (!_closed && _solvingPanels) SkyGroupingStatus.Text = message;
+            });
+            SkyPanelAnalysis analysis = await SkyPanelService.AnalyzeAsync(paths,
+                CatalogSettingsStore.LoadCatalogDirectory(), progress, cancellation.Token);
+            cancellation.Token.ThrowIfCancellationRequested();
+            ApplySkyAnalysis(analysis, paths);
+        }
+        catch (OperationCanceledException)
+        { SkyGroupingStatus.Text = "Solving cancelled. No partial grouping was applied; no files were changed."; }
+        catch (Exception exception)
+        { SkyGroupingStatus.Text = exception.Message; }
+        finally
+        {
+            _solvingPanels = _running = false;
+            ConfigurationHost.IsEnabled = true;
+            CancelButton.IsEnabled = true;
+            if (ReferenceEquals(_stackCancellation, cancellation)) _stackCancellation = null;
+            cancellation.Dispose();
+            RefreshGroupsAndValidation();
+            if (_closeWhenIdle && !_closed) { _allowClose = true; Close(); }
+        }
+    }
+
+    private void ApplySkyAnalysis(SkyPanelAnalysis analysis, IReadOnlyList<string> inputs)
+    {
+        _skyAnalysis = analysis;
+        _skyInputs = inputs;
+        SolvePanelsButton.Content = "Re-solve inputs and reset panel selection";
+        // Applying a complete analysis is atomic: cancellation never leaves a
+        // partially solved selection eligible for stacking.
+        _initializing = true;
+        try
+        {
+            FrameList.SelectedItems.Clear();
+            foreach (StackFrameChoice frame in _frames)
+                if (analysis.Sources.ContainsKey(frame.Path)) FrameList.SelectedItems.Add(frame);
+        }
+        finally { _initializing = false; }
+        BuildSkyPanelReview();
+        RefreshGroupsAndValidation();
+    }
+
+    private void BuildSkyPanelReview()
+    {
+        SkyPanelReview.Children.Clear();
+        _skyFrameChecks.Clear();
+        _skyPanelChecks.Clear();
+        if (_skyAnalysis is null) return;
+        FrameList.Visibility = Visibility.Collapsed;
+        SkyPanelReview.Visibility = Visibility.Visible;
+        LightSelectionTitle.Text = "Select panels to include";
+        int fieldNumber = 0;
+        foreach (SkyField field in _skyAnalysis.Fields)
+        {
+            SkyPanelReview.Children.Add(new TextBlock { Text = $"Sky field {++fieldNumber} · {field.Panels.Count} panel(s)",
+                TextWrapping = TextWrapping.Wrap });
+            int panelNumber = 0;
+            foreach (SkyPanel panel in field.Panels)
+            {
+                var children = new StackPanel { Spacing = 4 };
+                foreach (SkySolvedFrame frame in panel.Frames)
+                {
+                    var check = new CheckBox { Content = new TextBlock
+                        {
+                            Text = ImageStackFrameLabel.DisplayName(frame.Path, _browserRoot),
+                            TextWrapping = TextWrapping.Wrap, MaxLines = 2, TextTrimming = TextTrimming.CharacterEllipsis,
+                        },
+                        IsChecked = true, HorizontalAlignment = HorizontalAlignment.Stretch };
+                    ToolTipService.SetToolTip(check, frame.Path);
+                    check.Checked += (_, _) => SelectSkyPaths([frame.Path], true);
+                    check.Unchecked += (_, _) => SelectSkyPaths([frame.Path], false);
+                    _skyFrameChecks.Add(frame.Path, check);
+                    children.Children.Add(check);
+                }
+                string[] paths = panel.Frames.Select(f => f.Path).ToArray();
+                var selectPanel = new CheckBox { Content = $"Panel {++panelNumber} · {paths.Length} light(s) · {panel.Position}",
+                    IsChecked = true, HorizontalAlignment = HorizontalAlignment.Stretch };
+                selectPanel.Checked += (_, _) => SelectSkyPaths(paths, true);
+                selectPanel.Unchecked += (_, _) => SelectSkyPaths(paths, false);
+                _skyPanelChecks.Add((selectPanel, paths));
+                SkyPanelReview.Children.Add(new Expander { Header = selectPanel, Content = children,
+                    HorizontalAlignment = HorizontalAlignment.Stretch, HorizontalContentAlignment = HorizontalAlignment.Stretch });
+            }
+        }
+        if (_skyAnalysis.Failures.Count > 0)
+        {
+            var failures = new StackPanel { Spacing = 6 };
+            foreach (SkySolveFailure failure in _skyAnalysis.Failures)
+                failures.Children.Add(new TextBlock { Text = $"{ImageStackFrameLabel.DisplayName(failure.Path, _browserRoot)} — {failure.Reason}",
+                    TextWrapping = TextWrapping.Wrap });
+            SkyPanelReview.Children.Add(new Expander { Header = $"Excluded: {_skyAnalysis.Failures.Count} calibration / unsolved / unverified input(s)",
+                Content = failures, HorizontalAlignment = HorizontalAlignment.Stretch });
+        }
+        SkyGroupingStatus.Text = $"Solved {_skyAnalysis.Sources.Count}/{_skyInputs?.Count ?? 0} lights; {_skyAnalysis.Fields.Count} sky field(s). " +
+            "Check panels to include all their exposures; expand a panel to select individual lights. 85% overlap groups repeats, 5% connects panels. These are grouping estimates, not a guarantee of star registration.";
+        SyncSkySelection();
+    }
+
+    private void SelectSkyPaths(IReadOnlyList<string> paths, bool selected)
+    {
+        if (_updatingPanelSelection || _running) return;
+        _initializing = true;
+        try
+        {
+            var choices = paths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (StackFrameChoice frame in _frames.Where(frame => choices.Contains(frame.Path)))
+                if (selected) { if (!FrameList.SelectedItems.Contains(frame)) FrameList.SelectedItems.Add(frame); }
+                else FrameList.SelectedItems.Remove(frame);
+        }
+        finally { _initializing = false; }
+        SyncSkySelection();
+        RefreshGroupsAndValidation();
+    }
+
+    private void SyncSkySelection()
+    {
+        _updatingPanelSelection = true;
+        try
+        {
+            var selected = SelectedPaths.ToHashSet(StringComparer.OrdinalIgnoreCase);
+            foreach (var (path, check) in _skyFrameChecks) check.IsChecked = selected.Contains(path);
+            foreach (var (check, paths) in _skyPanelChecks)
+            {
+                int count = paths.Count(selected.Contains);
+                check.IsChecked = count == 0 ? false : count == paths.Count ? true : null;
+            }
+        }
+        finally { _updatingPanelSelection = false; }
+    }
+
     private void RefreshGroupsAndValidation()
     {
         IReadOnlyList<string> selected = SelectedPaths;
-        bool hasMultipleFilters = ImageStackGrouping.HasMultipleDetectedFilters(selected);
+        bool hasMultipleFilters = ImageStackGrouping.HasMultipleDetectedFilters(selected, _filterNames);
         SplitByFilterToggle.IsEnabled = hasMultipleFilters;
-        if (!hasMultipleFilters && SplitByFilterToggle.IsOn)
-        {
-            _initializing = true;
-            SplitByFilterToggle.IsOn = false;
-            _initializing = false;
-        }
+        // Keep the user's split preference while temporarily selecting no
+        // lights or one filter. All/None must not silently turn splitting off.
         FilterHintText.Text = hasMultipleFilters
-            ? "Multiple filename filters were detected. Split mode creates one registered FITS stack for each filter."
-            : "Include at least two detected filename filters to create separate filter stacks.";
+            ? "Multiple filters were detected from headers or filenames. Split mode creates one registered FITS stack for each filter."
+            : "Include at least two detected filters to create separate filter stacks.";
 
-        _groups = ImageStackGrouping.Groups(selected, SplitByFilterToggle.IsOn);
+        _groups = SkyGroupingToggle.IsOn && _skyAnalysis is not null
+            ? _skyAnalysis.SelectedGroups(selected, SplitByFilterToggle.IsOn, _filterNames)
+            : ImageStackGrouping.Groups(selected, SplitByFilterToggle.IsOn, _filterNames);
+        SkyOutputSummary.Visibility = SkyGroupingToggle.IsOn && _skyAnalysis is not null ? Visibility.Visible : Visibility.Collapsed;
+        SkyOutputSummary.Text = $"{selected.Count} lights selected → {_groups.Count} output(s). " +
+            string.Join("; ", _groups.Take(8).Select(group => $"{group.Title}: {group.Inputs.Count} lights")) +
+            (_groups.Count > 8 ? "; …" : string.Empty) + ". Removing a connecting panel can split a sky field into separate outputs.";
         SplitOutputPanel.Visibility = SplitsOutput ? Visibility.Visible : Visibility.Collapsed;
         BuildReferenceControls();
         UpdateOptionsAndValidation();
@@ -208,6 +450,21 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         }
     }
 
+    private void CanvasMode_Changed(object sender, SelectionChangedEventArgs e)
+    {
+        if (_initializing) return;
+        bool expanded = SelectedTag(CanvasModePicker) == "Expanded";
+        // Follow mode defaults only until the user explicitly edits overlap,
+        // even when that edit happens to equal another mode's default.
+        if (!_hasCustomOverlap)
+        {
+            _initializing = true;
+            try { MinimumOverlapBox.Value = expanded ? 0.05 : 0.60; }
+            finally { _initializing = false; }
+        }
+        UpdateOptionsAndValidation();
+    }
+
     private void Options_Changed(object sender, RoutedEventArgs e)
     {
         if (!_initializing)
@@ -220,6 +477,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     {
         if (!_initializing)
         {
+            if (ReferenceEquals(sender, MinimumOverlapBox)) _hasCustomOverlap = true;
             UpdateOptionsAndValidation();
         }
     }
@@ -234,9 +492,25 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private void UpdateOptionsAndValidation()
     {
+        bool expanded = SelectedTag(CanvasModePicker) == "Expanded";
+        MosaicOptionsPanel.Visibility = expanded ? Visibility.Visible : Visibility.Collapsed;
+        CanvasModeHelpText.Text = expanded
+            ? "Register selected lights onto one expanding canvas per output, including images from different folders. Overlapping panels can connect through other panels. Sky-panel analysis is optional; no pre-solving catalogs are required. Star registration decides which lights join."
+            : "Align and combine selected lights within a fixed reference frame. Choose Expanded mosaic to retain overlapping panels or dithered edges outside that frame.";
+        SharedAlignmentToggle.IsEnabled = StackingCoreCapabilities.Current.SupportsReferenceImage &&
+            (!expanded || SharedAlignmentToggle.IsOn);
+        ChooseAlignmentReferenceButton.IsEnabled = !expanded;
+        ClearAlignmentReferenceButton.Content = expanded ? "Clear shared alignment image" : "Use first stack's reference";
+        SharedAlignmentAvailabilityText.Text = expanded
+            ? SharedAlignmentToggle.IsOn
+                ? "Shared fixed alignment is unavailable on an expanded canvas. Turn it off or clear the selected shared image."
+                : "Each output's channel reference anchors its expanding canvas and normalization. Shared fixed alignment is unavailable."
+            : _sharedAlignmentHint;
         ReferencePanel.Visibility = AutomaticReferenceToggle.IsOn ? Visibility.Collapsed : Visibility.Visible;
         SharedAlignmentPanel.Visibility = SharedAlignmentToggle.IsOn ? Visibility.Visible : Visibility.Collapsed;
-        FooterHintText.Text = SharedAlignmentToggle.IsOn
+        FooterHintText.Text = expanded
+            ? "All selected lights contribute, including the anchor; disconnected panels may be rejected."
+            : SharedAlignmentToggle.IsOn
             ? "Only selected light frames contribute to the stack; the alignment image supplies geometry only."
             : "The reference frame is included in the stack.";
         StackRejectionMode rejection = SelectedTag(RejectionPicker) == "None"
@@ -255,6 +529,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             ? Visibility.Visible
             : Visibility.Collapsed;
         bool automaticCalibration = SelectedTag(CalibrationSourcePicker) == "Automatic";
+        RemoveCalibrationLibraryButton.IsEnabled = _calibrationLibraryPath is not null;
+        _graded.SetInputs(_calibrationLibraryPath, SelectedPaths, _providedCalibration, automaticCalibration && !_routing);
         ManualCalibrationPanel.Visibility = automaticCalibration
             ? Visibility.Collapsed
             : Visibility.Visible;
@@ -269,14 +545,35 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         _calibration.DarkExposureSeconds = DarkExposureBox.Value;
 
         string? message = ValidationMessage(CreateOptions());
+        if (message is not null) FooterHintText.Text = message;
         ValidationInfoBar.Severity = InfoBarSeverity.Error;
         ValidationInfoBar.Message = message ?? string.Empty;
         ValidationInfoBar.IsOpen = message is not null;
-        StartButton.IsEnabled = !_running && message is null;
+        StartButton.IsEnabled = !_running && !_solvingPanels && message is null;
+        _addLightFrames.IsEnabled = !_routing && !_running;
+        if (_frames.Length == 0 && !_routing)
+        {
+            ValidationInfoBar.IsOpen = false;
+            FooterHintText.Text = "Add light frames from images, a folder, or a TXT/CSV file list to get started.";
+        }
     }
 
     private string? ValidationMessage(ImageStackOptions options)
     {
+        if (_routing) return "Reading image roles before selecting lights…";
+        if (SkyGroupingToggle.IsOn)
+        {
+            if (_skyAnalysis is null) return "Solve and review panels, or turn off optional sky-panel analysis to stack the selected lights directly.";
+            if (SelectedPaths.Any(path => !_skyAnalysis.Sources.ContainsKey(path))) return "Only solved and verified lights can be included in automatic mode.";
+            if (_groups.Count == 0) return "Select at least one solved panel.";
+        }
+        if (options.CanvasMode == StackCanvasMode.Expanded)
+        {
+            if (!StackingCoreCapabilities.Current.SupportsExpandedCanvas)
+                return "Update Seiza to core 0.40.1 or later for expanded mosaic canvases.";
+            if (SharedAlignmentToggle.IsOn)
+                return "Turn off shared fixed alignment to plan an expanded mosaic canvas.";
+        }
         IReadOnlyList<string> selected = SelectedPaths;
         if (selected.Count < 2)
         {
@@ -284,7 +581,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         }
         if (_groups.Any(group => group.Inputs.Count < 2))
         {
-            return "Every filter stack needs at least two selected frames.";
+            return "Every sky field / filter output needs at least two selected light frames. Select more panels or deselect that field.";
         }
         if (SharedAlignmentToggle.IsOn && !StackingCoreCapabilities.Current.SupportsReferenceImage)
         {
@@ -300,11 +597,13 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         {
             return "Enter an output base name.";
         }
-        if (SelectedTag(CalibrationSourcePicker) == "Automatic" &&
-            (string.IsNullOrWhiteSpace(_calibrationLibraryPath) ||
-             !Directory.Exists(_calibrationLibraryPath)))
+        if (SelectedTag(CalibrationSourcePicker) == "Automatic")
         {
-            return "Choose a calibration library folder.";
+            if (_calibrationLibraryPath is null && _providedCalibration.Count == 0) return "Add calibration files or choose a library folder.";
+            if (_calibrationLibraryPath is not null && !Directory.Exists(_calibrationLibraryPath)) return "The calibration folder is unavailable.";
+            if (!_graded.IsCurrent) return "Calibration review needs analysis. See Calibration for progress or errors.";
+            if (options.LearnDefects) return "Turn off learned sensor defects when using graded per-light calibration.";
+            if (_graded.Preferences.Incomplete == "stop" && _graded.Review!.Missing.Any(m => m)) return "Some lights have incomplete calibration. Review the matches or choose Keep or Exclude in Calibration.";
         }
         return options.ValidationMessage ??
             (SelectedTag(CalibrationSourcePicker) == "Automatic"
@@ -314,6 +613,10 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private ImageStackOptions CreateOptions() => new()
     {
+        UseGpu = _useGpuSetting(),
+        GpuMemoryMib = _gpuMemorySetting(),
+        CanvasMode = SelectedTag(CanvasModePicker) == "Expanded" ? StackCanvasMode.Expanded : StackCanvasMode.Reference,
+        MaximumCanvasMegasamples = CheckedInt(CanvasLimitBox.Value),
         RegistrationModel = SelectedTag(RegistrationModelPicker) switch
         {
             "Affine" => StackRegistrationModel.Affine,
@@ -394,8 +697,42 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         _calibrationLibraryPath = folder.Path;
         CalibrationLibraryTextBox.Text = folder.Path;
         AutomaticCalibrationHintText.Text =
-            "Masters will be matched independently for each filter stack and cached for reuse.";
+            "The folder is scanned recursively. Calibration files remain available in the browser.";
         UpdateOptionsAndValidation();
+    }
+
+    private async void AddCalibrationFiles_Click(object sender, RoutedEventArgs e)
+    {
+        var picker = new FileOpenPicker { SuggestedStartLocation = PickerLocationId.PicturesLibrary };
+        foreach (string extension in ImageFileTypes.AstronomyExtensions) picker.FileTypeFilter.Add(extension);
+        WinRT.Interop.InitializeWithWindow.Initialize(picker, WindowHandle);
+        IReadOnlyList<StorageFile> files = await picker.PickMultipleFilesAsync();
+        if (_closed) return;
+        foreach (StorageFile file in files)
+            if (!_providedCalibration.Contains(file.Path, StringComparer.OrdinalIgnoreCase)) _providedCalibration.Add(file.Path);
+        RenderProvidedCalibration(); UpdateOptionsAndValidation();
+    }
+    private void RemoveCalibrationLibrary_Click(object sender, RoutedEventArgs e)
+    {
+        _calibrationLibraryPath = null; CalibrationLibraryTextBox.Text = "";
+        AutomaticCalibrationHintText.Text = ""; UpdateOptionsAndValidation();
+    }
+    private void RenderProvidedCalibration()
+    {
+        ProvidedCalibrationExpander.Header = $"Included calibration files ({_providedCalibration.Count})";
+        ProvidedCalibrationPanel.Children.Clear();
+        foreach (string path in _providedCalibration)
+        {
+            var row = new Grid { ColumnSpacing = 8 };
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+            row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+            row.Children.Add(new TextBlock { Text = path, TextWrapping = TextWrapping.Wrap, IsTextSelectionEnabled = true });
+            var remove = new Button { Content = "Remove" };
+            Microsoft.UI.Xaml.Automation.AutomationProperties.SetName(remove, "Remove calibration file " + Path.GetFileName(path));
+            Grid.SetColumn(remove, 1); row.Children.Add(remove);
+            remove.Click += (_, _) => { _providedCalibration.Remove(path); RenderProvidedCalibration(); UpdateOptionsAndValidation(); };
+            ProvidedCalibrationPanel.Children.Add(row);
+        }
     }
 
     private async void ChooseBias_Click(object sender, RoutedEventArgs e) =>
@@ -409,12 +746,13 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private async void ChooseAlignmentReference_Click(object sender, RoutedEventArgs e)
     {
+        if (SelectedTag(CanvasModePicker) == "Expanded") return;
         var picker = new FileOpenPicker
         {
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
             ViewMode = PickerViewMode.List,
         };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" })
+        foreach (string extension in ImageFileTypes.AstronomyExtensions)
         {
             picker.FileTypeFilter.Add(extension);
         }
@@ -431,6 +769,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
     private void ClearAlignmentReference_Click(object sender, RoutedEventArgs e)
     {
         _alignmentReferencePath = null;
+        if (SelectedTag(CanvasModePicker) == "Expanded") SharedAlignmentToggle.IsOn = false;
         AlignmentReferenceText.Text = "First stack's channel reference";
         UpdateOptionsAndValidation();
     }
@@ -460,7 +799,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             SuggestedStartLocation = PickerLocationId.PicturesLibrary,
             ViewMode = PickerViewMode.List,
         };
-        foreach (string extension in new[] { ".fits", ".fit", ".fts", ".xisf" })
+        foreach (string extension in ImageFileTypes.AstronomyExtensions)
         {
             picker.FileTypeFilter.Add(extension);
         }
@@ -486,7 +825,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     private async void Start_Click(object sender, RoutedEventArgs e)
     {
-        if (_running || _closed)
+        if (_running || _solvingPanels || _closed)
         {
             return;
         }
@@ -545,6 +884,9 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
         try
         {
+            if (outputs.Values.Any(output => _sourcePaths.Concat(_providedCalibration).Any(source => StackSourceIdentity.RefersToSameFile(output, source))))
+                throw new InvalidOperationException("An output cannot replace any input or calibration file, including excluded or unselected sources.");
+            await VerifySkySourcesAsync(cancellation.Token);
             _rankedReferencePaths.Clear();
             if (AutomaticReferenceToggle.IsOn)
             {
@@ -565,8 +907,23 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                 ? _alignmentReferencePath ?? _referencePaths.GetValueOrDefault(_groups[0].Id)
                     ?? _groups[0].Inputs[0]
                 : null;
-            using BatchCalibrationPreparation prepared = await PrepareCalibrationsAsync(
-                alignmentReference, cancellation.Token);
+            LibraryPreparedPlan? libraryPlan = null;
+            if (SelectedTag(CalibrationSourcePicker) == "Automatic")
+            {
+                if (!_graded.IsCurrent || _graded.Review is not { } review) throw new InvalidOperationException("Analyze calibration before stacking.");
+                var calibrationProgress = new Progress<LibraryProgress>(p =>
+                {
+                    if (!_closed) { ProgressMessageText.Text = "Preparing calibration: " + p.Phase.Replace('_', ' ');
+                        ProgressCountsText.Text = $"{p.Completed} / {p.Total}"; }
+                });
+                LibraryRequest execute = _graded.Request("execute", review.ReviewKey);
+                CalibrationLibraryPreferencesStore.Save(_graded.Preferences);
+                LibraryReview built = await CalibrationLibraryService.PerformAsync(execute, calibrationProgress, cancellation.Token);
+                libraryPlan = new LibraryPreparedPlan(built, execute.Lights);
+            }
+            using BatchCalibrationPreparation prepared = new(
+                _groups.ToDictionary(g => g.Id, _ => libraryPlan is null ? _calibration.Copy() : new ImageStackCalibration()),
+                libraryPlan?.Review.Warnings ?? [], []);
             FlatQualityReview[] reviews = prepared.Results.SelectMany(result => result.FlatQualityReviews).ToArray();
             if ((prepared.Warnings.Count > 0 || reviews.Length > 0) &&
                 !await ConfirmCalibrationWarningsAsync(prepared.Warnings, reviews))
@@ -589,6 +946,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                     .Concat(group.Inputs.Where(path =>
                         !string.Equals(path, reference, StringComparison.OrdinalIgnoreCase)))
                     .ToArray();
+                if (libraryPlan is not null) orderedInputs = libraryPlan.Inputs(orderedInputs, _graded.Preferences.Incomplete == "exclude");
+                if (orderedInputs.Length < 2) throw new InvalidOperationException($"{group.Title} needs two usable lights after calibration exclusions.");
                 jobs.Add(new ImageStackJob(
                     group,
                     new ImageStackRequest(
@@ -597,15 +956,19 @@ public sealed partial class ImageStackWindow : Window, IDisposable
                         options,
                         prepared.ByGroup[group.Id])
                     {
+                        LibraryPlan = libraryPlan,
                         AlignmentReferencePath = alignmentReference,
                         ChannelReferenceCandidates = alignmentReference is not null && AutomaticReferenceToggle.IsOn &&
                             StackingCoreCapabilities.Current.SupportsReferenceImageCandidates
-                            ? _rankedReferencePaths.GetValueOrDefault(group.Id) ?? [reference]
+                            ? (_rankedReferencePaths.GetValueOrDefault(group.Id) ?? [reference])
+                                .Where(p => libraryPlan is null || _graded.Preferences.Incomplete != "exclude" || !libraryPlan.Review.Missing[libraryPlan.Index(p)])
+                                .Select(p => libraryPlan is null ? p : libraryPlan.Review.Paths[libraryPlan.Index(p)]).ToArray()
                             : [],
                     }));
             }
 
             StackProgressBar.IsIndeterminate = false;
+            await VerifySkySourcesAsync(cancellation.Token);
             ImageStackBatchResult result = await ImageStackService.StackBatchAsync(
                 jobs,
                 progress,
@@ -659,122 +1022,16 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         }
     }
 
-    private async Task<BatchCalibrationPreparation> PrepareCalibrationsAsync(
-        string? alignmentReferencePath,
-        CancellationToken cancellationToken)
+    private async Task VerifySkySourcesAsync(CancellationToken token)
     {
-        if (SelectedTag(CalibrationSourcePicker) != "Automatic")
-        {
-            return new BatchCalibrationPreparation(
-                _groups.ToDictionary(
-                    group => group.Id,
-                    _ => _calibration.Copy(),
-                    StringComparer.Ordinal),
-                [],
-                []);
-        }
-
-        string libraryPath = Path.GetFullPath(_calibrationLibraryPath!);
-        var quality = FlatQualityOptions.ReadOptions();
-        quality.Validate();
-        string cacheDirectory = CalibrationCachePaths.ForLibrary(libraryPath);
-        var service = new CalibrationPreparationService();
-        var calibrations = new Dictionary<string, ImageStackCalibration>(StringComparer.Ordinal);
-        var warnings = new List<string>();
-        var results = new List<CalibrationPreparationResult>();
-        var protectedMasterPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        if (alignmentReferencePath is not null)
-        {
-            protectedMasterPaths.Add(Path.GetFullPath(alignmentReferencePath));
-        }
-        try
-        {
-            for (int index = 0; index < _groups.Count; index++)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                ImageStackGroup group = _groups[index];
-                string referencePath =
-                    _referencePaths.GetValueOrDefault(group.Id) ?? group.Inputs[0];
-                ProgressMessageText.Text = $"{group.Title}: inspecting target light headers…";
-                ProgressCountsText.Text =
-                    $"Preparing calibration {index + 1} of {_groups.Count}";
-                StackProgressBar.IsIndeterminate = true;
-                (CalibrationFrameProbe[] probes, string[] probeWarnings) =
-                    await ProbeTargetLightsAsync(group.Inputs, cancellationToken);
-                warnings.AddRange(
-                    probeWarnings.Select(warning => $"{group.Title}: {warning}"));
-                CalibrationTargetSelection.Partition partition =
-                    CalibrationTargetSelection.Split(probes);
-                warnings.AddRange(
-                    partition.Warnings.Select(warning => $"{group.Title}: {warning}"));
-                if (partition.Eligible.Count == 0)
-                {
-                    warnings.Add(
-                        $"{group.Title}: no raw light frame could be inspected; " +
-                        "the stack runs without automatic calibration.");
-                    calibrations[group.Id] = new ImageStackCalibration();
-                    continue;
-                }
-                CalibrationFrameProbe reference = partition.Eligible.FirstOrDefault(probe =>
-                        string.Equals(
-                            Path.GetFullPath(probe.Path),
-                            Path.GetFullPath(referencePath),
-                            StringComparison.OrdinalIgnoreCase))
-                    ?? partition.Eligible[0];
-                var progress = new Progress<CalibrationPreparationProgress>(update =>
-                {
-                    if (_closed)
-                    {
-                        return;
-                    }
-                    ProgressMessageText.Text = $"{group.Title}: {update.Message}";
-                    StackProgressBar.IsIndeterminate = update.Total <= 0;
-                    StackProgressBar.Value = update.Total <= 0
-                        ? 0
-                        : Math.Clamp((double)update.Completed / update.Total, 0, 1);
-                });
-                CalibrationPreparationResult result = await service.PrepareAsync(
-                    new CalibrationPreparationRequest
-                    {
-                        Reference = reference,
-                        TargetLights = partition.Eligible,
-                        SourcePaths = [libraryPath],
-                        CacheDirectory = cacheDirectory,
-                        ProtectedMasterPaths = protectedMasterPaths.ToArray(),
-                        Options = new() { FlatQuality = quality },
-                    },
-                    progress,
-                    cancellationToken);
-                results.Add(result);
-                for (int reviewIndex = 0; reviewIndex < result.FlatQualityReviews.Length; reviewIndex++)
-                    result.FlatQualityReviews[reviewIndex] = result.FlatQualityReviews[reviewIndex] with { GroupTitle = group.Title };
-                calibrations[group.Id] = result.Calibration.Copy();
-                warnings.AddRange(result.Warnings.Select(warning => $"{group.Title}: {warning}"));
-                foreach (string masterPath in result.Summaries
-                             .Select(summary => summary.MasterPath)
-                             .OfType<string>())
-                {
-                    protectedMasterPaths.Add(masterPath);
-                }
-            }
-        }
-        catch
-        {
-            foreach (CalibrationPreparationResult result in results)
-            {
-                result.Dispose();
-            }
-            throw;
-        }
-        return new BatchCalibrationPreparation(calibrations, warnings, results);
+        if (!SkyGroupingToggle.IsOn || _skyAnalysis is null) return;
+        SkyPanelAnalysis analysis = _skyAnalysis;
+        string[] paths = _groups.SelectMany(group => group.Inputs).ToArray();
+        if (!await Task.Run(() => analysis.SourcesUnchanged(paths), token))
+            throw new IOException("A selected source changed after solving. Solve and group again before stacking.");
+        token.ThrowIfCancellationRequested();
     }
 
-    /// <summary>
-    /// Probes a group's lights, tolerating unreadable files: an overnight
-    /// batch is not refused because one frame's header cannot be read. The
-    /// frame is still offered to the stacker, whose native admission decides
-    /// its fate.
-    /// </summary>
     private static async Task<(CalibrationFrameProbe[] Probes, string[] Warnings)>
         ProbeTargetLightsAsync(
             IReadOnlyList<string> paths,
@@ -989,6 +1246,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
     public void Dispose()
     {
+        _graded.Dispose();
+        _routingCancellation.Cancel();
         _stackCancellation?.Cancel();
         _stackCancellation?.Dispose();
         _stackCancellation = null;

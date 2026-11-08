@@ -11,6 +11,26 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.ImageIo.cs" Link="Interop\NativeMethods.ImageIo.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ImageSourceData.cs" Link="Models\ImageSourceData.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ImageSourceService.cs" Link="Services\ImageSourceService.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="..\..\src\Seiza.App\Services\FlatInspectionService.cs" Link="Services\FlatInspectionService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\CalibrationLibrary.cs" Link="Models\CalibrationLibrary.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationLibraryService.cs" Link="Services\CalibrationLibraryService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationLibraryPreferencesStore.cs" Link="Services\CalibrationLibraryPreferencesStore.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\StackInputRouting.cs" Link="Services\StackInputRouting.cs" />
+
+    <Compile Include="..\..\src\Seiza.App\Models\CalibrationQuality.cs" Link="Models\CalibrationQuality.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationCoreCapabilities.cs" Link="Services\CalibrationCoreCapabilities.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationQualityService.cs" Link="Services\CalibrationQualityService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\FlatGroupPolicyService.cs" Link="Services\FlatGroupPolicyService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.CalibrationSessions.cs" Link="Interop\NativeMethods.CalibrationSessions.cs" />
+    <Content Include="Fixtures\CalibrationParity\*.json" CopyToOutputDirectory="PreserveNewest" />
+    <Compile Include="..\..\src\Seiza.App\Services\CommandLineActivationRelay.cs" Link="Services\CommandLineActivationRelay.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ImagePathList.cs" Link="Services\ImagePathList.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\WindowsShortcutTarget.cs" Link="Services\WindowsShortcutTarget.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\LiveStackOverviewItem.cs" Link="Models\LiveStackOverviewItem.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\DeferredSettingsUpdate.cs" Link="Models\DeferredSettingsUpdate.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\FlatQuality.cs" Link="Models\FlatQuality.cs" />
@@ -39,6 +59,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Models\ImageBrowserGrouping.cs" Link="Models\ImageBrowserGrouping.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageDirectoryScanner.cs" Link="Services\ImageDirectoryScanner.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\StackFrameImport.cs" Link="Services\StackFrameImport.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageFileTypes.cs" Link="Services\ImageFileTypes.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\NaturalStringComparer.cs" Link="Services\NaturalStringComparer.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\WindowLifetimeRegistry.cs" Link="Services\WindowLifetimeRegistry.cs" />
@@ -57,12 +78,17 @@
     <Compile Include="..\..\src\Seiza.App\Models\ImageSampling.cs" Link="Models\ImageSampling.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\FitsStretch.cs" Link="Models\FitsStretch.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageStacking.cs" Link="Models\ImageStacking.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\SkyPanelGrouping.cs" Link="Models\SkyPanelGrouping.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\SkyPanelService.cs" Link="Services\SkyPanelService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\PlateSolveService.cs" Link="Services\PlateSolveService.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\StackReferenceSelection.cs" Link="Models\StackReferenceSelection.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\StackAlignmentReference.cs" Link="Models\StackAlignmentReference.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\StackingCoreCapabilities.cs" Link="Services\StackingCoreCapabilities.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\StackReferenceService.cs" Link="Services\StackReferenceService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\StackDefectService.cs" Link="Services\StackDefectService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ColorWorkflowService.cs" Link="Services\ColorWorkflowService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ColorToolsService.cs" Link="Services\ColorToolsService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Models\ColorTools.cs" Link="Models\ColorTools.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageStackSession.cs" Link="Models\ImageStackSession.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageMetadata.cs" Link="Models\ImageMetadata.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\CatalogStatus.cs" Link="Models\CatalogStatus.cs" />
@@ -77,6 +103,9 @@
     <Compile Include="..\..\src\Seiza.App\Models\LiveStackRun.cs" Link="Models\LiveStackRun.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\StackSnrPresentation.cs" Link="Models\StackSnrPresentation.cs" />
     <Compile Include="..\..\src\Seiza.App\Rendering\ImageSpaceTransform.cs" Link="Rendering\ImageSpaceTransform.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\ImageTileLayout.cs" Link="Rendering\ImageTileLayout.cs" />
+    <Compile Include="..\..\src\Seiza.App\Rendering\BgraBitmapStream.cs" Link="Rendering\BgraBitmapStream.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\Bgra8Compositor.cs" Link="Services\Bgra8Compositor.cs" />
     <Compile Include="..\..\src\Seiza.App\Rendering\OverlayOptions.cs" Link="Rendering\OverlayOptions.cs" />
     <Compile Include="..\..\src\Seiza.App\Rendering\StarAnalysisOverlayLifecycle.cs" Link="Rendering\StarAnalysisOverlayLifecycle.cs" />
     <Compile Include="..\..\src\Seiza.App\Rendering\StarAnalysisOverlayGeometry.cs" Link="Rendering\StarAnalysisOverlayGeometry.cs" />
@@ -87,6 +116,7 @@
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationPreparationService.cs" Link="Services\CalibrationPreparationService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationCachePaths.cs" Link="Services\CalibrationCachePaths.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationService.cs" Link="Services\CalibrationService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationMasterExport.cs" Link="Services\CalibrationMasterExport.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationMatchingService.cs" Link="Services\CalibrationMatchingService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackCheckpointWriter.cs" Link="Services\ImageStackCheckpointWriter.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackExportSnapshot.cs" Link="Services\ImageStackExportSnapshot.cs" />

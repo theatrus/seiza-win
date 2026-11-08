@@ -41,9 +41,29 @@
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
-                <StackPanel Spacing="6">
+                <StackPanel Spacing="12">
+                    <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="Stacking performance" />
+                    <Border Padding="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}"
+                            BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
+                        <StackPanel Spacing="8">
+                            <ToggleSwitch x:Name="UseStackingGpuToggle" Header="Use GPU for stacking"
+                                          OnContent="Automatic (GPU when available)" OffContent="CPU only" Toggled="StackingGpu_Toggled" />
+                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"
+                                       Text="Accelerate batch and live stacks, defect learning and reintegration. Small frames or unavailable GPU operations use the CPU automatically. Active stacks keep their settings; resumed stacks use your current settings without discarding accumulated frames." />
+                            <NumberBox x:Name="StackingGpuMemoryBox" Header="GPU planning budget (MiB; 0 = automatic)"
+                                       Minimum="0" Maximum="1048576" SmallChange="256" LargeChange="1024"
+                                       SpinButtonPlacementMode="Inline" ValueChanged="StackingGpuMemory_ValueChanged" />
+                            <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" TextWrapping="Wrap"
+                                       Text="Automatic uses the device's capacity. A smaller budget moves large accumulators to the CPU and reduces reintegration bands. Other GPU work can use more memory than this budget." />
+                            <InfoBar x:Name="StackingGpuErrorBar" IsOpen="False" IsClosable="True" Severity="Error" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <StackPanel Grid.Row="1" Spacing="6">
                     <TextBlock
                         Style="{StaticResource TitleTextBlockStyle}"
                         Text="Catalog data" />
@@ -55,14 +75,14 @@
 
                 <InfoBar
                     x:Name="ErrorInfoBar"
-                    Grid.Row="1"
+                    Grid.Row="2"
                     IsClosable="True"
                     IsOpen="False"
                     Message="{x:Bind ViewModel.ErrorMessage, Mode=OneWay}"
                     Severity="Error"
                     Title="Catalog setup needs attention" />
 
-                <StackPanel Grid.Row="2" Spacing="12">
+                <StackPanel Grid.Row="3" Spacing="12">
                     <TextBlock
                         Style="{StaticResource SubtitleTextBlockStyle}"
                         Text="Location" />
@@ -105,7 +125,7 @@
                     </Border>
                 </StackPanel>
 
-                <StackPanel Grid.Row="3" Spacing="12">
+                <StackPanel Grid.Row="4" Spacing="12">
                     <Grid>
                         <Grid.ColumnDefinitions>
                             <ColumnDefinition Width="*" />
@@ -244,7 +264,7 @@
                     </Border>
                 </StackPanel>
 
-                <StackPanel Grid.Row="4" Spacing="12">
+                <StackPanel Grid.Row="5" Spacing="12">
                     <TextBlock
                         Style="{StaticResource SubtitleTextBlockStyle}"
                         Text="Install or repair" />
@@ -310,7 +330,7 @@
                     </Border>
                 </StackPanel>
 
-                <StackPanel Grid.Row="5" Spacing="12">
+                <StackPanel Grid.Row="6" Spacing="12">
                     <TextBlock Style="{StaticResource SubtitleTextBlockStyle}" Text="External tools" />
                     <Border Padding="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" CornerRadius="8">
                         <StackPanel Spacing="10">

@@ -83,7 +83,7 @@ public sealed class StackAlignmentReferenceTests
     }
 
     [Fact]
-    public void EmptyNativeStateIsValidOnlyForAnExplicitSharedImage()
+    public void EmptyNativeStateRequiresAnUnintegratedReferenceIncludingExpandedCanvases()
     {
         LiveStackNativeState state = NativeState() with
         {
@@ -95,7 +95,8 @@ public sealed class StackAlignmentReferenceTests
         ImageStackSession.ValidateNativeState(state with { AcceptedFrames = 3 });
         Assert.Throws<SeizaCoreException>(() => ImageStackSession.ValidateNativeState(state with { ReferenceIntegrated = null }));
         Assert.Throws<SeizaCoreException>(() => ImageStackSession.ValidateNativeState(state with { ReferenceIntegrated = true }));
-        Assert.Throws<SeizaCoreException>(() => ImageStackSession.ValidateNativeState(state with { ReferenceImagePath = null }));
+        ImageStackSession.ValidateNativeState(state with { ReferenceImagePath = null });
+        Assert.Throws<SeizaCoreException>(() => ImageStackSession.ValidateNativeState(state with { ReferenceImagePath = null, ReferenceIntegrated = true }));
         Assert.Throws<SeizaCoreException>(() => ImageStackSession.ValidateNativeState(state with { ReferenceImagePath = " " }));
         Assert.Throws<SeizaCoreException>(() => ImageStackSession.ValidateNativeState(state with { RejectedFrames = -1 }));
         ImageStackSession.ValidateNativeState(NativeState());

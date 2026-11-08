@@ -1,4 +1,3 @@
-using Microsoft.Graphics.Canvas;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Seiza.App.Models;
@@ -136,19 +135,18 @@ internal static class ImageExportService
     }
 
     public static async Task Save8Async(
-        CanvasBitmap image,
+        RenderedImageData image,
         ImageExportDestination destination)
     {
-        CanvasBitmapFileFormat format = destination.Request.Format switch
+        Guid encoderId = destination.Request.Format switch
         {
-            ImageExportFormat.Jpeg => CanvasBitmapFileFormat.Jpeg,
-            ImageExportFormat.Tiff => CanvasBitmapFileFormat.Tiff,
-            _ => CanvasBitmapFileFormat.Png,
+            ImageExportFormat.Jpeg => BitmapEncoder.JpegEncoderId,
+            ImageExportFormat.Tiff => BitmapEncoder.TiffEncoderId,
+            _ => BitmapEncoder.PngEncoderId,
         };
-        float quality = format == CanvasBitmapFileFormat.Jpeg ? 0.92f : 1.0f;
         using IRandomAccessStream stream = await destination.File.OpenAsync(FileAccessMode.ReadWrite);
-        stream.Size = 0;
-        await image.SaveAsync(stream, format, quality);
+        await Bgra8Encoder.WriteAsync(stream, image.Bgra, image.Width, image.Height, encoderId,
+            destination.Request.Format == ImageExportFormat.Jpeg ? .92f : null);
     }
 
     public static async Task Save16Async(

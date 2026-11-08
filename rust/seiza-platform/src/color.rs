@@ -137,38 +137,6 @@ pub unsafe extern "C" fn seiza_win_color_calibrate_file_json(
     .unwrap_or(std::ptr::null_mut())
 }
 
-/// Header-only marker lookup; no pixels are decoded or copied.
-/// # Safety
-/// path is a NUL-terminated UTF-8 file path; error_out is null or writable.
-#[unsafe(no_mangle)]
-pub unsafe extern "C" fn seiza_win_color_calibrated(
-    path: *const c_char,
-    error_out: *mut *mut c_char,
-) -> i32 {
-    boundary(error_out, || {
-        if path.is_null() {
-            return Err("An image path is required.".into());
-        }
-        let path = PathBuf::from(
-            unsafe { CStr::from_ptr(path) }
-                .to_str()
-                .map_err(|e| e.to_string())?,
-        );
-        let headers = if path
-            .extension()
-            .is_some_and(|s| s.eq_ignore_ascii_case("xisf"))
-        {
-            seiza_xisf::read_header(&path).map_err(|e| e.to_string())?
-        } else {
-            seiza_fits::read_header(&path).map_err(|e| e.to_string())?
-        };
-        Ok(i32::from(headers.iter().any(|(key, value)| {
-            key == "SEIZAPCC" && value.as_str() == Some("GAIA")
-        })))
-    })
-    .unwrap_or(-1)
-}
-
 /// Install the optional offline Gaia photometry catalogue on explicit request.
 /// # Safety
 /// Same path/callback lifetime contract as the distance-catalog installer.
@@ -309,13 +277,13 @@ mod tests {
             let gains = result["calibration"]["gains"].as_array().unwrap();
             assert!((gains[0].as_f64().unwrap() - 1. / 0.6).abs() < 0.03);
             assert!((gains[2].as_f64().unwrap() - 1. / 1.4).abs() < 0.03);
-            let path = CString::new(output.to_str().unwrap()).unwrap();
-            let mut error = std::ptr::null_mut();
-            assert_eq!(
-                unsafe { seiza_win_color_calibrated(path.as_ptr(), &mut error) },
-                1
+            assert!(
+                seiza_image_io::read_header(&output)
+                    .unwrap()
+                    .cards
+                    .iter()
+                    .any(|(key, value)| key == "SEIZAPCC" && value.as_str() == Some("GAIA"))
             );
-            assert!(error.is_null());
             let frame = FitsFrame::open(&output).unwrap();
             let restored = seiza_image_io::solve_prior_from_headers(&frame.headers)
                 .wcs

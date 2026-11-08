@@ -95,6 +95,15 @@ public partial class App : Application
         window.Activate();
     }
 
+    internal static async Task OpenImageListInWindowAsync(string path, MainWindow? preferredWindow = null)
+    {
+        MainWindow window = preferredWindow is not null &&
+            DocumentWindows.Contains(preferredWindow) && !preferredWindow.HasDocument
+                ? preferredWindow : CreateDocumentWindow();
+        await window.OpenImageListAsync(path);
+        window.Activate();
+    }
+
     public static void ShowCatalogSettings()
     {
         if (_catalogSettingsWindow is null)
@@ -113,6 +122,13 @@ public partial class App : Application
     internal static void ShowColorStack(string? rgb = null)
     {
         var window = new ColorStackWindow(rgb);
+        RegisterIndependentWindow(window);
+        window.Activate();
+    }
+
+    internal static void ShowColorTools()
+    {
+        var window = new ColorToolsWindow();
         RegisterIndependentWindow(window);
         window.Activate();
     }
@@ -236,7 +252,7 @@ public partial class App : Application
             return fileActivation.Files
                 .OfType<StorageFile>()
                 .Select(file => file.Path)
-                .Where(path => File.Exists(path) && ImageFileService.IsSupportedImage(path))
+                .Where(path => File.Exists(path) && ImageFileTypes.IsOpenableFile(path))
                 .ToArray();
         }
 
@@ -244,7 +260,7 @@ public partial class App : Application
             ? launch.Arguments
             : fallbackArguments;
         string candidate = arguments.Trim().Trim('"');
-        return File.Exists(candidate) && ImageFileService.IsSupportedImage(candidate)
+        return File.Exists(candidate) && ImageFileTypes.IsOpenableFile(candidate)
             ? [candidate]
             : [];
     }
