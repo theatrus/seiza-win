@@ -2367,9 +2367,9 @@ dependencies = [
 
 [[package]]
 name = "seiza"
-version = "0.48.0"
+version = "0.49.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8bcab05efeb3b535e5b010845cfb067423e8afc9419807f635f16548486b2bdc"
+checksum = "fceaa6c25712827581eb87f11abb8b368c651c0482ba3cbd320a5d229ea9ebd8"
 dependencies = [
  "directories",
  "image",
@@ -2386,15 +2386,15 @@ dependencies = [
  "seiza-stats",
  "serde",
  "serde_json",
- "sha2 0.11.0",
+ "sha2 0.11.1",
  "thiserror",
 ]
 
 [[package]]
 name = "seiza-analysis"
-version = "0.3.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ec90981be0074a036c4e0e01bf91b384922622825c582bbc4a1000f1d8ada177"
+checksum = "2e517d506f65f4e1580ea566e24bb75a5ff3e0a78d25f44acc8fd08e9a3f9451"
 dependencies = [
  "seiza-fits",
  "seiza-image-io",
@@ -2422,9 +2422,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.48.0"
+version = "0.49.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5b0cda3b990edb464460294c04e277fcb9fa3938fefbcfeaeba785d596babc60"
+checksum = "e5e23ea65b10878ec9ec7d6799fe95242def386b5cf31ae72ec4ab4be563b036"
 dependencies = [
  "cbindgen",
  "image",
@@ -2437,6 +2437,7 @@ dependencies = [
  "seiza-fits",
  "seiza-image-io",
  "seiza-parallax",
+ "seiza-pipeline",
  "seiza-satellites",
  "seiza-sources",
  "seiza-stacking",
@@ -2457,9 +2458,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-calibration"
-version = "0.11.0"
+version = "0.12.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce08aa7f1e82fb9b1a42957c3b477a738b0a6e8e85c94b7d80af02ea9ef796f8"
+checksum = "6491df9650d20e501b61b9e86bf3c3b2b8d7a4d30d8084f30724b8ae7d0846aa"
 dependencies = [
  "chrono",
  "nalgebra",
@@ -2469,7 +2470,7 @@ dependencies = [
  "seiza-stats",
  "serde",
  "serde_json",
- "sha2 0.11.0",
+ "sha2 0.11.1",
  "thiserror",
 ]
 
@@ -2504,7 +2505,7 @@ dependencies = [
  "reqwest",
  "serde",
  "serde_json",
- "sha2 0.11.0",
+ "sha2 0.11.1",
  "thiserror",
  "tokio",
  "tokio-util",
@@ -2522,23 +2523,24 @@ dependencies = [
 
 [[package]]
 name = "seiza-fits"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e847f31fbe7dc948985980c0049f8e18b9b135cd390cfafe0af315ce72698955"
+checksum = "7500c218dd19051536126f4f90df83b64eec054531ad75ff2087e557c3c8adc4"
 dependencies = [
  "flate2",
  "memmap2",
  "multiversion",
  "rayon",
+ "rustix",
  "seiza-stretch",
  "tempfile",
 ]
 
 [[package]]
 name = "seiza-image-io"
-version = "0.12.0"
+version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "88f4e03ea9f7b87483d133beb6dde5feb2c3f3b1a4cb0f88d6295ca95741d99c"
+checksum = "3a3a1f0a3e6642f07893d328a0989436f2bc0fbe459648e670caa4d5ac1da025"
 dependencies = [
  "chrono",
  "image",
@@ -2562,9 +2564,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-parallax"
-version = "0.19.6"
+version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "60a7d709343f0377f354dbbf72d664a85aaef601a2ffbcbecd51b81f380e9396"
+checksum = "0542aa0d962761ff9dd30bca7660a31f476a182c1a79c8829d4ceb591f696c41"
 dependencies = [
  "ab_glyph",
  "image",
@@ -2580,6 +2582,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "seiza-pipeline"
+version = "0.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ea70c0499eea8e3371f50118605fe7de02528d2a0eefb05a82ffcb268945b91"
+dependencies = [
+ "rayon",
+ "seiza-calibration",
+ "seiza-fits",
+ "seiza-image-io",
+ "seiza-stacking",
+ "seiza-xisf",
+ "serde",
+ "serde_json",
+ "sha2 0.11.1",
+ "tempfile",
+ "thiserror",
+]
+
+[[package]]
 name = "seiza-platform"
 version = "0.1.0"
 dependencies = [
@@ -2591,7 +2612,7 @@ dependencies = [
  "seiza-stretch",
  "serde",
  "serde_json",
- "sha2 0.11.0",
+ "sha2 0.11.1",
  "tempfile",
  "tokio",
 ]
@@ -2609,7 +2630,7 @@ dependencies = [
  "seiza-download",
  "serde",
  "serde_json",
- "sha2 0.11.0",
+ "sha2 0.11.1",
  "thiserror",
  "tokio",
 ]
@@ -2630,17 +2651,19 @@ dependencies = [
 
 [[package]]
 name = "seiza-stacking"
-version = "0.55.0"
+version = "0.57.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fbd98db3f697d0f02294d8de7bfa7984ebc2093fd66945c77f992cdb0a74e7bb"
+checksum = "2b0136f5c25a4eebacc96f8f79c223b56d60be336037ede697154879153678ec"
 dependencies = [
  "bytemuck",
  "fs2",
+ "libc",
  "multiversion",
  "nalgebra",
  "objc2-metal",
  "pollster",
  "postcard",
+ "quick-xml",
  "rayon",
  "same-file",
  "schemars",
@@ -2654,7 +2677,7 @@ dependencies = [
  "seiza-xisf",
  "serde",
  "serde_json",
- "sha2 0.11.0",
+ "sha2 0.11.1",
  "statrs",
  "tempfile",
  "thiserror",
@@ -2665,9 +2688,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-stars"
-version = "0.4.0"
+version = "0.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8d8f7ea3db9ae4e4ca1ad90f802ecb7167e918867ab749ef51c9065837a7e3c7"
+checksum = "20e20ef99897c9bb4830166058531da9382e31d1e57f6983b4faa49830d64166"
 dependencies = [
  "nalgebra",
  "rayon",
@@ -2708,9 +2731,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-xisf"
-version = "0.8.0"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b592baad38df8f44451207312acce4e880b9300842582e9f30cafc0262f98651"
+checksum = "036fb003e9037533ad8cf5b38167677f7564d9baf334b258f51d02ab5fd5a261"
 dependencies = [
  "flate2",
  "lz4_flex",
@@ -2718,7 +2741,7 @@ dependencies = [
  "rayon",
  "seiza-fits",
  "sha1",
- "sha2 0.11.0",
+ "sha2 0.11.1",
  "sha3",
  "tempfile",
  "thiserror",
@@ -2830,9 +2853,9 @@ dependencies = [
 
 [[package]]
 name = "sha2"
-version = "0.11.0"
+version = "0.11.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "446ba717509524cb3f22f17ecc096f10f4822d76ab5c0b9822c5f9c284e825f4"
+checksum = "47d7069beb7d6ac7b9acd1039986e73443f24234f41074da099d6f994ac9ad19"
 dependencies = [
  "cfg-if",
  "cpufeatures 0.3.0",
@@ -3118,9 +3141,9 @@ checksum = "1f3ccbac311fea05f86f61904b462b55fb3df8837a366dfc601a0161d0532f20"
 
 [[package]]
 name = "tokio"
-version = "1.53.3"
+version = "1.54.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ce3335fa71841cda333a58d7615b03901380ecf09d59b3296d21f8bbac0dde4e"
+checksum = "b52fd3255258d26fac7264ab5a76b53c13367136dc011d3d6ad4f8ed070396a3"
 dependencies = [
  "bytes",
  "libc",
