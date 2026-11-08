@@ -30,6 +30,7 @@
                 <MenuFlyoutItem Text="Open image list…" Click="OpenImageList_Click" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem x:Name="StackImagesMenuItem" Text="Stack images…" Click="StackImages_Click" IsEnabled="False" />
+                <MenuFlyoutItem x:Name="BuildMastersMenuItem" Text="Build calibration masters…" Click="BuildMasters_Click" IsEnabled="False" />
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="New window" Click="NewWindow_Click" />
             </MenuBarItem>
@@ -48,38 +49,41 @@
             </CommandBar.SecondaryCommands>
 
             <AppBarButton
-                Click="OpenImage_Click"
-                Label="Open image"
-                ToolTipService.ToolTip="Open images or TXT/CSV image lists (Ctrl+O)">
+                Label="Open"
+                AutomationProperties.Name="Open"
+                ToolTipService.ToolTip="Open an image, folder, or image file list">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE8E5;" />
                 </AppBarButton.Icon>
-                <AppBarButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="O" Modifiers="Control" />
-                </AppBarButton.KeyboardAccelerators>
-            </AppBarButton>
-            <AppBarButton
-                Click="OpenFolder_Click"
-                Label="Open folder"
-                ToolTipService.ToolTip="Open folder (Ctrl+Shift+O)">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE8B7;" />
-                </AppBarButton.Icon>
-                <AppBarButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="O" Modifiers="Control,Shift" />
-                </AppBarButton.KeyboardAccelerators>
-            </AppBarButton>
-
-            <AppBarButton
-                Click="OpenImageList_Click"
-                Label="Open image list"
-                ToolTipService.ToolTip="Open images listed in a TXT or CSV file (Ctrl+Alt+O)">
-                <AppBarButton.Icon>
-                    <FontIcon Glyph="&#xE8A5;" />
-                </AppBarButton.Icon>
-                <AppBarButton.KeyboardAccelerators>
-                    <KeyboardAccelerator Key="O" Modifiers="Control,Menu" />
-                </AppBarButton.KeyboardAccelerators>
+                <AppBarButton.Flyout>
+                    <MenuFlyout>
+                        <MenuFlyoutItem Click="OpenImage_Click" Text="Open image…">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE8E5;" />
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="O" Modifiers="Control" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Click="OpenFolder_Click" Text="Open folder…">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE8B7;" />
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="O" Modifiers="Control,Shift" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                        <MenuFlyoutItem Click="OpenImageList_Click" Text="Open image list…"
+                            ToolTipService.ToolTip="Open images listed in a TXT or CSV file">
+                            <MenuFlyoutItem.Icon>
+                                <FontIcon Glyph="&#xE8A5;" />
+                            </MenuFlyoutItem.Icon>
+                            <MenuFlyoutItem.KeyboardAccelerators>
+                                <KeyboardAccelerator Key="O" Modifiers="Control,Menu" />
+                            </MenuFlyoutItem.KeyboardAccelerators>
+                        </MenuFlyoutItem>
+                    </MenuFlyout>
+                </AppBarButton.Flyout>
             </AppBarButton>
 
             <AppBarButton
@@ -90,6 +94,16 @@
                 ToolTipService.ToolTip="Register and stack the FITS or XISF images in this collection">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE8FD;" />
+                </AppBarButton.Icon>
+            </AppBarButton>
+
+            <AppBarButton
+                x:Name="BuildMastersButton"
+                Click="BuildMasters_Click"
+                Label="Build masters"
+                ToolTipService.ToolTip="Build bias, dark, or flat calibration masters without light frames">
+                <AppBarButton.Icon>
+                    <FontIcon Glyph="&#xE9E9;" />
                 </AppBarButton.Icon>
             </AppBarButton>
 
@@ -638,7 +652,7 @@
                     Text="Open an image, folder, or TXT/CSV image list; or drop one here."
                     TextAlignment="Center"
                     TextWrapping="Wrap" />
-                <TextBlock Text="To stack exposures, open a folder and choose File → Stack images…." TextWrapping="Wrap" TextAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock Text="To stack exposures, choose File → Stack images… and add frames." TextWrapping="Wrap" TextAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Button Content="Open image list…" Click="OpenImageList_Click" HorizontalAlignment="Center" />
                 <TextBlock
                     HorizontalAlignment="Center"

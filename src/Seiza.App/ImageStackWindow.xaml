@@ -32,9 +32,10 @@
                     <Border x:Name="StackSummaryCard" Padding="16" Background="{ThemeResource CardBackgroundFillColorDefaultBrush}" BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}" BorderThickness="1" CornerRadius="8">
                         <StackPanel Spacing="8">
                             <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Summary" />
+                            <StackPanel x:Name="StackInputActions" Orientation="Horizontal" />
                             <TextBlock x:Name="LightCountText" Text="Reading images…" TextWrapping="Wrap" />
                             <TextBlock x:Name="OutputCountText" TextWrapping="Wrap" />
-                            <Expander Header="Source folders" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                            <Expander x:Name="SourceFoldersExpander" Header="Source folders" Visibility="Collapsed" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
                                 <TextBlock x:Name="SourceFoldersText" TextWrapping="Wrap" IsTextSelectionEnabled="True" />
                             </Expander>
                             <Expander x:Name="ImportNotesExpander" Header="Import notes" Visibility="Collapsed" HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">

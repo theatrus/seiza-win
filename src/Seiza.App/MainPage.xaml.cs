@@ -56,6 +56,7 @@ public sealed partial class MainPage : Page, IDisposable
     private bool _disposed;
     private FitsStretchWindow? _stretchWindow;
     private ImageStackWindow? _stackWindow;
+    private CalibrationMasterWindow? _masterWindow;
     private LiveStackWindow? _liveStackWindow;
     private MainWindow? _ownerWindow;
 
@@ -85,6 +86,7 @@ public sealed partial class MainPage : Page, IDisposable
             InspectorControl.FlatInspection.IsAvailable ? Visibility.Visible : Visibility.Collapsed;
         Loaded += MainPage_Loaded;
         Unloaded += MainPage_Unloaded;
+        UpdateVisualState();
     }
 
     private async void MainPage_Loaded(object sender, RoutedEventArgs e)
@@ -162,6 +164,20 @@ public sealed partial class MainPage : Page, IDisposable
         await session.InitializeAsync();
     }
 
+    private void BuildMasters_Click(object sender, RoutedEventArgs e)
+    {
+        if (_masterWindow is not null) { _masterWindow.Activate(); return; }
+        var window = new CalibrationMasterWindow(GetStackableBrowserPaths().ToArray());
+        _masterWindow = window;
+        window.Closed += (_, _) =>
+        {
+            if (ReferenceEquals(_masterWindow, window)) _masterWindow = null;
+            UpdateVisualState();
+        };
+        UpdateVisualState();
+        window.Activate();
+    }
+
     private async void StackImages_Click(object sender, RoutedEventArgs e)
     {
         if (_stackWindow is not null)
@@ -171,11 +187,6 @@ public sealed partial class MainPage : Page, IDisposable
         }
 
         string[] paths = GetStackableBrowserPaths().ToArray();
-        if (paths.Length < 2)
-        {
-            return;
-        }
-
         var window = new ImageStackWindow(paths, _browserRoot);
         _stackWindow = window;
         UpdateVisualState();
@@ -1702,12 +1713,10 @@ public sealed partial class MainPage : Page, IDisposable
         PasteAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         ImageBrowserButton.IsEnabled = CanBrowseImages;
         StackImagesMenuItem.IsEnabled = StackImagesButton.IsEnabled =
-            _stackWindow is not null ||
-            (!_isScanningFolder && !ViewModel.IsLoading &&
-             GetStackableBrowserPaths().Take(2).Count() >= 2);
-        ToolTipService.SetToolTip(StackImagesButton, _browserRoot is not null && _includeSubfolders
-            ? "Choose FITS/XISF frames from this directory tree to stack (including collapsed groups)"
-            : "Choose FITS/XISF frames from the current folder to stack");
+            _stackWindow is not null || (!_isScanningFolder && !ViewModel.IsLoading);
+        BuildMastersMenuItem.IsEnabled = BuildMastersButton.IsEnabled =
+            _masterWindow is not null || (!_isScanningFolder && !ViewModel.IsLoading);
+        ToolTipService.SetToolTip(StackImagesButton, "Stack light frames; add images, a folder, or an image list");
         LiveStackButton.IsEnabled = _liveStackWindow is null && !ViewModel.IsLoading;
         ParallaxVideoButton.IsEnabled = _currentPath is not null && _bitmap is not null && !ViewModel.IsLoading;
         ImageBrowserButton.Label = _isBrowserOpen ? "Hide images" : "Images";
@@ -1948,6 +1957,8 @@ public sealed partial class MainPage : Page, IDisposable
         _stretchWindow = null;
         _stackWindow?.Close();
         _stackWindow = null;
+        _masterWindow?.Close();
+        _masterWindow = null;
         _liveStackWindow?.Close();
         _liveStackWindow = null;
         if (!ReferenceEquals(_bitmap, _committedBitmap))

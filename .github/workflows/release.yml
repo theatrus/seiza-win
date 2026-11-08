@@ -333,11 +333,17 @@ jobs:
 
       # Both tests run against the signed MSI rather than an earlier copy, so
       # what CI exercises is byte for byte what ships.
+      - name: Test signed native loading without the VC++ runtime
+        run: .\.github\scripts\test-windows-native-loader.ps1 -Directory .\artifacts\publish\win-x64 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
+
       - name: Verify installer Finish launch action
         run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
 
       - name: Smoke-test Windows installer
         run: .\.github\scripts\test-windows-installer.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
+
+      - name: Reject upgrades when the previous uninstall fails
+        run: .\.github\scripts\test-windows-installer-upgrade.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
 
       - name: Hand the signed installer to the publishing job
         uses: actions/upload-artifact@v7

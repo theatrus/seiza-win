@@ -10,6 +10,11 @@ $ErrorActionPreference = "Stop"
 
 $workspaceRoot = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
 $targetDirectory = Join-Path $workspaceRoot "target"
+# An explicit target keeps build scripts/proc macros on the host while the DLLs
+# and their native dependencies use /MT. The MSI embeds the Shell provider as a
+# temporary custom action, so app-local DLLs would not fix its loader failure.
+$nativeTarget = "x86_64-pc-windows-msvc"
+$runtimeFlags = " --target $nativeTarget --config target.$nativeTarget.rustflags=['-C','target-feature=+crt-static']"
 $vsWhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio\Installer\vswhere.exe"
 if (-not (Test-Path -LiteralPath $vsWhere)) {
     throw "Visual Studio Installer's vswhere.exe was not found."
@@ -76,7 +81,7 @@ if ($resolvedRevision -notmatch '^[0-9a-f]{40}$') {
 $cargoAction = if ($Test) { "test" } else { "build" }
 $releaseFlag = if ($Configuration -eq "Release") { " --release" } else { "" }
 $nativePackageSpec = "seiza-cabi@$($nativePackage.version)"
-$workspaceNativeBuildCommand = "cargo build --package $nativePackageSpec --target-dir `"$targetDirectory`" --locked$releaseFlag"
+$workspaceNativeBuildCommand = "cargo build --package $nativePackageSpec --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
 if ($Test) {
     # The 0.47.0 C ABI archive refers to sibling calibration fixtures. Stage
     # the unchanged published crate and fixtures from the matching published
@@ -102,8 +107,8 @@ if ($Test) {
     # C ABI archive can predate a compatible stacking patch and retain the
     # earlier leaf in its packaged lockfile. Finally build the shipped DLL from
     # the application's locked dependency graph.
-    $nativeTestCommand = "cargo test --manifest-path `"$nativeTestManifest`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked$releaseFlag"
-    $stackingTestCommand = "cargo test --manifest-path `"$($stackingPackage.manifest_path)`" --package seiza-stacking --target-dir `"$targetDirectory`" --locked$releaseFlag"
+    $nativeTestCommand = "cargo test --manifest-path `"$nativeTestManifest`" --package seiza-cabi --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
+    $stackingTestCommand = "cargo test --manifest-path `"$($stackingPackage.manifest_path)`" --package seiza-stacking --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
     $cargoCommand = "$nativeTestCommand && $stackingTestCommand && $workspaceNativeBuildCommand"
 }
 else {
@@ -112,17 +117,17 @@ else {
     # compatible transitive patches such as seiza-calibration bug fixes.
     $cargoCommand = $workspaceNativeBuildCommand
 }
-$thumbnailCommand = "cargo $cargoAction --package seiza-thumbnail-provider --target-dir `"$targetDirectory`" --locked$releaseFlag"
-$platformCommand = "cargo $cargoAction --package seiza-platform --target-dir `"$targetDirectory`" --locked$releaseFlag"
+$thumbnailCommand = "cargo $cargoAction --package seiza-thumbnail-provider --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
+$platformCommand = "cargo $cargoAction --package seiza-platform --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
 if ($Test) {
     # Testing an rlib/cdylib crate does not emit its deployable DLL. Build both
     # local DLLs explicitly before MSBuild evaluates native content items; on a
     # clean runner no earlier build exists to satisfy their Exists conditions.
-    $thumbnailCommand += " && cargo build --package seiza-thumbnail-provider --target-dir `"$targetDirectory`" --locked$releaseFlag"
-    $platformCommand += " && cargo build --package seiza-platform --target-dir `"$targetDirectory`" --locked$releaseFlag"
+    $thumbnailCommand += " && cargo build --package seiza-thumbnail-provider --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
+    $platformCommand += " && cargo build --package seiza-platform --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
     # Dependency dev-targets must run from the published archive, not the
     # application workspace. The shipped DLL still uses the application lock.
-    $platformCommand += " && cargo test --manifest-path `"$($parallaxPackage.manifest_path)`" --package seiza-parallax --lib --target-dir `"$targetDirectory`" --locked$releaseFlag"
+    $platformCommand += " && cargo test --manifest-path `"$($parallaxPackage.manifest_path)`" --package seiza-parallax --lib --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
 }
 
 $buildCommand = "call `"$developerCommand`" -no_logo -arch=x64 -host_arch=x64 && $cargoCommand && $thumbnailCommand && $platformCommand"
@@ -134,12 +139,17 @@ try {
         throw "Cargo failed with exit code $LASTEXITCODE."
     }
 
+    $nativeProfileDirectory = Join-Path $targetDirectory "$nativeTarget\$($Configuration.ToLowerInvariant())"
+    $dllNames = @("seiza_cabi.dll", "seiza_thumbnail_provider.dll", "seiza_platform.dll")
+    $dllPaths = @($dllNames | ForEach-Object { Join-Path $nativeProfileDirectory $_ })
+    & (Join-Path $workspaceRoot ".github\scripts\test-windows-runtime-dependencies.ps1") -Path $dllPaths
+
+    # Keep the existing MSBuild/test payload paths. Audit before copying so an
+    # ambient RUSTFLAGS override cannot silently restore the VC++ prerequisite.
     $profileDirectory = Join-Path $targetDirectory $Configuration.ToLowerInvariant()
-    foreach ($dllName in @("seiza_cabi.dll", "seiza_thumbnail_provider.dll", "seiza_platform.dll")) {
-        $dllPath = Join-Path $profileDirectory $dllName
-        if (-not (Test-Path -LiteralPath $dllPath -PathType Leaf)) {
-            throw "Native build did not produce required DLL '$dllPath'."
-        }
+    [System.IO.Directory]::CreateDirectory($profileDirectory) | Out-Null
+    foreach ($dllPath in $dllPaths) {
+        Copy-Item -LiteralPath $dllPath -Destination $profileDirectory -Force
     }
 
     $buildInfo = [ordered]@{

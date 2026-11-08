@@ -12,7 +12,7 @@ namespace Seiza.App;
 public sealed partial class ImageStackWindow : Window, IDisposable
 {
     private StackFrameChoice[] _frames;
-    private readonly string[] _sourcePaths;
+    private string[] _sourcePaths;
     private IReadOnlyDictionary<string, string?> _filterNames = new Dictionary<string, string?>();
     private readonly List<string> _providedCalibration = [];
     private readonly CancellationTokenSource _routingCancellation = new();
@@ -137,15 +137,13 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             _providedCalibration.AddRange(routed.Calibration);
             _filterNames = routed.Filters;
             if (_providedCalibration.Count > 0) CalibrationSourcePicker.SelectedIndex = 1;
-            RoutingNotes.Text = string.Join(Environment.NewLine, routed.Notes);
-            ImportNotesExpander.Visibility = routed.Notes.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-            SourceFoldersText.Text = string.Join(Environment.NewLine, routed.Lights.Select(Path.GetDirectoryName).Distinct(StringComparer.OrdinalIgnoreCase));
+            SetImportNotes(string.Join(Environment.NewLine, routed.Notes));
             RenderProvidedCalibration();
         }
         catch (OperationCanceledException) { }
         catch (Exception exception)
         {
-            if (!_closed) { RoutingNotes.Text = exception.Message; ImportNotesExpander.Visibility = Visibility.Visible; }
+            if (!_closed) SetImportNotes(exception.Message, expand: true);
         }
         finally
         {
@@ -166,6 +164,9 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             _setupTabs.TabItems.Add(new TabViewItem { Header = title, IsClosable = false, Content = new ScrollViewer
                 { Content = panel, HorizontalScrollBarVisibility = ScrollBarVisibility.Disabled } });
         }
+        _addLightFrames = StackFramePicker.CreateButton("Add frames", AddFramesAsync);
+        StackInputActions.Children.Add(_addLightFrames);
+        Microsoft.UI.Xaml.Automation.AutomationProperties.SetLiveSetting(RoutingNotes, Microsoft.UI.Xaml.Automation.Peers.AutomationLiveSetting.Polite);
         Page("Stack", StackSummaryCard, CalibrationSummaryCard, StackModeCard, FrameOptionsCard, SplitOutputPanel);
         UIElement calibrationContent = (UIElement)CalibrationExpander.Content;
         CalibrationExpander.Content = null;
@@ -394,6 +395,8 @@ public sealed partial class ImageStackWindow : Window, IDisposable
             string.Join("; ", _groups.Take(8).Select(group => $"{group.Title}: {group.Inputs.Count} lights")) +
             (_groups.Count > 8 ? "; …" : string.Empty) + ". Removing a connecting panel can split a sky field into separate outputs.";
         LightCountText.Text = _routing ? "Light frames: reading images…" : $"Light frames: {selected.Count} of {_frames.Length} selected";
+        SourceFoldersText.Text = string.Join(Environment.NewLine, _frames.Select(frame => Path.GetDirectoryName(frame.Path)).Distinct(StringComparer.OrdinalIgnoreCase));
+        SourceFoldersExpander.Visibility = _frames.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         OutputCountText.Text = $"Output files: {_groups.Count} FITS {(_groups.Count == 1 ? "file" : "files")}";
         SplitOutputPanel.Visibility = SplitsOutput ? Visibility.Visible : Visibility.Collapsed;
         BuildReferenceControls();
@@ -565,6 +568,12 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         ValidationInfoBar.Message = message ?? string.Empty;
         ValidationInfoBar.IsOpen = message is not null;
         StartButton.IsEnabled = !_running && !_solvingPanels && message is null;
+        _addLightFrames.IsEnabled = !_routing && !_running;
+        if (_frames.Length == 0 && !_routing)
+        {
+            ValidationInfoBar.IsOpen = false;
+            FooterHintText.Text = "Add light frames from images, a folder, or a TXT/CSV file list to get started.";
+        }
     }
 
     private string? ValidationMessage(ImageStackOptions options)

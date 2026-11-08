@@ -60,6 +60,7 @@
   <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Models\ImageBrowserGrouping.cs" Link="Models\ImageBrowserGrouping.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageDirectoryScanner.cs" Link="Services\ImageDirectoryScanner.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\StackFrameImport.cs" Link="Services\StackFrameImport.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageFileTypes.cs" Link="Services\ImageFileTypes.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\NaturalStringComparer.cs" Link="Services\NaturalStringComparer.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\WindowLifetimeRegistry.cs" Link="Services\WindowLifetimeRegistry.cs" />
@@ -116,6 +117,7 @@
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationPreparationService.cs" Link="Services\CalibrationPreparationService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationCachePaths.cs" Link="Services\CalibrationCachePaths.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationService.cs" Link="Services\CalibrationService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\CalibrationMasterExport.cs" Link="Services\CalibrationMasterExport.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationMatchingService.cs" Link="Services\CalibrationMatchingService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackCheckpointWriter.cs" Link="Services\ImageStackCheckpointWriter.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageStackExportSnapshot.cs" Link="Services\ImageStackExportSnapshot.cs" />
