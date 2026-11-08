@@ -1,8 +1,8 @@
 # Expanded mosaic stacking
 
-Expanded stacking shipped in Windows 0.8.6. The development branch follows
-[Mac #96's simplified setup](MAC-PR-96-PARITY.md), using the existing published
-Seiza/C ABI 0.48.0 and stacking 0.55.0 dependencies. The older screenshots below
+Expanded stacking shipped in Windows 0.8.6. Windows 0.9.3 follows
+[Mac #96's simplified setup](MAC-PR-96-PARITY.md), using published
+Seiza/C ABI 0.49.0 and stacking 0.57.0 dependencies. The older screenshots below
 record the 0.8.8 layout; see the UI guide for the current tab and action names.
 
 ## GPU preference

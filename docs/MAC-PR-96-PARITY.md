@@ -1,10 +1,9 @@
 # Mac #96: simpler stacking setup
 
-The Windows development branch follows merged [Mac PR #96](https://github.com/theatrus/seiza-mac/pull/96),
-reviewed at `b1e31749440e585302b5a5d4c91bfe11252e0992`. These UI changes are not
-in the published Windows 0.9.2 installer. The review is integrated with current
-main: published Seiza/C ABI 0.49.0, calibration 0.12.1 and stacking 0.57.0.
-This UI PR keeps that dependency set and the product version unchanged.
+Windows 0.9.3 follows merged [Mac PR #96](https://github.com/theatrus/seiza-mac/pull/96),
+reviewed at `b1e31749440e585302b5a5d4c91bfe11252e0992`. It uses published
+Seiza/C ABI 0.49.0, calibration 0.12.1 and stacking 0.57.0, with direct imports
+and standalone calibration-master building.
 
 ## Start directly from Stack
 

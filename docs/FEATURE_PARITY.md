@@ -30,9 +30,9 @@ test exist.
 | **Planned** | No usable Windows implementation yet. |
 | **Deferred** | Intentionally outside the first parity release. |
 
-## Seiza 0.48 image I/O adoption (development branch)
+## Seiza 0.48 image I/O adoption
 
-The image I/O adoption landed with published Seiza 0.48.0 crates; current main
+The image I/O adoption landed with published Seiza 0.48.0 crates; Windows 0.9.3
 uses published 0.49.0 crates, with no temporary Git pin.
 Shared header and bounded window reads, cache invalidation, header-first filter
 identity and Windows junction handling have native-backed application tests.
@@ -41,7 +41,7 @@ interactive validation remains **Partial** from the earlier audit; this stacking
 UI review does not re-audit those controls. See the
 [adoption guide](IMAGE-IO-048.md) for behavior, dependency provenance and limits.
 
-## Mac #96 stacking UI parity (development branch)
+## Mac #96 stacking UI parity (Windows 0.9.3)
 
 [Mac #96](https://github.com/theatrus/seiza-mac/pull/96) is followed by Windows'
 File → Stack images command, compact Stack summary and calibration progress,

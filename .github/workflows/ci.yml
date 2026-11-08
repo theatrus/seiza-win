@@ -1,10 +1,5 @@
 name: CI
 
-# GitHub-hosted CI is the default while tfinfra's Windows pool is disabled.
-# Opt in with SEIZA_SELF_HOSTED_WINDOWS_CI=true only after enabling that pool.
-# Fork PRs (including missing head metadata) always use GitHub-hosted runners.
-# Release builds and signing keep their existing GitHub-hosted runners.
-
 on:
   push:
     branches: [main]
@@ -19,7 +14,7 @@ concurrency:
 
 jobs:
   windows:
-    runs-on: ${{ vars.SEIZA_SELF_HOSTED_WINDOWS_CI == 'true' && (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && fromJSON('["self-hosted","windows","ghr-windows-x64"]') || 'windows-latest' }}
+    runs-on: windows-latest
     env:
       DOTNET_CLI_TELEMETRY_OPTOUT: 1
       DOTNET_NOLOGO: true
@@ -63,13 +58,13 @@ jobs:
       # which is the budget releases depend on. Authenticode is applied by
       # release.yml alone.
       - name: Build all-users MSI
-        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.9.2
+        run: dotnet build packaging\windows\Seiza.App.wixproj -c Release -p:SeizaVersion=0.9.3
 
       - name: Test native loading without the VC++ runtime
-        run: .\.github\scripts\test-windows-native-loader.ps1 -Directory .\artifacts\publish\win-x64 -Msi .\dist\seiza-0.9.2-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-native-loader.ps1 -Directory .\artifacts\publish\win-x64 -Msi .\dist\seiza-0.9.3-windows-x86_64.msi
 
       - name: Verify installer Finish launch action
-        run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi .\dist\seiza-0.9.2-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi .\dist\seiza-0.9.3-windows-x86_64.msi
 
       - name: Upload Windows installer
         uses: actions/upload-artifact@v7
@@ -79,7 +74,7 @@ jobs:
           if-no-files-found: error
 
       - name: Smoke-test Windows installer
-        run: .\.github\scripts\test-windows-installer.ps1 -Msi .\dist\seiza-0.9.2-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-installer.ps1 -Msi .\dist\seiza-0.9.3-windows-x86_64.msi
 
       - name: Reject upgrades when the previous uninstall fails
-        run: .\.github\scripts\test-windows-installer-upgrade.ps1 -Msi .\dist\seiza-0.9.2-windows-x86_64.msi
+        run: .\.github\scripts\test-windows-installer-upgrade.ps1 -Msi .\dist\seiza-0.9.3-windows-x86_64.msi

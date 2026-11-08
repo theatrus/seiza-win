@@ -8,9 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.9.2 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.2/seiza-0.9.2-windows-x86_64.msi)
-· [0.9.2 release notes](docs/releases/v0.9.2.md)
-· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.2/SHA256SUMS.txt)
+[Download Seiza for Windows 0.9.3 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.3/seiza-0.9.3-windows-x86_64.msi)
+· [0.9.3 release notes](docs/releases/v0.9.3.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.3/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -34,9 +34,12 @@ or explicitly choose a different incomplete-light policy. Frame selection,
 references, matching and processing controls remain available on the other tabs
 and in collapsed sections. These are settings, not required steps.
 
-The File menu and simplified Stack tab are on this development branch; the
-published 0.9.1 release uses the toolbar's **Stack** command. See the
-[stacking UI guide](docs/MAC-PR-96-PARITY.md) for the current layout.
+See the [stacking UI guide](docs/MAC-PR-96-PARITY.md) for the layout and
+processing controls. Choose **File → Build calibration masters…** or
+**Build masters…** in the toolbar to prepare calibration masters independently
+of a light stack.
+
+![Stack summary with automatic calibration matching](docs/images/mac96-stack-summary.jpg)
 
 ## Features
 
@@ -113,8 +116,22 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.9.2 uses Seiza/C ABI 0.48.0, stacking 0.55.0, parallax
-0.19.6 and image-io 0.12.0 from published crates.
+0.9.3 uses Seiza/C ABI 0.49.0, stacking 0.57.0, parallax
+0.20.0 and image-io 0.13.0 from published crates.
+
+## New in 0.9.3
+
+- Start stacking or build calibration masters from an empty viewer. Add images,
+  folders, or TXT/CSV lists directly in either workflow.
+- Use a compact Stack summary with automatic calibration matching. Review matches
+  when needed; reference settings and memory limits are in Processing.
+- Build bias, dark/dark-flat, and flat masters in a separate window, with
+  cancellation and source-file protection.
+- Use the published Seiza 0.49 imaging core and updated FITS, XISF, image I/O,
+  stacking and parallax libraries.
+
+The self-contained installer retains the runtime and upgrade fixes from 0.9.2.
+See the [0.9.3 release notes](docs/releases/v0.9.3.md).
 
 ## New in 0.9.2
 
@@ -789,8 +806,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.9.2 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.2/seiza-0.9.2-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.2/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.9.3 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.3/seiza-0.9.3-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.3/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -856,7 +873,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.2
+  -p:SeizaVersion=0.9.3
 ```
 
 The installer is written to `dist`. See the
