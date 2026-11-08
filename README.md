@@ -19,8 +19,9 @@ a WinUI 3 interface and GPU-backed viewport with the shared
 
 ## Start a stack
 
-1. Open a folder of FITS/XISF exposures, then choose **File → Stack images…**
-   or **Stack…** in the toolbar. TXT/CSV image lists work too.
+1. Choose **File → Stack images…** or **Stack…** in the toolbar. Use **Add frames**
+   to choose FITS/XISF images, a folder, or a TXT/CSV image list. An open collection
+   prefills the inputs.
 2. On **Stack**, keep **Fixed reference** for one field, or choose
    **Expanded mosaic** for overlapping fields. Lights are selected for you;
    calibration files in a mixed collection are matched automatically.

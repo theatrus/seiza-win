@@ -53,6 +53,10 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         _useGpuSetting = useGpuSetting ?? (() => CatalogSettingsStore.LoadUseGpuForStacking());
         _gpuMemorySetting = gpuMemorySetting ?? (() => CatalogSettingsStore.LoadStackingGpuMemoryMib());
         InitializeComponent();
+        // Use model doubles rather than single-precision XAML literals.
+        var defaults = new ImageStackOptions();
+        DriftFractionBox.Value = defaults.MaximumDriftFraction;
+        MinimumOverlapBox.Value = defaults.MinimumOverlap;
         BuildSetupTabs();
         GradedCalibrationHost.Children.Add(_graded);
         GradedCalibrationHost.Children.Add(_graded.SettingsView);
@@ -60,7 +64,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         _graded.ReviewRequested += (_, _) => _setupTabs.SelectedIndex = 3;
         _graded.ReturnToStackRequested += (_, _) => _setupTabs.SelectedIndex = 0;
         _browserRoot = browserRoot;
-        MinimumWeightBox.Value = new ImageStackOptions().MinimumWeight;
+        MinimumWeightBox.Value = defaults.MinimumWeight;
         SharedAlignmentToggle.IsEnabled = StackingCoreCapabilities.Current.SupportsReferenceImage;
         _sharedAlignmentHint = StackingCoreCapabilities.Current.SupportsReferenceImage
             ? StackingCoreCapabilities.Current.SupportsReferenceImageCandidates
@@ -397,7 +401,9 @@ public sealed partial class ImageStackWindow : Window, IDisposable
         LightCountText.Text = _routing ? "Light frames: reading images…" : $"Light frames: {selected.Count} of {_frames.Length} selected";
         SourceFoldersText.Text = string.Join(Environment.NewLine, _frames.Select(frame => Path.GetDirectoryName(frame.Path)).Distinct(StringComparer.OrdinalIgnoreCase));
         SourceFoldersExpander.Visibility = _frames.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
-        OutputCountText.Text = $"Output files: {_groups.Count} FITS {(_groups.Count == 1 ? "file" : "files")}";
+        int outputCount = _groups.Count(group => group.Inputs.Count > 0);
+        OutputCountText.Text = outputCount == 0 ? "Planned outputs: none" :
+            $"Planned outputs: {outputCount} FITS {(outputCount == 1 ? "file" : "files")}";
         SplitOutputPanel.Visibility = SplitsOutput ? Visibility.Visible : Visibility.Collapsed;
         BuildReferenceControls();
         UpdateOptionsAndValidation();

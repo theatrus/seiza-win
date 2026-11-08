@@ -32,12 +32,13 @@ test exist.
 
 ## Seiza 0.48 image I/O adoption (development branch)
 
-The app now uses published Seiza 0.48.0 crates, with no temporary Git pin.
+The image I/O adoption landed with published Seiza 0.48.0 crates; current main
+uses published 0.49.0 crates, with no temporary Git pin.
 Shared header and bounded window reads, cache invalidation, header-first filter
 identity and Windows junction handling have native-backed application tests.
 Browser regrouping and Inspector source-pixel controls are implemented; their
-interactive validation remains **Partial** because the desktop helper returned
-an access-denied error before launching the isolated UI probe. See the
+interactive validation remains **Partial** from the earlier audit; this stacking
+UI review does not re-audit those controls. See the
 [adoption guide](IMAGE-IO-048.md) for behavior, dependency provenance and limits.
 
 ## Mac #96 stacking UI parity (development branch)

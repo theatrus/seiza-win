@@ -2,14 +2,16 @@
 
 The Windows development branch follows merged [Mac PR #96](https://github.com/theatrus/seiza-mac/pull/96),
 reviewed at `b1e31749440e585302b5a5d4c91bfe11252e0992`. These UI changes are not
-in the published Windows 0.9.1 installer. Core dependencies and product version
-are unchanged: published Seiza/C ABI 0.48.0, calibration 0.11.0 and stacking 0.55.0.
+in the published Windows 0.9.2 installer. The review is integrated with current
+main: published Seiza/C ABI 0.49.0, calibration 0.12.1 and stacking 0.57.0.
+This UI PR keeps that dependency set and the product version unchanged.
 
 ## Start directly from Stack
 
-1. Open a folder or TXT/CSV image list, then choose **File → Stack images…** or
-   **Stack…** in the toolbar. Both commands reuse the current document's setup
-   window. Raster-only collections cannot start an astronomy stack.
+1. Choose **File → Stack images…** or **Stack…** in the toolbar. Use **Add frames**
+   to choose images, a folder, or a TXT/CSV image list, or use a prefilled open
+   collection. Both commands reuse the current document's setup window. Only
+   FITS/XISF files become stack inputs; a raster viewer can open an empty setup.
 2. Keep **Fixed reference** for repeated exposures of one field, or choose
    **Expanded mosaic** for overlapping fields. All detected lights are selected.
    Mixed collections provide calibration files and start matching automatically.
@@ -22,6 +24,12 @@ frame and matched-light counts, warnings, and **Review matches**. Source folders
 import notes, individual lights and sky panels start collapsed. Splitting controls
 appear when multiple filters are detected; header filters still take precedence
 over filename guesses.
+
+The review preserves current main's direct imports and standalone **Build
+masters** workflow. File → Build calibration masters opens the same master
+window as the toolbar. Added frames update counts and source folders; import
+errors and cancellation messages expand immediately instead of staying hidden
+inside collapsed import notes.
 
 ## Detailed controls
 
@@ -46,16 +54,30 @@ unchanged.
 
 ## Validation
 
-- 875 managed tests passed, including readiness checks for complete matching,
+- 888 managed tests passed, including readiness checks for complete matching,
   Stop/Keep/Exclude, separate outputs, and unreviewed/stale coverage.
-- Release app publish and solution build succeeded; final build results are
-  recorded in the pull request. The solution build has zero warnings/errors.
-- Interactive validation and current screenshots are unavailable: the Windows
-  computer-use helper returned `GetCursorPos: Access is denied (0x80070005)` on
-  launch and retry. The published preview was then started as a development
-  process and created its Seiza window without exiting. The helper also refused
-  to bind that window, reporting an owner-identity mismatch on refresh/retry.
-  This establishes startup only: no manual fixed/expanded stack or visual-layout
-  pass is claimed. Older #92 screenshots describe the previous UI.
+- Release solution build passed with zero warnings/errors. Self-contained
+  publishing passed, and the native DLL runtime audit passed. The Windows
+  graphics suite passed 96 tests with four existing optional-data/encoder skips;
+  the first local run stalled and the bounded diagnostic rerun passed.
+- Interactive review on 2026-11-08 used twelve generated 256 × 256 FITS fixtures:
+  three lights plus three each of bias, dark and flat frames. The empty setup,
+  File/toolbar entry points, Add frames choices, automatic 3-of-3 matching,
+  Review matches → Done, reference defaults, fixed/expanded modes, registration
+  and memory limits, Select all/Deselect all, cancellation and the standalone
+  master-window menu entry were checked in the running app.
+- The review host uses the same C#/XAML/native code with `AssemblyName=Seiza.Review`
+  to avoid the computer-use helper confusing the preview with the installed
+  `Seiza.App.exe`. The normal production-name publish also succeeded.
+- Picker-driven import completion and a manual end-to-end fixed/expanded stack
+  are not claimed. The system folder picker opened, but the helper could not
+  target its separate `PickerHost.exe` window. Native and managed integration
+  tests cover the underlying import, calibration and stacking services.
 
-Local validation logs and the preview build are under ignored `artifacts/mac96-*`.
+The bounded screenshots below show the reviewed UI with generated test inputs;
+source folder paths remain collapsed. Local logs, fixtures and preview builds
+are in ignored `artifacts/pr-review-2026-11-08`.
+
+![Stack summary after matching three lights with nine calibration frames](images/mac96-stack-summary.jpg)
+
+![Processing page with registration references and integration settings](images/mac96-processing.jpg)
