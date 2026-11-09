@@ -8,9 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.9.3 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.3/seiza-0.9.3-windows-x86_64.msi)
-· [0.9.3 release notes](docs/releases/v0.9.3.md)
-· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.3/SHA256SUMS.txt)
+[Download Seiza for Windows 0.9.4 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.4/seiza-0.9.4-windows-x86_64.msi)
+· [0.9.4 release notes](docs/releases/v0.9.4.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.4/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -116,8 +116,20 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.9.3 uses Seiza/C ABI 0.49.0, stacking 0.57.0, parallax
-0.20.0 and image-io 0.13.0 from published crates.
+0.9.4 uses Seiza/C ABI 0.50.0, stacking 0.58.0, parallax
+0.20.1 and image-io 0.13.1 from published crates.
+
+## New in 0.9.4
+
+- Build dark masters with more robust rejection across exposures. Calibration
+  matching prefers usable raw flats when an external master exceeds the flat
+  age limit.
+- Improve photometric gain measurements with seeing-scaled apertures and reduce
+  the influence of stars on local background estimates.
+- Validate compressed FITS tiles and bound XISF header parsing. Protect stack
+  inputs and calibration masters when an output path is a hard link to a source.
+
+See the [0.9.4 release notes](docs/releases/v0.9.4.md).
 
 ## New in 0.9.3
 
@@ -806,8 +818,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.9.3 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.3/seiza-0.9.3-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.3/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.9.4 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.4/seiza-0.9.4-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.4/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -873,7 +885,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.3
+  -p:SeizaVersion=0.9.4
 ```
 
 The installer is written to `dist`. See the

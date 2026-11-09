@@ -30,7 +30,7 @@ Build the installer from the repository root:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.3
+  -p:SeizaVersion=0.9.4
 ```
 
 `build-rust.ps1` uses an explicit `x86_64-pc-windows-msvc` target and
@@ -53,12 +53,12 @@ work in two:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.3 `
+  -p:SeizaVersion=0.9.4 `
   -t:PublishSeizaApp
 # sign artifacts\publish\win-x64 here
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.3 `
+  -p:SeizaVersion=0.9.4 `
   -p:SeizaSkipPublish=true
 ```
 
@@ -84,7 +84,7 @@ Run the same check locally after packaging:
 ```powershell
 .\.github\scripts\test-windows-native-loader.ps1 `
   -Directory .\artifacts\publish\win-x64 `
-  -Msi .\dist\seiza-0.9.3-windows-x86_64.msi
+  -Msi .\dist\seiza-0.9.4-windows-x86_64.msi
 ```
 
 The interactive installer's selected-by-default **Launch Seiza** option uses
@@ -109,7 +109,7 @@ validation:
 
 ```powershell
 .\.github\scripts\test-windows-installer.ps1 `
-  -Msi .\dist\seiza-0.9.3-windows-x86_64.msi
+  -Msi .\dist\seiza-0.9.4-windows-x86_64.msi
 ```
 
 Tagged releases use `.github/workflows/release.yml` to build and smoke-test

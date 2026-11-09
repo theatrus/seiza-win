@@ -35,9 +35,24 @@ if ($LASTEXITCODE -ne 0) {
     throw "Cargo metadata failed with exit code $LASTEXITCODE."
 }
 
-$metadata = $metadataJson | ConvertFrom-Json
+# Cargo includes arbitrary package metadata, including case-distinct keys.
+# Read only the package fields we need with a parser that also works in Windows PowerShell.
+Add-Type -AssemblyName System.Runtime.Serialization
+$metadataBytes = [System.Text.Encoding]::UTF8.GetBytes(($metadataJson -join "`n"))
+$reader = [System.Runtime.Serialization.Json.JsonReaderWriterFactory]::CreateJsonReader(
+    $metadataBytes, [System.Xml.XmlDictionaryReaderQuotas]::Max)
+$metadata = [System.Xml.XmlDocument]::new()
+try { $metadata.Load($reader) } finally { $reader.Dispose() }
+$packages = foreach ($package in $metadata.SelectNodes('/root/packages/item')) {
+    [pscustomobject]@{
+        name = $package.SelectSingleNode('name').InnerText
+        source = $package.SelectSingleNode('source').InnerText
+        version = $package.SelectSingleNode('version').InnerText
+        manifest_path = $package.SelectSingleNode('manifest_path').InnerText
+    }
+}
 $nativePackages = @(
-    $metadata.packages | Where-Object {
+    $packages | Where-Object {
         $_.name -eq "seiza-cabi" -and
         $_.source -like "registry+*"
     }
@@ -48,7 +63,7 @@ if ($nativePackages.Count -ne 1) {
 
 $nativePackage = $nativePackages[0]
 $stackingPackages = @(
-    $metadata.packages | Where-Object {
+    $packages | Where-Object {
         $_.name -eq "seiza-stacking" -and
         $_.source -like "registry+*"
     }
@@ -58,7 +73,7 @@ if ($stackingPackages.Count -ne 1) {
 }
 $stackingPackage = $stackingPackages[0]
 $parallaxPackages = @(
-    $metadata.packages | Where-Object {
+    $packages | Where-Object {
         $_.name -eq "seiza-parallax" -and
         $_.source -like "registry+*"
     }
@@ -83,21 +98,24 @@ $releaseFlag = if ($Configuration -eq "Release") { " --release" } else { "" }
 $nativePackageSpec = "seiza-cabi@$($nativePackage.version)"
 $workspaceNativeBuildCommand = "cargo build --package $nativePackageSpec --target-dir `"$targetDirectory`" --locked$releaseFlag$runtimeFlags"
 if ($Test) {
-    # The 0.47.0 C ABI archive refers to sibling calibration fixtures. Stage
-    # the unchanged published crate and fixtures from the matching published
-    # calibration archive; never write into Cargo's registry cache or fetch a
-    # moving branch. The production DLL is still built from the app lock below.
-    $nativeTestManifest = $nativePackage.manifest_path
-    $calibrationPackages = @($metadata.packages | Where-Object {
+    # Stage the published C ABI and its sibling fixtures outside the registry cache.
+    $calibrationPackages = @($packages | Where-Object {
         $_.name -eq "seiza-calibration" -and $_.source -like "registry+*"
     })
     if ($calibrationPackages.Count -ne 1) {
         throw "Expected exactly one published calibration package for native test fixtures."
     }
+    $modelPackages = @($packages | Where-Object {
+        $_.name -eq "seiza-model" -and $_.source -like "registry+*"
+    })
+    if ($modelPackages.Count -ne 1) {
+        throw "Expected exactly one published model package for native test fixtures."
+    }
     . (Join-Path $PSScriptRoot "native-test-manifest.ps1")
     $nativeTestManifest = Get-SeizaNativeTestManifest `
         -NativeManifest $nativePackage.manifest_path `
         -CalibrationManifest $calibrationPackages[0].manifest_path `
+        -ModelManifest $modelPackages[0].manifest_path `
         -TargetDirectory $targetDirectory `
         -SourceRevision $resolvedRevision
     Write-Host "Testing published C ABI using $nativeTestManifest"
