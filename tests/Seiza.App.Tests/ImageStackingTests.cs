@@ -74,8 +74,21 @@ public sealed class ImageStackingTests
     {
         const string expected = "{\"registration\":{\"maximum_drift_pixels\":256,\"maximum_drift_fraction\":0.15},\"normalization\":{\"mode\":\"global\",\"options\":null},\"rejection\":{\"mode\":\"delta-sigma\",\"options\":{\"low_sigma\":3,\"high_sigma\":3,\"warmup_samples\":5,\"minimum_sigma\":1E-06}},\"acceptance\":{\"maximum_registration_rms_pixels\":2,\"minimum_overlap_fraction\":0.6}}";
 
-        Assert.Null(new ImageStackOptions().ValidationMessage);
-        Assert.Equal(expected, new ImageStackOptions().ToJson());
+        // Similarity was the default when those checkpoints were written, and
+        // is still spelled by leaving the model out.
+        var legacy = new ImageStackOptions { RegistrationModel = StackRegistrationModel.Similarity };
+        Assert.Null(legacy.ValidationMessage);
+        Assert.Equal(expected, legacy.ToJson());
+    }
+
+    [Fact]
+    public void DefaultOptionsRegisterByAQuadraticWarp()
+    {
+        var options = new ImageStackOptions();
+        Assert.Null(options.ValidationMessage);
+        Assert.Equal(StackRegistrationModel.Quadratic, options.RegistrationModel);
+        using JsonDocument document = JsonDocument.Parse(options.ToJson());
+        Assert.Equal("quadratic", document.RootElement.GetProperty("registration").GetProperty("model").GetString());
     }
 
     [Theory]
