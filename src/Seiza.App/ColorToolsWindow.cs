@@ -84,7 +84,7 @@ public sealed class ColorToolsWindow : Window, IDisposable
     public ColorToolsWindow()
     {
         Title = "Color tools — Seiza";
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        WindowIcon.Apply(AppWindow);
         RectInt32 workArea = DisplayArea.GetFromWindowId(AppWindow.Id, DisplayAreaFallback.Primary).WorkArea;
         AppWindow.Resize(new SizeInt32(Math.Min(1280, workArea.Width), Math.Min(1000, workArea.Height)));
         foreach (string title in new[] { "Narrowband HOO / SHO display", "Linear continuum subtraction",

@@ -31,7 +31,7 @@ internal sealed class CalibrationMasterWindow : Window
     {
         Title = "Build calibration masters";
         SystemBackdrop = new Microsoft.UI.Xaml.Media.MicaBackdrop();
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        WindowIcon.Apply(AppWindow);
         _sourcePaths = paths.Where(ImageFileService.IsStackableImage).Distinct(StringComparer.OrdinalIgnoreCase).ToArray();
         var root = new Grid { Padding = new Thickness(24), RowSpacing = 16 };
         root.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });

@@ -38,6 +38,7 @@ internal sealed class ParallaxDustEditorDialog : ContentDialog
     {
         _model = new(opacity, width, height); _owner = owner.Content as FrameworkElement;
         XamlRoot = owner; Title = "Paint dust map"; PrimaryButtonText = "Apply"; CloseButtonText = "Cancel";
+        TitleTemplate = (DataTemplate)Application.Current.Resources["SeizaDialogTitleTemplate"];
         DefaultButton = ContentDialogButton.None; IsPrimaryButtonEnabled = false;
         Resources["ContentDialogMaxWidth"] = 760d;
         var sourceBitmap = new WriteableBitmap(source.Width, source.Height);

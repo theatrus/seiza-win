@@ -34,8 +34,8 @@ session. Both preferences persist immediately and across app restarts.
 
 ## Stack selected lights on an expanding canvas
 
-1. Open images, a directory, or a TXT/CSV image list and choose **File → Stack images…**
-   or **Stack…** in the toolbar.
+1. Open images, a directory, or a TXT/CSV image list and choose **Stack…**
+   in the toolbar.
 2. On **Stack**, choose **Stacking mode → Expanded mosaic**. Automatic calibration
    matching starts for mixed collections. No sky-panel analysis or review approval
    is required when calibration is complete.

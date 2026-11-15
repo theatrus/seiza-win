@@ -8,9 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.9.4 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.4/seiza-0.9.4-windows-x86_64.msi)
-· [0.9.4 release notes](docs/releases/v0.9.4.md)
-· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.4/SHA256SUMS.txt)
+[Download Seiza for Windows 0.9.5 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.5/seiza-0.9.5-windows-x86_64.msi)
+· [0.9.5 release notes](docs/releases/v0.9.5.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.5/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -19,7 +19,7 @@ a WinUI 3 interface and GPU-backed viewport with the shared
 
 ## Start a stack
 
-1. Choose **File → Stack images…** or **Stack…** in the toolbar. Use **Add frames**
+1. Choose **Stack…** in the toolbar. Use **Add frames**
    to choose FITS/XISF images, a folder, or a TXT/CSV image list. An open collection
    prefills the inputs.
 2. On **Stack**, keep **Fixed reference** for one field, or choose
@@ -35,9 +35,8 @@ references, matching and processing controls remain available on the other tabs
 and in collapsed sections. These are settings, not required steps.
 
 See the [stacking UI guide](docs/MAC-PR-96-PARITY.md) for the layout and
-processing controls. Choose **File → Build calibration masters…** or
-**Build masters…** in the toolbar to prepare calibration masters independently
-of a light stack.
+processing controls. Choose **Build masters** in the toolbar to prepare
+calibration masters independently of a light stack.
 
 ![Stack summary with automatic calibration matching](docs/images/mac96-stack-summary.jpg)
 
@@ -46,11 +45,35 @@ of a light stack.
 - **[Parallax videos and tours](#parallax-videos-and-tours)** — Turn an astrophoto into a depth-aware camera tour with painted dust and title cards, then export video or lossless PNG frames.
 - **[Image viewing and folder review](#image-viewing-and-folder-review)** — Browse nested capture folders with collapsible path, filter or file-type groups, cached thumbnails and fast previews.
 - **[Stretch and image processing](#stretch-and-image-processing)** — Build live stretch recipes, correct backgrounds, and apply light deconvolution.
+- **[AI Models](#ai-models)** — Restore a linear stack with a Seiza noise model and control how much grain and mottle to reduce.
 - **[Directory and live stacking](#directory-image-stacking)** — Align and combine selected frames or [watch a capture folder](#live-folder-stacking), with calibration, shared-reference alignment, and resumable sessions.
 - **[Plate solving and sky overlays](#plate-solving-and-sky-overlays)** — Solve locally, identify stars and deep-sky objects, and export WCS solutions.
 - **[Star and tilt measurement](#star-and-sensor-tilt-analysis)** — Measure stellar quality and sensor tilt, with optional parallelogram and triangle diagrams.
 - **[Catalogs and distance data](#catalogs-and-distance-data)** — Download and verify solver catalogs and offline parallax distances from native controls.
 - **[Image export and Explorer integration](#image-export-and-explorer-integration)** — Save full-size images with overlays and preview FITS/XISF files in Windows Explorer.
+
+## AI Models
+
+Open a linear mono or RGB FITS or XISF stack and choose **AI Models…**
+from the toolbar's **More options** menu. Seiza checks the model catalog and
+automatically installs the recommended model and ONNX Runtime as needed.
+Installed models work offline. Under **Advanced processing**, choose a
+different model from the catalog, check for updates, or import a local model
+folder containing `card.json` and its graphs. Seiza downloads the selected
+model if needed. The bundled Windows runtime enables DirectML when the model
+supports it. In **Advanced processing**, choose **DirectML** and enter a DXGI
+adapter index to select a particular GPU. Set `SEIZA_ONNXRUNTIME` to use a
+different runtime DLL before launching Seiza.
+
+Choose **Preview center** to run the model on the center crop. Compare with
+**Original**, then adjust **Grain reduction** and **Mottle reduction**.
+**Update preview** applies the new amounts to the existing center result.
+**Advanced processing** exposes the backend, precision, tile size, and the
+scale that splits fine grain from wider mottle. **Save full FITS…** runs the
+model across the full image and writes a linear FITS with the source geometry
+and model provenance. It is also available before previewing.
+
+![AI Models with advanced controls and a completed DirectML center preview](docs/images/ai-models-directml.png)
 
 ## Parallax videos and tours
 
@@ -116,8 +139,22 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.9.4 uses Seiza/C ABI 0.50.0, stacking 0.58.0, parallax
-0.20.1 and image-io 0.13.1 from published crates.
+0.9.5 uses Seiza/C ABI 0.53.0, stacking 0.61.0, parallax
+0.23.0 and image-io 0.13.1 from published crates.
+
+## New in 0.9.5
+
+- Restore linear FITS and XISF stacks from **AI Models…** in the toolbar.
+  Seiza installs the recommended model automatically and checks for updates
+  from **Advanced processing**.
+- Preview the center tiles, adjust grain and mottle reduction, and save a
+  full-resolution linear FITS with WCS and model provenance.
+- Run models on Windows GPUs through the bundled DirectML runtime. Advanced
+  settings allow an explicit adapter, precision, tile size, or band scale.
+- Keep image commands in the toolbar and add the Seiza icon to dialog titles.
+- Use Quadratic registration by default for new stacks.
+
+See the [0.9.5 release notes](docs/releases/v0.9.5.md).
 
 ## New in 0.9.4
 
@@ -662,8 +699,8 @@ use a master bias. Flats require a master bias or an uncalibrated master
 dark-flat matching their exposure. Masters are saved as FITS images without
 star alignment, and no light stack is started.
 
-Choose **File → Stack images…** or the toolbar's
-**Stack…**. Add frames, or use the prefilled collection. Start directly from Stack after automatic matching completes. Expand
+Choose **Stack…** in the toolbar. Add frames or use the prefilled collection.
+Start directly from Stack after automatic matching completes. Expand
 **Light frames** to exclude exposures. **Processing → Registration reference**
 contains reference selection; its first selected light remains the default.
 When headers or filenames identify multiple filters, separate outputs are enabled
@@ -818,8 +855,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.9.4 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.4/seiza-0.9.4-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.4/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.9.5 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.5/seiza-0.9.5-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.5/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -885,7 +922,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.4
+  -p:SeizaVersion=0.9.5
 ```
 
 The installer is written to `dist`. See the

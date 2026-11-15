@@ -59,7 +59,7 @@ public sealed partial class ParallaxWindow : Window, IDisposable
         InitializeComponent();
         _windowSizing = new(WindowHandle, 980, 680);
         Title = $"Parallax Video — {session.SourceName}";
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        WindowIcon.Apply(AppWindow);
         SourceNameText.Text = session.SourceName;
         _sequenceFolderName = Path.GetFileNameWithoutExtension(session.SourceName) + "-frames";
         ContentRoot.Loaded += ContentRoot_Loaded;

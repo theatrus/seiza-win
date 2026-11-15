@@ -86,6 +86,21 @@ internal static class CatalogSettingsStore
         lock (SyncRoot) return LoadSettings(path).UseGpuForStacking;
     }
 
+    internal static string? LoadPreferredNoiseModel()
+    {
+        lock (SyncRoot) return LoadSettings().PreferredNoiseModel;
+    }
+
+    internal static void SavePreferredNoiseModel(string? name)
+    {
+        lock (SyncRoot)
+        {
+            Settings current = LoadSettings();
+            if (current.PreferredNoiseModel != name)
+                SaveSettings(current with { PreferredNoiseModel = name });
+        }
+    }
+
     public static void SaveUseGpuForStacking(bool value, string? path = null)
     {
         lock (SyncRoot)
@@ -180,6 +195,7 @@ internal static class CatalogSettingsStore
         public string BrowserGrouping { get; init; } = "Folder";
         public bool UseGpuForStacking { get; init; } = true;
         public int? StackingGpuMemoryMib { get; init; }
+        public string? PreferredNoiseModel { get; init; }
 
         public bool AutomaticallyCheckForUpdates { get; init; } = true;
 

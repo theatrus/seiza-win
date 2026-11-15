@@ -90,7 +90,7 @@ public sealed partial class ImageStackWindow : Window, IDisposable
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(StackTitleBar);
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        WindowIcon.Apply(AppWindow);
         AppWindow.IsShownInSwitchers = false;
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {

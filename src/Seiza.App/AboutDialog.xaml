@@ -5,7 +5,8 @@
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     CloseButtonText="Close"
     DefaultButton="Close"
-    Title="About Seiza">
+    Title="About Seiza"
+    TitleTemplate="{StaticResource SeizaDialogTitleTemplate}">
 
     <StackPanel MinWidth="380" MaxWidth="480" Spacing="20">
         <StackPanel Orientation="Horizontal" Spacing="16">

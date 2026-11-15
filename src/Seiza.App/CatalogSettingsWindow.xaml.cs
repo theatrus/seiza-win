@@ -26,7 +26,7 @@ public sealed partial class CatalogSettingsWindow : Window
 
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(SettingsTitleBar);
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        WindowIcon.Apply(AppWindow);
 
         ViewModel.PropertyChanged += ViewModel_PropertyChanged;
         ContentRoot.Loaded += ContentRoot_Loaded;

@@ -22,19 +22,6 @@
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <StackPanel>
-        <MenuBar>
-            <MenuBarItem Title="File" AccessKey="F">
-                <MenuFlyoutItem Text="Open image…" Click="OpenImage_Click" />
-                <MenuFlyoutItem Text="Open folder…" Click="OpenFolder_Click" />
-                <MenuFlyoutItem Text="Open image list…" Click="OpenImageList_Click" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem x:Name="StackImagesMenuItem" Text="Stack images…" Click="StackImages_Click" IsEnabled="False" />
-                <MenuFlyoutItem x:Name="BuildMastersMenuItem" Text="Build calibration masters…" Click="BuildMasters_Click" IsEnabled="False" />
-                <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="New window" Click="NewWindow_Click" />
-            </MenuBarItem>
-        </MenuBar>
         <CommandBar
             x:Name="Toolbar"
             DefaultLabelPosition="Right"
@@ -42,6 +29,8 @@
             <CommandBar.SecondaryCommands>
                 <AppBarButton Click="NewWindow_Click" Label="New window" />
                 <AppBarButton x:Name="ParallaxVideoButton" Click="ParallaxVideo_Click" Label="Parallax video…" IsEnabled="False" />
+                <AppBarButton Click="RestoreImage_Click" Label="AI Models…"
+                              ToolTipService.ToolTip="Restore a linear FITS or XISF stack with a Seiza noise model" />
                 <AppBarSeparator />
                 <AppBarButton Click="CheckForUpdates_Click" Label="Check for updates…" />
                 <AppBarSeparator />
@@ -370,7 +359,6 @@
                 <AppBarButton.Icon><FontIcon Glyph="&#xE790;" /></AppBarButton.Icon>
             </AppBarButton>
         </CommandBar>
-        </StackPanel>
 
         <SplitView
             x:Name="WorkspaceSplitView"

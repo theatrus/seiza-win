@@ -10,7 +10,21 @@
                 <XamlControlsResources xmlns="using:Microsoft.UI.Xaml.Controls" />
                 <!-- Other merged dictionaries here -->
             </ResourceDictionary.MergedDictionaries>
-            <!-- Other app resources here -->
+            <DataTemplate x:Key="SeizaDialogTitleTemplate">
+                <Grid ColumnSpacing="10">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Image Width="24" Height="24" VerticalAlignment="Center"
+                           Source="ms-appx:///Assets/AppIcon.ico" />
+                    <TextBlock Grid.Column="1" Text="{Binding}" TextWrapping="Wrap"
+                               Style="{ThemeResource TitleTextBlockStyle}" />
+                </Grid>
+            </DataTemplate>
+            <Style TargetType="ContentDialog">
+                <Setter Property="TitleTemplate" Value="{StaticResource SeizaDialogTitleTemplate}" />
+            </Style>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
