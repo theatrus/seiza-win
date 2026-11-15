@@ -1,5 +1,4 @@
 using System.Diagnostics;
-using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -17,7 +16,7 @@ internal sealed record InstalledNoiseModel(string Name, string Path, string Card
 internal sealed record PublishedNoiseModel(string Name, string CardHash);
 internal sealed record NoiseModelCatalog(string? Recommended, PublishedNoiseModel[] Models);
 internal sealed record RestorationProgress(string Message, double? Fraction = null);
-internal sealed record RestorationOptions(string? Backend, string? Precision, int? Tile);
+internal sealed record RestorationOptions(string? Backend, string? Precision, int? Tile, int? DeviceId);
 internal sealed record RestorationBands(double High, double Low, double Scale);
 internal sealed record RestorationPreview(RenderedImageData Original, RenderedImageData Restored, string Details);
 internal sealed record RestorationBackend(string Name, string Label)
@@ -27,23 +26,17 @@ internal sealed record RestorationBackend(string Name, string Label)
 
 internal static class RestorationService
 {
-    private const string ModelCatalogUrl = "https://downloads.seiza.fyi/models/v1/manifest.json";
     internal static readonly string DataDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Seiza", "Restoration");
     private static readonly string ModelDirectory = Path.Combine(DataDirectory, "Models");
     private static readonly string PreviousDirectory = Path.Combine(DataDirectory, "Previous model");
     private static readonly SemaphoreSlim StoreGate = new(1, 1);
-    private static readonly HttpClient CatalogClient = new() { Timeout = TimeSpan.FromSeconds(8) };
-
-    internal static async Task<NoiseModelCatalog> FetchCatalogAsync(CancellationToken token)
+    internal static Task<NoiseModelCatalog> FetchCatalogAsync(CancellationToken token) => Task.Run(() =>
     {
-        string json = await CatalogClient.GetStringAsync(ModelCatalogUrl, token).ConfigureAwait(false);
-        using JsonDocument document = JsonDocument.Parse(json);
+        using JsonDocument document = ReadModelResponse(NativeMethods.GetModelCatalog(null, out nint error), error);
         JsonElement manifest = document.RootElement;
         string? recommended = manifest.TryGetProperty("latest", out JsonElement latest) &&
             latest.TryGetProperty("denoise", out JsonElement denoise) ? denoise.GetString() : null;
-        // The catalog drives selection and update detection. Seiza verifies the
-        // manifest and bundle again through its downloader before installation.
         PublishedNoiseModel[] models = manifest.GetProperty("models").EnumerateArray()
             .Select(model => new PublishedNoiseModel(
                 model.GetProperty("name").GetString()!,
@@ -52,7 +45,7 @@ internal static class RestorationService
                     .GetProperty("sha256").GetString()!))
             .ToArray();
         return new NoiseModelCatalog(recommended, models);
-    }
+    }, token);
 
     internal static Task<IReadOnlyList<InstalledNoiseModel>> ListAsync() => InStoreAsync<IReadOnlyList<InstalledNoiseModel>>(() =>
     {
@@ -162,7 +155,7 @@ internal static class RestorationService
 
     private static unsafe JsonDocument DownloadModel(string? name, string staging, IProgress<RestorationProgress> progress)
     {
-        var context = GCHandle.Alloc(new CallbackState(progress, CancellationToken.None));
+        var context = GCHandle.Alloc(new CallbackState(progress));
         try
         {
             return ReadModelResponse(NativeMethods.DownloadModel(name, staging, null, &OnProgress,
@@ -174,20 +167,24 @@ internal static class RestorationService
     internal static Task<(string Version, RestorationBackend[] Backends)> BackendsAsync() => Task.Run(() =>
     {
         string runtime = RestorationRuntime.Load();
-        using JsonDocument document = ReadPlatform(NativeMethods.GetRestorationBackends(runtime, out nint error), error);
+        var options = new JsonObject { ["library"] = runtime };
+        using JsonDocument document = ReadModelResponse(NativeMethods.GetRestorationBackends(options.ToJsonString(), out nint error), error);
+        JsonElement library = document.RootElement.GetProperty("runtime");
+        if (library.ValueKind == JsonValueKind.Null) throw new SeizaCoreException("Seiza could not initialize ONNX Runtime.");
         var backends = document.RootElement.GetProperty("backends").EnumerateArray()
             .Where(backend => backend.GetProperty("unavailable").ValueKind == JsonValueKind.Null)
-            .Select(backend => backend.GetProperty("name").GetString()!)
+            .Select(backend => backend.GetProperty("backend").GetString()!)
             .Select(name => new RestorationBackend(name, name switch
             {
                 "cpu" => "CPU",
+                "directml" => "DirectML",
                 "cuda" => "NVIDIA CUDA",
                 "tensorrt" => "NVIDIA TensorRT",
                 "tensorrt-rtx" => "NVIDIA TensorRT for RTX",
                 "webgpu" => "WebGPU",
                 _ => name,
             })).ToArray();
-        return (document.RootElement.GetProperty("version").GetString()!, backends);
+        return (library.GetProperty("version").GetString()!, backends);
     });
 
     internal static Task<SafeRestorationHandle> RunPreviewAsync(string input, InstalledNoiseModel model,
@@ -201,22 +198,33 @@ internal static class RestorationService
         if (!ImageFileService.IsAstronomyImage(input)) throw new InvalidOperationException("Choose a linear FITS or XISF image.");
         string request = new JsonObject
         {
-            ["input"] = input, ["model"] = model.Path, ["library"] = RestorationRuntime.Load(),
+            ["library"] = RestorationRuntime.Load(),
             ["backend"] = options.Backend, ["precision"] = options.Precision, ["tile"] = options.Tile,
-            ["preview"] = preview,
+            ["deviceId"] = options.DeviceId,
         }.ToJsonString();
-        var context = GCHandle.Alloc(new CallbackState(progress, token));
+        progress.Report(new("Opening the model…"));
+        nint opened = NativeMethods.OpenNoiseModel(model.Path, request, out nint error);
+        if (opened == 0) throw NativeString.TakeError(error, "Could not open the model.");
+        using var nativeModel = new SafeNoiseModelHandle(opened);
+        token.ThrowIfCancellationRequested();
+
+        nint signal = NativeMethods.CreateCancelSignal();
+        if (signal == 0) throw new SeizaCoreException("Could not create the cancellation signal.");
+        using var cancellation = new SafeCancelSignalHandle(signal);
+        using var registration = token.UnsafeRegister(static value => ((SafeCancelSignalHandle)value!).Cancel(), cancellation);
+        var context = GCHandle.Alloc(new CallbackState(progress));
         try
         {
-            nint result = NativeMethods.RunRestoration(request, &OnProgress, &IsCancelled, GCHandle.ToIntPtr(context), out nint error);
+            nint result = NativeMethods.RunRestoration(nativeModel, input, preview, &OnInferenceProgress,
+                cancellation, GCHandle.ToIntPtr(context), out error);
             if (token.IsCancellationRequested)
             {
                 if (result != 0) NativeMethods.FreeRestoration(result);
-                if (error != 0) NativeMethods.FreeRestorationString(error);
+                if (error != 0) NativeMethods.FreeString(error);
                 token.ThrowIfCancellationRequested();
             }
-            if (result == 0) throw PlatformError(error);
-            if (error != 0) NativeMethods.FreeRestorationString(error);
+            if (result == 0) throw NativeString.TakeError(error, "Restoration failed.");
+            if (error != 0) NativeMethods.FreeString(error);
             return new SafeRestorationHandle(result);
         }
         finally { context.Free(); }
@@ -254,35 +262,12 @@ internal static class RestorationService
 
     private static string Blend(SafeRestorationHandle result, RestorationBands bands, string output, string? original = null)
     {
-        string request = new JsonObject
-        {
-            ["output"] = output, ["originalPreview"] = original,
-            ["high"] = bands.High, ["low"] = bands.Low, ["scalePx"] = bands.Scale,
-        }.ToJsonString();
-        using JsonDocument report = ReadPlatform(NativeMethods.BlendRestoration(result, request, out nint error), error);
+        using JsonDocument report = ReadModelResponse(NativeMethods.BlendRestoration(result, output, original,
+            (float)bands.High, (float)bands.Low, (float)bands.Scale, out nint error), error);
         JsonElement data = report.RootElement;
         string backend = data.GetProperty("backend").GetString()!;
-        return $"{(backend == "cpu" ? "CPU" : backend)} · {data.GetProperty("precision").GetString()} · {data.GetProperty("tile").GetInt32()} px tiles";
-    }
-
-    private static JsonDocument ReadPlatform(nint json, nint error)
-    {
-        try
-        {
-            if (json == 0) throw new SeizaCoreException(Marshal.PtrToStringUTF8(error) ?? "Restoration failed.");
-            return JsonDocument.Parse(Marshal.PtrToStringUTF8(json) ?? "null");
-        }
-        finally
-        {
-            if (json != 0) NativeMethods.FreeRestorationString(json);
-            if (error != 0) NativeMethods.FreeRestorationString(error);
-        }
-    }
-
-    private static SeizaCoreException PlatformError(nint error)
-    {
-        try { return new SeizaCoreException(Marshal.PtrToStringUTF8(error) ?? "Restoration failed."); }
-        finally { if (error != 0) NativeMethods.FreeRestorationString(error); }
+        string label = backend switch { "cpu" => "CPU", "directml" => "DirectML", _ => backend };
+        return $"{label} · {data.GetProperty("precision").GetString()} · {data.GetProperty("tile").GetInt32()} px tiles";
     }
 
     internal static void DeleteStagingDirectory(string path)
@@ -292,21 +277,27 @@ internal static class RestorationService
         catch (UnauthorizedAccessException) { }
     }
 
-    private sealed class CallbackState(IProgress<RestorationProgress> progress, CancellationToken token)
+    private sealed class CallbackState(IProgress<RestorationProgress> progress)
     {
         private long _lastUpdate;
-        internal CancellationToken Token => token;
+        private bool ShouldReport()
+        {
+            long now = Stopwatch.GetTimestamp();
+            if (Stopwatch.GetElapsedTime(_lastUpdate, now) < TimeSpan.FromMilliseconds(125)) return false;
+            _lastUpdate = now;
+            return true;
+        }
+
+        internal void ReportTile(nuint channel, nuint channels, nuint tile, nuint tiles)
+        {
+            if (ShouldReport())
+                progress.Report(new($"Channel {channel + 1} of {channels} · tile {tile} of {tiles}",
+                    ((double)channel + (double)tile / (double)tiles) / (double)channels));
+        }
 
         internal void Report(JsonElement value)
         {
-            long now = Stopwatch.GetTimestamp();
-            if (Stopwatch.GetElapsedTime(_lastUpdate, now) < TimeSpan.FromMilliseconds(125)) return;
-            _lastUpdate = now;
-            if (value.TryGetProperty("message", out JsonElement message))
-            {
-                progress.Report(new(message.GetString()!, value.TryGetProperty("fraction", out JsonElement fraction) ? fraction.GetDouble() : null));
-                return;
-            }
+            if (!ShouldReport()) return;
             switch (value.GetProperty("event").GetString())
             {
                 case "fetching-manifest": progress.Report(new("Checking the Seiza model catalog…")); break;
@@ -334,6 +325,13 @@ internal static class RestorationService
     }
 
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
-    private static byte IsCancelled(nint context) =>
-        ((CallbackState)GCHandle.FromIntPtr(context).Target!).Token.IsCancellationRequested ? (byte)1 : (byte)0;
+    private static void OnInferenceProgress(nuint channel, nuint channels, nuint tile, nuint tiles, nint context)
+    {
+        try
+        {
+            var state = (CallbackState)GCHandle.FromIntPtr(context).Target!;
+            state.ReportTile(channel, channels, tile, tiles);
+        }
+        catch (Exception) { /* Exceptions cannot cross the native callback. */ }
+    }
 }

@@ -17,13 +17,14 @@ internal static partial class RestorationRuntime
         "msvcp140.dll", "msvcp140_1.dll", "vcruntime140.dll", "vcruntime140_1.dll",
         "LICENSE-onnxruntime.txt", "ThirdPartyNotices-onnxruntime.txt"];
     private static readonly string DirectoryPath = Path.Combine(RestorationService.DataDirectory, "ONNX Runtime", Version);
+    private static readonly string BundledLibrary = Path.Combine(AppContext.BaseDirectory, "onnxruntime.dll");
     private static readonly HttpClient Client = new();
     private static readonly object LoadGate = new();
     private static string? _loadedPath;
 
     private static bool IsInstalled => Files.All(name => File.Exists(Path.Combine(DirectoryPath, name)));
     private static string? ConfiguredLibrary => Environment.GetEnvironmentVariable("SEIZA_ONNXRUNTIME");
-    internal static bool CanLoad => IsInstalled || !string.IsNullOrWhiteSpace(ConfiguredLibrary);
+    internal static bool CanLoad => File.Exists(BundledLibrary) || IsInstalled || !string.IsNullOrWhiteSpace(ConfiguredLibrary);
 
     internal static async Task InstallAsync(IProgress<RestorationProgress> progress, CancellationToken token)
     {
@@ -111,6 +112,10 @@ internal static partial class RestorationRuntime
             {
                 path = Path.GetFullPath(configured);
                 if (!File.Exists(path)) throw new FileNotFoundException("SEIZA_ONNXRUNTIME must point to an ONNX Runtime DLL.", path);
+            }
+            else if (File.Exists(BundledLibrary))
+            {
+                path = BundledLibrary;
             }
             else
             {

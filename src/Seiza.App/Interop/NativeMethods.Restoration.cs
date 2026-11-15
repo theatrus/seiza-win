@@ -5,10 +5,11 @@ namespace Seiza.App.Interop;
 
 internal static partial class NativeMethods
 {
-    private const string RestorationLibrary = "seiza_platform";
-
     [LibraryImport(LibraryName, EntryPoint = "seiza_model_list_json", StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint ListModels(string store, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_model_catalog_json", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint GetModelCatalog(string? options, out nint error);
 
     [LibraryImport(LibraryName, EntryPoint = "seiza_model_download_json", StringMarshalling = StringMarshalling.Utf8)]
     internal static unsafe partial nint DownloadModel(string? name, string store, string? options,
@@ -25,22 +26,37 @@ internal static partial class NativeMethods
     [return: MarshalAs(UnmanagedType.U1)]
     internal static partial bool RemoveModel(string name, string store, out nint error);
 
-    [LibraryImport(RestorationLibrary, EntryPoint = "seiza_win_restoration_backends", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint GetRestorationBackends(string library, out nint error);
+    [LibraryImport(LibraryName, EntryPoint = "seiza_model_backends_json", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint GetRestorationBackends(string options, out nint error);
 
-    [LibraryImport(RestorationLibrary, EntryPoint = "seiza_win_restoration_run", StringMarshalling = StringMarshalling.Utf8)]
-    internal static unsafe partial nint RunRestoration(string request,
-        delegate* unmanaged[Cdecl]<nint, nint, void> progress, delegate* unmanaged[Cdecl]<nint, byte> cancel,
-        nint context, out nint error);
+    [LibraryImport(LibraryName, EntryPoint = "seiza_noise_model_open", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint OpenNoiseModel(string model, string options, out nint error);
 
-    [LibraryImport(RestorationLibrary, EntryPoint = "seiza_win_restoration_blend", StringMarshalling = StringMarshalling.Utf8)]
-    internal static partial nint BlendRestoration(SafeRestorationHandle result, string request, out nint error);
+    [LibraryImport(LibraryName, EntryPoint = "seiza_noise_model_free")]
+    internal static partial void FreeNoiseModel(nint model);
 
-    [LibraryImport(RestorationLibrary, EntryPoint = "seiza_win_restoration_free")]
+    [LibraryImport(LibraryName, EntryPoint = "seiza_noise_model_denoise_file", StringMarshalling = StringMarshalling.Utf8)]
+    internal static unsafe partial nint RunRestoration(SafeNoiseModelHandle model, string input,
+        [MarshalAs(UnmanagedType.U1)] bool center, delegate* unmanaged[Cdecl]<nuint, nuint, nuint, nuint, nint, void> progress,
+        SafeCancelSignalHandle cancel, nint context, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_file_restoration_write", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint BlendRestoration(SafeRestorationHandle result, string output, string? original,
+        float high, float low, float scalePx, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_file_restoration_free")]
     internal static partial void FreeRestoration(nint result);
+}
 
-    [LibraryImport(RestorationLibrary, EntryPoint = "seiza_win_string_free")]
-    internal static partial void FreeRestorationString(nint value);
+internal sealed class SafeNoiseModelHandle : SafeHandleZeroOrMinusOneIsInvalid
+{
+    internal SafeNoiseModelHandle(nint value) : base(ownsHandle: true) => SetHandle(value);
+
+    protected override bool ReleaseHandle()
+    {
+        NativeMethods.FreeNoiseModel(handle);
+        return true;
+    }
 }
 
 internal sealed class SafeRestorationHandle : SafeHandleZeroOrMinusOneIsInvalid

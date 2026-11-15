@@ -1,4 +1,3 @@
-using System.Net.Http;
 using System.Runtime.InteropServices.WindowsRuntime;
 using System.Text.Json;
 using Microsoft.UI.Windowing;
@@ -27,6 +26,7 @@ internal sealed class RestorationWindow : Window
     private readonly Slider _mottle = new() { Header = "Mottle reduction · 90%", Minimum = 0, Maximum = 100, Value = 90, StepFrequency = 1 };
     private readonly ComboBox _backend = new() { Header = "Backend", HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly ComboBox _precision = new() { Header = "Precision", HorizontalAlignment = HorizontalAlignment.Stretch };
+    private readonly NumberBox _device = new() { Header = "DirectML adapter index (-1 = automatic)", Value = -1, Minimum = -1, Maximum = int.MaxValue, Visibility = Visibility.Collapsed };
     private readonly NumberBox _tile = new() { Header = "Tile size (px, 0 = automatic)", Value = 0, Minimum = 0, Maximum = 4096, SmallChange = 16 };
     private readonly NumberBox _scale = new() { Header = "Grain / mottle scale (px)", Value = 5, Minimum = 0.25, Maximum = 64, SmallChange = 0.25 };
     private readonly Button _run = new() { Content = "Preview center" };
@@ -69,6 +69,7 @@ internal sealed class RestorationWindow : Window
         advanced.Children.Add(Buttons(_verify, _remove));
         advanced.Children.Add(_runtimeStatus);
         advanced.Children.Add(_backend);
+        advanced.Children.Add(_device);
         advanced.Children.Add(_precision);
         advanced.Children.Add(_tile);
         advanced.Children.Add(_scale);
@@ -161,7 +162,13 @@ internal sealed class RestorationWindow : Window
                 }, "Preparing the selected model…", canCancel: false);
             }
         };
-        _backend.SelectionChanged += (_, _) => InvalidateResult();
+        _backend.SelectionChanged += (_, _) =>
+        {
+            _device.Visibility = (_backend.SelectedItem as RestorationBackend)?.Name == "directml"
+                ? Visibility.Visible : Visibility.Collapsed;
+            InvalidateResult();
+        };
+        _device.ValueChanged += (_, _) => InvalidateResult();
         _precision.SelectionChanged += (_, _) => InvalidateResult();
         _tile.ValueChanged += (_, _) => InvalidateResult();
         _grain.ValueChanged += (_, _) => { _grain.Header = $"Grain reduction · {_grain.Value:0}%"; MarkPreviewStale(); };
@@ -243,8 +250,7 @@ internal sealed class RestorationWindow : Window
         if (refreshCatalog)
         {
             try { catalog = await RestorationService.FetchCatalogAsync(token); }
-            catch (Exception error) when (error is HttpRequestException or JsonException or KeyNotFoundException or InvalidOperationException
-                || error is OperationCanceledException && !token.IsCancellationRequested)
+            catch (Exception error) when (error is SeizaCoreException or JsonException)
             {
                 catalogAvailable = false;
             }
@@ -388,7 +394,16 @@ internal sealed class RestorationWindow : Window
             throw new InvalidOperationException("Enter a whole tile size or 0 for automatic.");
         string? backend = (_backend.SelectedItem as RestorationBackend)?.Name;
         string? precision = (_precision.SelectedItem as RestorationBackend)?.Name;
-        return new RestorationOptions(backend is "" ? null : backend, precision is "" ? null : precision, tile == 0 ? null : (int)tile);
+        int? device = null;
+        if (backend == "directml")
+        {
+            double index = _device.Value;
+            if (!double.IsFinite(index) || index != Math.Truncate(index))
+                throw new InvalidOperationException("Enter a whole DirectML adapter index or -1 for automatic.");
+            if (index >= 0) device = (int)index;
+        }
+        return new RestorationOptions(backend is "" ? null : backend, precision is "" ? null : precision,
+            tile == 0 ? null : (int)tile, device);
     }
 
     private RestorationBands ReadBands()
@@ -512,7 +527,7 @@ internal sealed class RestorationWindow : Window
         _verify.IsEnabled = _remove.IsEnabled = idle && SelectedModel is not null;
         _browse.IsEnabled = _download.IsEnabled = _import.IsEnabled = _model.IsEnabled = idle;
         _grain.IsEnabled = _mottle.IsEnabled = _scale.IsEnabled = idle;
-        _precision.IsEnabled = _backend.IsEnabled = _tile.IsEnabled = idle;
+        _precision.IsEnabled = _backend.IsEnabled = _tile.IsEnabled = _device.IsEnabled = idle;
     }
 
     private void Show(string message, InfoBarSeverity severity = InfoBarSeverity.Informational)

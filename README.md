@@ -60,9 +60,10 @@ automatically installs the recommended model and ONNX Runtime as needed.
 Installed models work offline. Under **Advanced processing**, choose a
 different model from the catalog, check for updates, or import a local model
 folder containing `card.json` and its graphs. Seiza downloads the selected
-model if needed. Seiza's downloadable Windows runtime provides CPU inference.
-To use a runtime with another provider, set `SEIZA_ONNXRUNTIME` to its DLL
-before launching Seiza.
+model if needed. The bundled Windows runtime enables DirectML when the model
+supports it. In **Advanced processing**, choose **DirectML** and enter a DXGI
+adapter index to select a particular GPU. Set `SEIZA_ONNXRUNTIME` to use a
+different runtime DLL before launching Seiza.
 
 Choose **Preview center** to run the model on the center crop. Compare with
 **Original**, then adjust **Grain reduction** and **Mottle reduction**.

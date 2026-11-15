@@ -2726,7 +2726,6 @@ dependencies = [
  "seiza-download",
  "seiza-fits",
  "seiza-image-io",
- "seiza-model",
  "seiza-stacking",
  "seiza-stretch",
  "serde",
