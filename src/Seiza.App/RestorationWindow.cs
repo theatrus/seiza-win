@@ -29,16 +29,16 @@ internal sealed class RestorationWindow : Window
     private readonly ComboBox _precision = new() { Header = "Precision", HorizontalAlignment = HorizontalAlignment.Stretch };
     private readonly NumberBox _tile = new() { Header = "Tile size (px, 0 = automatic)", Value = 0, Minimum = 0, Maximum = 4096, SmallChange = 16 };
     private readonly NumberBox _scale = new() { Header = "Grain / mottle scale (px)", Value = 5, Minimum = 0.25, Maximum = 64, SmallChange = 0.25 };
-    private readonly Button _run = new() { Content = "Restore preview" };
+    private readonly Button _run = new() { Content = "Preview center" };
     private readonly Button _refresh = new() { Content = "Update preview" };
-    private readonly Button _save = new() { Content = "Save restored FITS…" };
+    private readonly Button _save = new() { Content = "Save full FITS…" };
     private readonly Button _cancel = new() { Content = "Cancel", Visibility = Visibility.Collapsed };
     private readonly Button _openOutput = new() { Content = "Open saved image", Visibility = Visibility.Collapsed };
     private readonly ProgressBar _progress = new() { Visibility = Visibility.Collapsed };
     private readonly InfoBar _status = new() { IsOpen = true, IsClosable = false };
     private readonly Image _preview = new() { Stretch = Stretch.Uniform, MaxHeight = 440 };
-    private readonly ToggleSwitch _compare = new() { Header = "Center crop", OffContent = "Restored", OnContent = "Original", IsEnabled = false };
-    private readonly TextBlock _previewHint = new() { Text = "Restore a linear image to compare its center crop.", TextWrapping = TextWrapping.Wrap };
+    private readonly ToggleSwitch _compare = new() { Header = "Center preview", OffContent = "Restored", OnContent = "Original", IsEnabled = false };
+    private readonly TextBlock _previewHint = new() { Text = "Preview the center tiles before processing the full image.", TextWrapping = TextWrapping.Wrap };
     private readonly TextBlock _details = new() { TextWrapping = TextWrapping.Wrap };
     private readonly Grid _root = new() { RowSpacing = 12, Padding = new Thickness(20) };
     private CancellationTokenSource? _operation;
@@ -56,7 +56,7 @@ internal sealed class RestorationWindow : Window
 
     internal RestorationWindow(string? source)
     {
-        Title = "Restore image — Seiza";
+        Title = "AI Models — Seiza";
         WindowIcon.Apply(AppWindow);
         _source = source;
         _preferredModel = CatalogSettingsStore.LoadPreferredNoiseModel();
@@ -373,18 +373,23 @@ internal sealed class RestorationWindow : Window
         if (_source is not string input) return;
         await EnsureRuntimeAsync(progress, token);
         var model = await EnsureModelAsync(progress, token);
+        var options = ReadOptions();
+        InvalidateResult();
+        Show("Processing the center tiles…");
+        _result = await RestorationService.RunPreviewAsync(input, model, options, progress, token);
+        token.ThrowIfCancellationRequested();
+        await UpdatePreviewAsync(token);
+    }, "Preparing the center preview…");
+
+    private RestorationOptions ReadOptions()
+    {
         double tile = _tile.Value;
         if (!double.IsFinite(tile) || tile != Math.Truncate(tile))
             throw new InvalidOperationException("Enter a whole tile size or 0 for automatic.");
         string? backend = (_backend.SelectedItem as RestorationBackend)?.Name;
         string? precision = (_precision.SelectedItem as RestorationBackend)?.Name;
-        var options = new RestorationOptions(backend is "" ? null : backend, precision is "" ? null : precision, tile == 0 ? null : (int)tile);
-        InvalidateResult();
-        Show("Reading the linear image…");
-        _result = await RestorationService.RunAsync(input, model, options, progress, token);
-        token.ThrowIfCancellationRequested();
-        await UpdatePreviewAsync(token);
-    }, "Preparing restoration…");
+        return new RestorationOptions(backend is "" ? null : backend, precision is "" ? null : precision, tile == 0 ? null : (int)tile);
+    }
 
     private RestorationBands ReadBands()
     {
@@ -409,7 +414,7 @@ internal sealed class RestorationWindow : Window
         _preview.Source = _restoredBitmap;
         _previewHint.Text = "Both views use the same display stretch.";
         _details.Text = rendered.Details;
-        Show("Preview ready. Adjust the amounts or save a restored FITS.", InfoBarSeverity.Success);
+        Show("Center preview ready. Save full FITS to process the entire image.", InfoBarSeverity.Success);
     }
 
     private static WriteableBitmap ToBitmap(RenderedImageData image)
@@ -420,9 +425,9 @@ internal sealed class RestorationWindow : Window
         return bitmap;
     }
 
-    private void Save() => Perform(async (_, token) =>
+    private void Save() => Perform(async (progress, token) =>
     {
-        if (_source is not string input || _result is null) return;
+        if (_source is not string input) return;
         var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(AppWindow.Id)
         {
             SuggestedFileName = Path.GetFileNameWithoutExtension(input) + "-restored",
@@ -431,8 +436,10 @@ internal sealed class RestorationWindow : Window
         picker.FileTypeChoices.Add("Linear FITS", [".fits"]);
         var selected = await picker.PickSaveFileAsync();
         if (selected is null || _closed) return;
-        Show("Saving the full linear image…");
-        await RestorationService.SaveAsync(_result, ReadBands(), input, selected.Path, token);
+        await EnsureRuntimeAsync(progress, token);
+        var model = await EnsureModelAsync(progress, token);
+        Show("Processing the full image…");
+        await RestorationService.SaveAsync(input, selected.Path, model, ReadOptions(), ReadBands(), progress, token);
         if (_closed) return;
         _savedPath = selected.Path;
         _openOutput.Visibility = Visibility.Visible;
@@ -458,7 +465,7 @@ internal sealed class RestorationWindow : Window
         _restoredBitmap = null;
         _compare.IsEnabled = false;
         _preview.Source = null;
-        _previewHint.Text = "Restore a linear image to compare its center crop.";
+        _previewHint.Text = "Preview the center tiles before processing the full image.";
         _details.Text = string.Empty;
         UpdateButtons();
     }
@@ -500,8 +507,8 @@ internal sealed class RestorationWindow : Window
     private void UpdateButtons()
     {
         bool idle = _operation is null;
-        _run.IsEnabled = idle && _source is not null;
-        _refresh.IsEnabled = _save.IsEnabled = idle && _result is not null;
+        _run.IsEnabled = _save.IsEnabled = idle && _source is not null;
+        _refresh.IsEnabled = idle && _result is not null;
         _verify.IsEnabled = _remove.IsEnabled = idle && SelectedModel is not null;
         _browse.IsEnabled = _download.IsEnabled = _import.IsEnabled = _model.IsEnabled = idle;
         _grain.IsEnabled = _mottle.IsEnabled = _scale.IsEnabled = idle;

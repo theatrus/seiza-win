@@ -190,12 +190,12 @@ internal static class RestorationService
         return (document.RootElement.GetProperty("version").GetString()!, backends);
     });
 
-    internal static Task<SafeRestorationHandle> RunAsync(string input, InstalledNoiseModel model,
+    internal static Task<SafeRestorationHandle> RunPreviewAsync(string input, InstalledNoiseModel model,
         RestorationOptions options, IProgress<RestorationProgress> progress, CancellationToken token) =>
-        InStoreAsync(() => Run(input, model, options, progress, token));
+        InStoreAsync(() => Run(input, model, options, preview: true, progress, token));
 
-    private static unsafe SafeRestorationHandle Run(string input, InstalledNoiseModel model,
-        RestorationOptions options, IProgress<RestorationProgress> progress, CancellationToken token)
+    private static unsafe SafeRestorationHandle Run(string input, InstalledNoiseModel model, RestorationOptions options,
+        bool preview, IProgress<RestorationProgress> progress, CancellationToken token)
     {
         token.ThrowIfCancellationRequested();
         if (!ImageFileService.IsAstronomyImage(input)) throw new InvalidOperationException("Choose a linear FITS or XISF image.");
@@ -203,6 +203,7 @@ internal static class RestorationService
         {
             ["input"] = input, ["model"] = model.Path, ["library"] = RestorationRuntime.Load(),
             ["backend"] = options.Backend, ["precision"] = options.Precision, ["tile"] = options.Tile,
+            ["preview"] = preview,
         }.ToJsonString();
         var context = GCHandle.Alloc(new CallbackState(progress, token));
         try
@@ -237,8 +238,8 @@ internal static class RestorationService
         finally { DeleteStagingDirectory(folder); }
     }, token);
 
-    internal static Task SaveAsync(SafeRestorationHandle result, RestorationBands bands, string input,
-        string output, CancellationToken token) => Task.Run(() =>
+    internal static async Task SaveAsync(string input, string output, InstalledNoiseModel model, RestorationOptions options,
+        RestorationBands bands, IProgress<RestorationProgress> progress, CancellationToken token)
     {
         void ValidateDestination()
         {
@@ -246,8 +247,10 @@ internal static class RestorationService
                 throw new SeizaCoreException("Choose a separate destination for the restored image.");
         }
         ValidateDestination();
-        AtomicOutputFile.Write(output, staging => Blend(result, bands, staging), ValidateDestination, token);
-    }, token);
+        using var result = await InStoreAsync(() => Run(input, model, options, preview: false, progress, token)).ConfigureAwait(false);
+        await Task.Run(() => AtomicOutputFile.Write(output, staging => Blend(result, bands, staging),
+            ValidateDestination, token), token).ConfigureAwait(false);
+    }
 
     private static string Blend(SafeRestorationHandle result, RestorationBands bands, string output, string? original = null)
     {
