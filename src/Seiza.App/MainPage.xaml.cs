@@ -458,6 +458,9 @@ public sealed partial class MainPage : Page, IDisposable
     private void ZoomOut_Click(object sender, RoutedEventArgs e) =>
         ZoomAt(new Vector2((float)ImageCanvas.ActualWidth / 2, (float)ImageCanvas.ActualHeight / 2), 0.8f);
 
+    private void RestoreImage_Click(object sender, RoutedEventArgs e) =>
+        App.ShowRestoration(ImageFileService.IsAstronomyImage(_currentPath ?? string.Empty) ? _currentPath : null);
+
     private async void Stretch_Click(object sender, RoutedEventArgs e)
     {
         if (_stretchWindow is not null)

@@ -46,11 +46,30 @@ of a light stack.
 - **[Parallax videos and tours](#parallax-videos-and-tours)** — Turn an astrophoto into a depth-aware camera tour with painted dust and title cards, then export video or lossless PNG frames.
 - **[Image viewing and folder review](#image-viewing-and-folder-review)** — Browse nested capture folders with collapsible path, filter or file-type groups, cached thumbnails and fast previews.
 - **[Stretch and image processing](#stretch-and-image-processing)** — Build live stretch recipes, correct backgrounds, and apply light deconvolution.
+- **[Learned image restoration](#learned-image-restoration)** — Restore a linear stack with a Seiza noise model and control how much grain and mottle to reduce.
 - **[Directory and live stacking](#directory-image-stacking)** — Align and combine selected frames or [watch a capture folder](#live-folder-stacking), with calibration, shared-reference alignment, and resumable sessions.
 - **[Plate solving and sky overlays](#plate-solving-and-sky-overlays)** — Solve locally, identify stars and deep-sky objects, and export WCS solutions.
 - **[Star and tilt measurement](#star-and-sensor-tilt-analysis)** — Measure stellar quality and sensor tilt, with optional parallelogram and triangle diagrams.
 - **[Catalogs and distance data](#catalogs-and-distance-data)** — Download and verify solver catalogs and offline parallax distances from native controls.
 - **[Image export and Explorer integration](#image-export-and-explorer-integration)** — Save full-size images with overlays and preview FITS/XISF files in Windows Explorer.
+
+## Learned image restoration
+
+Open a linear mono or RGB FITS or XISF stack and choose **Process → Restore
+image…**. In **Model and runtime setup**, install ONNX Runtime from the Seiza
+Windows package and download the recommended model. **Download model update**
+fetches the catalog again when you want a newer model. You can also import a
+local model folder containing `card.json` and its graphs. Installed models work
+offline. Seiza's downloadable Windows runtime provides CPU inference.
+To use a runtime with another provider, set `SEIZA_ONNXRUNTIME` to its DLL
+before launching Seiza.
+
+Choose **Restore preview** to run the model across the image. Compare the center
+crop with **Original**, then adjust **Grain reduction** and **Mottle reduction**.
+**Update preview** reapplies the new amounts to the saved inference. Advanced
+processing exposes the backend, precision, tile size, and the scale that splits
+fine grain from wider mottle. **Save restored FITS…** writes a full-resolution
+linear result with the source geometry and model provenance.
 
 ## Parallax videos and tours
 

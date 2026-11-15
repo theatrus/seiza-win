@@ -34,6 +34,9 @@
                 <MenuFlyoutSeparator />
                 <MenuFlyoutItem Text="New window" Click="NewWindow_Click" />
             </MenuBarItem>
+            <MenuBarItem Title="Process" AccessKey="P">
+                <MenuFlyoutItem Text="Restore image…" Click="RestoreImage_Click" />
+            </MenuBarItem>
         </MenuBar>
         <CommandBar
             x:Name="Toolbar"
@@ -42,6 +45,7 @@
             <CommandBar.SecondaryCommands>
                 <AppBarButton Click="NewWindow_Click" Label="New window" />
                 <AppBarButton x:Name="ParallaxVideoButton" Click="ParallaxVideo_Click" Label="Parallax video…" IsEnabled="False" />
+                <AppBarButton Click="RestoreImage_Click" Label="Restore image…" />
                 <AppBarSeparator />
                 <AppBarButton Click="CheckForUpdates_Click" Label="Check for updates…" />
                 <AppBarSeparator />
