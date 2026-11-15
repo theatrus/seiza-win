@@ -122,9 +122,9 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="Registration model" VerticalAlignment="Center" />
                                 <ComboBox x:Name="RegistrationModelPicker" Grid.Column="1" AutomationProperties.Name="Registration model" HorizontalAlignment="Stretch" SelectionChanged="ConfigurationSelection_Changed" ToolTipService.ToolTip="Similarity fits shift, rotation, and scale. Affine adds shear; quadratic follows field distortion. Sparse matches fall back to similarity.">
-                                    <ComboBoxItem Content="Similarity" Tag="Similarity" IsSelected="True" />
+                                    <ComboBoxItem Content="Similarity" Tag="Similarity" />
                                     <ComboBoxItem Content="Affine" Tag="Affine" />
-                                    <ComboBoxItem Content="Quadratic" Tag="Quadratic" />
+                                    <ComboBoxItem Content="Quadratic" Tag="Quadratic" IsSelected="True" />
                                 </ComboBox>
                             </Grid>
                             <Grid ColumnSpacing="12">

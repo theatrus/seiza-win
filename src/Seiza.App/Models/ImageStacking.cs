@@ -52,7 +52,7 @@ internal sealed class ImageStackOptions
         get => _minimumOverlap ?? (CanvasMode == StackCanvasMode.Expanded ? 0.05 : 0.60);
         set => _minimumOverlap = value;
     }
-    public StackRegistrationModel RegistrationModel { get; set; } = StackRegistrationModel.Similarity;
+    public StackRegistrationModel RegistrationModel { get; set; } = StackRegistrationModel.Quadratic;
     public StackWeightingMode Weighting { get; set; } = StackWeightingMode.Equal;
     public double MinimumWeight { get; set; } = 0.05;
     public double MaximumWeight { get; set; } = 20;
