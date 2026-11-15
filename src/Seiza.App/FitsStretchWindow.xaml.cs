@@ -66,7 +66,7 @@ public sealed partial class FitsStretchWindow : Window
         StretchTitleBar.Title = Title;
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(StretchTitleBar);
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        WindowIcon.Apply(AppWindow);
         AppWindow.IsShownInSwitchers = false;
         if (AppWindow.Presenter is OverlappedPresenter presenter)
         {

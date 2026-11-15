@@ -1715,9 +1715,9 @@ public sealed partial class MainPage : Page, IDisposable
         CopyAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         PasteAdjustmentsItem.IsEnabled = supportsAstronomyProcessing && !ViewModel.IsLoading;
         ImageBrowserButton.IsEnabled = CanBrowseImages;
-        StackImagesMenuItem.IsEnabled = StackImagesButton.IsEnabled =
+        StackImagesButton.IsEnabled =
             _stackWindow is not null || (!_isScanningFolder && !ViewModel.IsLoading);
-        BuildMastersMenuItem.IsEnabled = BuildMastersButton.IsEnabled =
+        BuildMastersButton.IsEnabled =
             _masterWindow is not null || (!_isScanningFolder && !ViewModel.IsLoading);
         ToolTipService.SetToolTip(StackImagesButton, "Stack light frames; add images, a folder, or an image list");
         LiveStackButton.IsEnabled = _liveStackWindow is null && !ViewModel.IsLoading;

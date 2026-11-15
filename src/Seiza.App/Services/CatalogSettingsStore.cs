@@ -91,7 +91,7 @@ internal static class CatalogSettingsStore
         lock (SyncRoot) return LoadSettings().PreferredNoiseModel;
     }
 
-    internal static void SavePreferredNoiseModel(string name)
+    internal static void SavePreferredNoiseModel(string? name)
     {
         lock (SyncRoot)
         {

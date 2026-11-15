@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Net.Http;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Text.Json;
@@ -13,6 +14,8 @@ internal sealed record InstalledNoiseModel(string Name, string Path, string Card
     public override string ToString() => Name;
 }
 
+internal sealed record PublishedNoiseModel(string Name, string CardHash);
+internal sealed record NoiseModelCatalog(string? Recommended, PublishedNoiseModel[] Models);
 internal sealed record RestorationProgress(string Message, double? Fraction = null);
 internal sealed record RestorationOptions(string? Backend, string? Precision, int? Tile);
 internal sealed record RestorationBands(double High, double Low, double Scale);
@@ -24,11 +27,32 @@ internal sealed record RestorationBackend(string Name, string Label)
 
 internal static class RestorationService
 {
+    private const string ModelCatalogUrl = "https://downloads.seiza.fyi/models/v1/manifest.json";
     internal static readonly string DataDirectory = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Seiza", "Restoration");
     private static readonly string ModelDirectory = Path.Combine(DataDirectory, "Models");
     private static readonly string PreviousDirectory = Path.Combine(DataDirectory, "Previous model");
     private static readonly SemaphoreSlim StoreGate = new(1, 1);
+    private static readonly HttpClient CatalogClient = new() { Timeout = TimeSpan.FromSeconds(8) };
+
+    internal static async Task<NoiseModelCatalog> FetchCatalogAsync(CancellationToken token)
+    {
+        string json = await CatalogClient.GetStringAsync(ModelCatalogUrl, token).ConfigureAwait(false);
+        using JsonDocument document = JsonDocument.Parse(json);
+        JsonElement manifest = document.RootElement;
+        string? recommended = manifest.TryGetProperty("latest", out JsonElement latest) &&
+            latest.TryGetProperty("denoise", out JsonElement denoise) ? denoise.GetString() : null;
+        // The catalog drives selection and update detection. Seiza verifies the
+        // manifest and bundle again through its downloader before installation.
+        PublishedNoiseModel[] models = manifest.GetProperty("models").EnumerateArray()
+            .Select(model => new PublishedNoiseModel(
+                model.GetProperty("name").GetString()!,
+                model.GetProperty("files").EnumerateArray()
+                    .First(file => file.GetProperty("name").GetString() == "card.json")
+                    .GetProperty("sha256").GetString()!))
+            .ToArray();
+        return new NoiseModelCatalog(recommended, models);
+    }
 
     internal static Task<IReadOnlyList<InstalledNoiseModel>> ListAsync() => InStoreAsync<IReadOnlyList<InstalledNoiseModel>>(() =>
     {
@@ -39,8 +63,8 @@ internal static class RestorationService
             .ToArray();
     });
 
-    internal static Task<InstalledNoiseModel> DownloadLatestAsync(IProgress<RestorationProgress> progress, CancellationToken token) =>
-        InStoreAsync(() => InstallStaged(staging => DownloadLatest(staging, progress), token));
+    internal static Task<InstalledNoiseModel> DownloadAsync(string? name, IProgress<RestorationProgress> progress,
+        CancellationToken token) => InStoreAsync(() => InstallStaged(staging => DownloadModel(name, staging, progress), token));
 
     internal static Task<InstalledNoiseModel> ImportAsync(string path, CancellationToken token) =>
         InStoreAsync(() => InstallStaged(staging =>
@@ -136,12 +160,12 @@ internal static class RestorationService
         return JsonDocument.Parse(NativeString.TakeOwned(json, "null"));
     }
 
-    private static unsafe JsonDocument DownloadLatest(string staging, IProgress<RestorationProgress> progress)
+    private static unsafe JsonDocument DownloadModel(string? name, string staging, IProgress<RestorationProgress> progress)
     {
         var context = GCHandle.Alloc(new CallbackState(progress, CancellationToken.None));
         try
         {
-            return ReadModelResponse(NativeMethods.DownloadModel(null, staging, null, &OnProgress,
+            return ReadModelResponse(NativeMethods.DownloadModel(name, staging, null, &OnProgress,
                 GCHandle.ToIntPtr(context), out nint error), error);
         }
         finally { context.Free(); }

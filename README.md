@@ -19,7 +19,7 @@ a WinUI 3 interface and GPU-backed viewport with the shared
 
 ## Start a stack
 
-1. Choose **File → Stack images…** or **Stack…** in the toolbar. Use **Add frames**
+1. Choose **Stack…** in the toolbar. Use **Add frames**
    to choose FITS/XISF images, a folder, or a TXT/CSV image list. An open collection
    prefills the inputs.
 2. On **Stack**, keep **Fixed reference** for one field, or choose
@@ -35,9 +35,8 @@ references, matching and processing controls remain available on the other tabs
 and in collapsed sections. These are settings, not required steps.
 
 See the [stacking UI guide](docs/MAC-PR-96-PARITY.md) for the layout and
-processing controls. Choose **File → Build calibration masters…** or
-**Build masters…** in the toolbar to prepare calibration masters independently
-of a light stack.
+processing controls. Choose **Build masters** in the toolbar to prepare
+calibration masters independently of a light stack.
 
 ![Stack summary with automatic calibration matching](docs/images/mac96-stack-summary.jpg)
 
@@ -55,12 +54,13 @@ of a light stack.
 
 ## Learned image restoration
 
-Open a linear mono or RGB FITS or XISF stack and choose **Process → Restore
-image…**. In **Model and runtime setup**, install ONNX Runtime from the Seiza
-Windows package and download the recommended model. **Download model update**
-fetches the catalog again when you want a newer model. You can also import a
-local model folder containing `card.json` and its graphs. Installed models work
-offline. Seiza's downloadable Windows runtime provides CPU inference.
+Open a linear mono or RGB FITS or XISF stack and choose **Restore image…**
+from the toolbar's **More options** menu. Seiza checks the model catalog and
+automatically installs the recommended model and ONNX Runtime as needed.
+Installed models work offline. Under **Advanced processing**, choose a
+different model from the catalog, check for updates, or import a local model
+folder containing `card.json` and its graphs. Seiza downloads the selected
+model if needed. Seiza's downloadable Windows runtime provides CPU inference.
 To use a runtime with another provider, set `SEIZA_ONNXRUNTIME` to its DLL
 before launching Seiza.
 
@@ -681,8 +681,8 @@ use a master bias. Flats require a master bias or an uncalibrated master
 dark-flat matching their exposure. Masters are saved as FITS images without
 star alignment, and no light stack is started.
 
-Choose **File → Stack images…** or the toolbar's
-**Stack…**. Add frames, or use the prefilled collection. Start directly from Stack after automatic matching completes. Expand
+Choose **Stack…** in the toolbar. Add frames or use the prefilled collection.
+Start directly from Stack after automatic matching completes. Expand
 **Light frames** to exclude exposures. **Processing → Registration reference**
 contains reference selection; its first selected light remains the default.
 When headers or filenames identify multiple filters, separate outputs are enabled

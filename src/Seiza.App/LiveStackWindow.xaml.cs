@@ -60,7 +60,7 @@ public sealed partial class LiveStackWindow : Window, IDisposable
         WatchFolderTextBox.Text = Path.GetFullPath(initialFolder);
         ExtendsContentIntoTitleBar = true;
         SetTitleBar(LiveStackTitleBar);
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        WindowIcon.Apply(AppWindow);
         ContentRoot.Loaded += ContentRoot_Loaded;
         _checkpointAgeTimer.Tick += CheckpointAgeTimer_Tick;
         AppWindow.Closing += AppWindow_Closing;

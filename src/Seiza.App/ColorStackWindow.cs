@@ -31,7 +31,7 @@ public sealed class ColorStackWindow : Window, IDisposable
     public ColorStackWindow(string? initialRgb = null)
     {
         Title = "Color stacking — Seiza";
-        AppWindow.SetIcon("Assets/AppIcon.ico");
+        WindowIcon.Apply(AppWindow);
         AppWindow.Resize(new SizeInt32(760, 920));
         _mode.Items.Add("Combine aligned R / G / B (optional L)");
         _mode.Items.Add("Calibrate an existing RGB / OSC stack");
