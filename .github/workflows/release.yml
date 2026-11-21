@@ -336,6 +336,9 @@ jobs:
       - name: Test signed native loading without the VC++ runtime
         run: .\.github\scripts\test-windows-native-loader.ps1 -Directory .\artifacts\publish\win-x64 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
 
+      - name: Test inference through the signed packaged ONNX Runtime
+        run: python .github/scripts/test-windows-model-runtime.py --directory artifacts/publish/win-x64
+
       - name: Verify installer Finish launch action
         run: .\.github\scripts\test-windows-installer-launch.ps1 -Msi ".\dist\seiza-${{ env.SEIZA_VERSION }}-windows-x86_64.msi"
 

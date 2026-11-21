@@ -164,9 +164,43 @@ internal static class RestorationService
         finally { context.Free(); }
     }
 
+    internal static string? InstalledRuntimePath(string directory)
+    {
+        using JsonDocument document = ReadModelResponse(NativeMethods.InstalledOnnxRuntime(directory, out nint error), error);
+        return document.RootElement.ValueKind == JsonValueKind.Null ? null
+            : document.RootElement.GetProperty("library").GetString();
+    }
+
+    internal static Task<string> InstallRuntimeAsync(string directory, IProgress<RestorationProgress> progress,
+        CancellationToken token) => Task.Run(() => InstallRuntime(directory, progress, token), token);
+
+    private static unsafe string InstallRuntime(string directory, IProgress<RestorationProgress> progress, CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        nint signal = NativeMethods.CreateCancelSignal();
+        if (signal == 0) throw new SeizaCoreException("Could not create the cancellation signal.");
+        using var cancellation = new SafeCancelSignalHandle(signal);
+        using var registration = token.UnsafeRegister(static value => ((SafeCancelSignalHandle)value!).Cancel(), cancellation);
+        var context = GCHandle.Alloc(new CallbackState(progress));
+        try
+        {
+            nint result = NativeMethods.InstallOnnxRuntime(directory, &OnProgress, cancellation,
+                GCHandle.ToIntPtr(context), out nint error);
+            if (token.IsCancellationRequested)
+            {
+                if (result != 0) NativeMethods.FreeString(result);
+                if (error != 0) NativeMethods.FreeString(error);
+                token.ThrowIfCancellationRequested();
+            }
+            using JsonDocument document = ReadModelResponse(result, error);
+            return document.RootElement.GetProperty("library").GetString()!;
+        }
+        finally { context.Free(); }
+    }
+
     internal static Task<(string Version, RestorationBackend[] Backends)> BackendsAsync() => Task.Run(() =>
     {
-        string runtime = RestorationRuntime.Load();
+        string runtime = RestorationRuntime.GetLibraryPath();
         var options = new JsonObject { ["library"] = runtime };
         using JsonDocument document = ReadModelResponse(NativeMethods.GetRestorationBackends(options.ToJsonString(), out nint error), error);
         JsonElement library = document.RootElement.GetProperty("runtime");
@@ -198,7 +232,7 @@ internal static class RestorationService
         if (!ImageFileService.IsAstronomyImage(input)) throw new InvalidOperationException("Choose a linear FITS or XISF image.");
         string request = new JsonObject
         {
-            ["library"] = RestorationRuntime.Load(),
+            ["library"] = RestorationRuntime.GetLibraryPath(),
             ["backend"] = options.Backend, ["precision"] = options.Precision, ["tile"] = options.Tile,
             ["deviceId"] = options.DeviceId,
         }.ToJsonString();
@@ -307,7 +341,7 @@ internal static class RestorationService
                     double total = value.GetProperty("total").GetDouble();
                     progress.Report(new($"Downloading {file} · {bytes / 1048576:N0} of {total / 1048576:N0} MiB", total > 0 ? bytes / total : null));
                     break;
-                case "verifying" or "installing": progress.Report(new("Verifying the model bundle…")); break;
+                case "verifying" or "installing": progress.Report(new("Verifying and installing downloaded files…")); break;
             }
         }
     }

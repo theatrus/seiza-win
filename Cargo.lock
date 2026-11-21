@@ -99,6 +99,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "arbitrary"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bc62ac97cc33321f50863d514c3bc38a453947a8f9e781137e47c7401020aed"
+dependencies = [
+ "derive_arbitrary",
+]
+
+[[package]]
 name = "arrayvec"
 version = "0.7.8"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -469,9 +478,9 @@ dependencies = [
 
 [[package]]
 name = "crc32fast"
-version = "1.5.0"
+version = "1.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9481c1c90cbf2ac953f07c8d4a58aa3945c425b7185c9154d67a65e4230da511"
+checksum = "01a7799fd6b852db0e61728dde9a204c423b44d689dbd432522543614b490e78"
 dependencies = [
  "cfg-if",
 ]
@@ -530,6 +539,17 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ce6e4c961d6cd6c9a86db418387425e8bdeaf05b3c8bc1411e6dca4c252f1453"
 dependencies = [
  "hybrid-array",
+]
+
+[[package]]
+name = "derive_arbitrary"
+version = "1.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1b034bd7d5f032402a2479444dcc6f74e36a03f31854d41680fb240ef682a1ac"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "syn 3.0.2",
 ]
 
 [[package]]
@@ -704,6 +724,7 @@ checksum = "843fba2746e448b37e26a819579957415c8cef339bf08564fe8b7ddbd959573c"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
+ "zlib-rs",
 ]
 
 [[package]]
@@ -1409,9 +1430,9 @@ dependencies = [
 
 [[package]]
 name = "log"
-version = "0.4.33"
+version = "0.4.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
+checksum = "f9f8bd3e56ce4dfc153cf470fffbfa98c7620958b312ca5c3a4b8d5181fd13c6"
 
 [[package]]
 name = "lru-slab"
@@ -2463,9 +2484,9 @@ dependencies = [
 
 [[package]]
 name = "seiza"
-version = "0.53.0"
+version = "0.55.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8e5cddc2b67c55e2722622ef614fb694d757b6e31f1f407204c37806342411c1"
+checksum = "b700a99feac4279d09d99a45043d5b523f04800471870c54041b00ee9d6f25d7"
 dependencies = [
  "directories",
  "image",
@@ -2488,9 +2509,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-analysis"
-version = "0.8.0"
+version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1955b63c9e2addc5561306bfd41a3b2a39c5c1a4c21ff2a969e0ffd85f36f939"
+checksum = "aef0900d96d471514156d7c5de87d0727c26da6082249b937c31f0be8e5b6b93"
 dependencies = [
  "seiza-fits",
  "seiza-image-io",
@@ -2518,9 +2539,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.53.0"
+version = "0.55.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "6bc4a84ee2ca0d189f03222c49338567cb4d23183dfaef515535d76501f8cf92"
+checksum = "a13aabc896b43564bf09a8ee4abb614a9acb22473ddbf2ed7f3cbe4c2ea3beba"
 dependencies = [
  "cbindgen",
  "image",
@@ -2593,21 +2614,25 @@ dependencies = [
 
 [[package]]
 name = "seiza-download"
-version = "0.11.0"
+version = "0.12.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9e6e1f02effc2e590621cb8a3e257223a09f81acd2db7cc4802af7274ab87564"
+checksum = "b0610a025bad36a9481e541e2ffbf56ffa0a11032c50818d3978d6cd81c1291c"
 dependencies = [
  "async-compression",
  "directories",
+ "flate2",
  "fs2",
  "futures-util",
  "reqwest",
  "serde",
  "serde_json",
  "sha2 0.11.1",
+ "tar",
+ "tempfile",
  "thiserror",
  "tokio",
  "tokio-util",
+ "zip",
 ]
 
 [[package]]
@@ -2663,9 +2688,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-model"
-version = "0.4.0"
+version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9eaf282ff262a95f2bba5418897cc3b1208c6517e4da3868588dcf88a250b5b3"
+checksum = "950a91c3ba8c6d2b95f4da33f26cdc3abfbe3407c5546b951456578182189b56"
 dependencies = [
  "directories",
  "half",
@@ -2686,9 +2711,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-parallax"
-version = "0.23.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cbd7c7ae90e934a04e1920418b33575b8591d55599545351130740a2d350d97c"
+checksum = "d0275dc87bfa8f75c984d32395c7d580ac2302b87194292901c7c386108e939a"
 dependencies = [
  "ab_glyph",
  "image",
@@ -2705,9 +2730,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-pipeline"
-version = "0.5.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5fbebd9c64f9de6f5cf65849f1f7d1e7823411a0b9cc6c5c21d967bf324a2f09"
+checksum = "cd6535e66016815e0430ef8150b5982bdf20b36ccb5dd1a0fcfaefd996ae0d39"
 dependencies = [
  "rayon",
  "seiza-calibration",
@@ -2741,9 +2766,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-satellites"
-version = "0.24.0"
+version = "0.25.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b81eb948c64510309faa766fcac51044fea3435649be863e15d563544d592319"
+checksum = "e7d45d032a8e242c9d380314445ff5e767e997ad15cfab1bcd31610a3cb3e54c"
 dependencies = [
  "directories",
  "fs2",
@@ -2773,9 +2798,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-stacking"
-version = "0.61.0"
+version = "0.63.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b959ae08f2db2d3147f0821adea6b4d5f7abb9fa52ed5a75bdf30e0192b8738f"
+checksum = "95fb5ff0a2cd475ed6c280e66eb43630d0195201f206308b02b35839a5293455"
 dependencies = [
  "bytemuck",
  "fs2",
@@ -4207,10 +4232,42 @@ dependencies = [
 ]
 
 [[package]]
+name = "zip"
+version = "4.6.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "caa8cd6af31c3b31c6631b8f483848b91589021b28fffe50adada48d4f4d2ed1"
+dependencies = [
+ "arbitrary",
+ "crc32fast",
+ "flate2",
+ "indexmap",
+ "memchr",
+ "zopfli",
+]
+
+[[package]]
+name = "zlib-rs"
+version = "0.6.8"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "b268e58e7c693d7c271f93ffc4ba3b380412554231c85bf61ca7af91042a4112"
+
+[[package]]
 name = "zmij"
 version = "1.0.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "29666d0abbfad1e3dc4dcf6144730dd3a3ab225bbbdac83319345b1b44ccfc1b"
+
+[[package]]
+name = "zopfli"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "aaf7fc5d30c28483d93805c4a5e12b05bbb52407fa67c5f8bd552374cd01fb11"
+dependencies = [
+ "bumpalo",
+ "crc32fast",
+ "log",
+ "simd-adler32",
+]
 
 [[package]]
 name = "zstd"
