@@ -8,9 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.9.5 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.5/seiza-0.9.5-windows-x86_64.msi)
-· [0.9.5 release notes](docs/releases/v0.9.5.md)
-· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.5/SHA256SUMS.txt)
+[Download Seiza for Windows 0.9.6 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.6/seiza-0.9.6-windows-x86_64.msi)
+· [0.9.6 release notes](docs/releases/v0.9.6.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.6/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -139,22 +139,21 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.9.5 uses Seiza/C ABI 0.53.0, stacking 0.61.0, parallax
-0.23.0 and image-io 0.13.1 from published crates.
+0.9.6 uses Seiza/C ABI 0.55.0, stacking 0.63.0, parallax
+0.25.0 and image-io 0.13.1 from published crates.
 
-## New in 0.9.5
+## New in 0.9.6
 
-- Restore linear FITS and XISF stacks from **AI Models…** in the toolbar.
-  Seiza installs the recommended model automatically and checks for updates
-  from **Advanced processing**.
-- Preview the center tiles, adjust grain and mottle reduction, and save a
-  full-resolution linear FITS with WCS and model provenance.
-- Run models on Windows GPUs through the bundled DirectML runtime. Advanced
-  settings allow an explicit adapter, precision, tile size, or band scale.
-- Keep image commands in the toolbar and add the Seiza icon to dialog titles.
-- Use Quadratic registration by default for new stacks.
+- Keep noise-model GPU processing on the bundled DirectML runtime, with
+  automatic model downloads and center-tile previews.
+- Install or repair the fallback CPU runtime through Seiza's shared API,
+  with verified mirrors, app-local VC++ dependencies, and offline reuse.
+- Update Seiza to 0.55.0, including mosaic panel-background fixes and reduced
+  memory use for aperture photometry.
+- Check real model inference, blending, export and cancellation against the
+  packaged runtime before publishing an installer.
 
-See the [0.9.5 release notes](docs/releases/v0.9.5.md).
+See the [0.9.6 release notes](docs/releases/v0.9.6.md).
 
 ## New in 0.9.4
 
@@ -855,8 +854,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.9.5 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.5/seiza-0.9.5-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.5/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.9.6 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.6/seiza-0.9.6-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.6/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -922,7 +921,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.5
+  -p:SeizaVersion=0.9.6
 ```
 
 The installer is written to `dist`. See the

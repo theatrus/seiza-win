@@ -5,6 +5,14 @@ namespace Seiza.App.Interop;
 
 internal static partial class NativeMethods
 {
+    [LibraryImport(LibraryName, EntryPoint = "seiza_onnxruntime_installed_json", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint InstalledOnnxRuntime(string directory, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_onnxruntime_install_json", StringMarshalling = StringMarshalling.Utf8)]
+    internal static unsafe partial nint InstallOnnxRuntime(string directory,
+        delegate* unmanaged[Cdecl]<nint, nint, void> progress, SafeCancelSignalHandle cancel,
+        nint context, out nint error);
+
     [LibraryImport(LibraryName, EntryPoint = "seiza_model_list_json", StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint ListModels(string store, out nint error);
 
