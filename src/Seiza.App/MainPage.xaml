@@ -640,7 +640,7 @@
                     Text="Open an image, folder, or TXT/CSV image list; or drop one here."
                     TextAlignment="Center"
                     TextWrapping="Wrap" />
-                <TextBlock Text="To stack exposures, choose File → Stack images… and add frames." TextWrapping="Wrap" TextAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                <TextBlock Text="To stack exposures, choose Stack… in the toolbar and add frames." TextWrapping="Wrap" TextAlignment="Center" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
                 <Button Content="Open image list…" Click="OpenImageList_Click" HorizontalAlignment="Center" />
                 <TextBlock
                     HorizontalAlignment="Center"
