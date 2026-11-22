@@ -62,6 +62,7 @@
     <Compile Include="..\..\src\Seiza.App\Services\ImageDirectoryScanner.cs" Link="Services\ImageDirectoryScanner.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\StackFrameImport.cs" Link="Services\StackFrameImport.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageFileTypes.cs" Link="Services\ImageFileTypes.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\RestorationSourceSelection.cs" Link="Services\RestorationSourceSelection.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\NaturalStringComparer.cs" Link="Services\NaturalStringComparer.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\WindowLifetimeRegistry.cs" Link="Services\WindowLifetimeRegistry.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ParallaxRequestSource.cs" Link="Services\ParallaxRequestSource.cs" />
