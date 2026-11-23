@@ -45,7 +45,7 @@ internal sealed class RestorationWindow : Window
     private SafeRestorationHandle? _result;
     private ImageSource? _originalBitmap;
     private ImageSource? _restoredBitmap;
-    private string? _source;
+    private readonly RestorationSourceSelection _sourceSelection;
     private string? _savedPath;
     private string? _preferredModel;
     private NoiseModelCatalog? _catalog;
@@ -58,7 +58,7 @@ internal sealed class RestorationWindow : Window
     {
         Title = "AI Models — Seiza";
         WindowIcon.Apply(AppWindow);
-        _source = source;
+        _sourceSelection = new RestorationSourceSelection(source);
         _preferredModel = CatalogSettingsStore.LoadPreferredNoiseModel();
         SetSourceLabel();
 
@@ -201,7 +201,7 @@ internal sealed class RestorationWindow : Window
             await RefreshModelsAsync(token, refreshCatalog: true);
             await EnsureRuntimeAsync(progress, token);
             await EnsureModelAsync(progress, token);
-            Show(_source is null ? "Choose a linear mono or RGB image." : "Ready to restore the selected image.");
+            ShowSourceStatus();
         }, "Checking the Seiza model catalog…", canCancel: false);
     }
 
@@ -229,10 +229,27 @@ internal sealed class RestorationWindow : Window
 
     internal void UseSource(string? source)
     {
-        if (_operation is not null || source is null || string.Equals(source, _source, StringComparison.OrdinalIgnoreCase)) return;
-        _source = source;
+        if (_closed) return;
+        if (_sourceSelection.Request(source, busy: _operation is not null)) SourceChanged();
+    }
+
+    private void SourceChanged()
+    {
         SetSourceLabel();
         InvalidateResult();
+        _savedPath = null;
+        _openOutput.Visibility = Visibility.Collapsed;
+        ShowSourceStatus();
+    }
+
+    private void ShowSourceStatus()
+    {
+        if (_sourceSelection.Path is null)
+            Show("Open an image in Seiza, or choose a linear FITS or XISF stack.");
+        else if (!_sourceSelection.CanProcess)
+            Show("This image format cannot be processed by the noise model. Use a linear FITS or XISF stack.", InfoBarSeverity.Warning);
+        else
+            Show("Current image selected. Preview the center tiles or save a full restored FITS.");
     }
 
     private static StackPanel Buttons(params Button[] buttons)
@@ -339,10 +356,8 @@ internal sealed class RestorationWindow : Window
         var selected = await picker.PickSingleFileAsync();
         if (selected is null || _closed) return;
         token.ThrowIfCancellationRequested();
-        _source = selected.Path;
-        SetSourceLabel();
-        InvalidateResult();
-        Show("Image selected.");
+        if (_sourceSelection.Select(selected.Path)) SourceChanged();
+        else ShowSourceStatus();
     }, "Choose a linear FITS or XISF image.", canCancel: false);
 
     private void ImportModel() => Perform(async (_, token) =>
@@ -376,7 +391,7 @@ internal sealed class RestorationWindow : Window
 
     private void Run() => Perform(async (progress, token) =>
     {
-        if (_source is not string input) return;
+        if (!_sourceSelection.CanProcess || _sourceSelection.Path is not string input) return;
         await EnsureRuntimeAsync(progress, token);
         var model = await EnsureModelAsync(progress, token);
         var options = ReadOptions();
@@ -442,7 +457,7 @@ internal sealed class RestorationWindow : Window
 
     private void Save() => Perform(async (progress, token) =>
     {
-        if (_source is not string input) return;
+        if (!_sourceSelection.CanProcess || _sourceSelection.Path is not string input) return;
         var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(AppWindow.Id)
         {
             SuggestedFileName = Path.GetFileNameWithoutExtension(input) + "-restored",
@@ -463,8 +478,10 @@ internal sealed class RestorationWindow : Window
 
     private void SetSourceLabel()
     {
-        _sourceLabel.Text = _source is null ? "Choose a linear FITS or XISF stack." : Path.GetFileName(_source);
-        ToolTipService.SetToolTip(_sourceLabel, _source);
+        string? source = _sourceSelection.Path;
+        _sourceLabel.Text = source is null ? "No image selected" : $"Current image: {Path.GetFileName(source)}";
+        _browse.Content = source is null ? "Choose image…" : "Change image…";
+        ToolTipService.SetToolTip(_sourceLabel, source);
     }
 
     private void MarkPreviewStale()
@@ -514,6 +531,7 @@ internal sealed class RestorationWindow : Window
             {
                 _progress.Visibility = Visibility.Collapsed;
                 _cancel.Visibility = Visibility.Collapsed;
+                if (_sourceSelection.ApplyPending()) SourceChanged();
                 UpdateButtons();
             }
         }
@@ -522,7 +540,7 @@ internal sealed class RestorationWindow : Window
     private void UpdateButtons()
     {
         bool idle = _operation is null;
-        _run.IsEnabled = _save.IsEnabled = idle && _source is not null;
+        _run.IsEnabled = _save.IsEnabled = idle && _sourceSelection.CanProcess;
         _refresh.IsEnabled = idle && _result is not null;
         _verify.IsEnabled = _remove.IsEnabled = idle && SelectedModel is not null;
         _browse.IsEnabled = _download.IsEnabled = _import.IsEnabled = _model.IsEnabled = idle;

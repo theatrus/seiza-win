@@ -8,9 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.9.6 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.6/seiza-0.9.6-windows-x86_64.msi)
-· [0.9.6 release notes](docs/releases/v0.9.6.md)
-· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.6/SHA256SUMS.txt)
+[Download Seiza for Windows 0.9.7 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.7/seiza-0.9.7-windows-x86_64.msi)
+· [0.9.7 release notes](docs/releases/v0.9.7.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.7/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -55,8 +55,9 @@ calibration masters independently of a light stack.
 ## AI Models
 
 Open a linear mono or RGB FITS or XISF stack and choose **AI Models…**
-from the toolbar's **More options** menu. Seiza checks the model catalog and
-automatically installs the recommended model and ONNX Runtime as needed.
+from the toolbar's **More options** menu. The current image is already selected;
+**Change image…** is only needed to use a different file. Seiza checks the model
+catalog and automatically installs the recommended model and ONNX Runtime as needed.
 Installed models work offline. Under **Advanced processing**, choose a
 different model from the catalog, check for updates, or import a local model
 folder containing `card.json` and its graphs. Seiza downloads the selected
@@ -139,8 +140,18 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.9.6 uses Seiza/C ABI 0.55.0, stacking 0.63.0, parallax
+0.9.7 uses Seiza/C ABI 0.55.0, stacking 0.63.0, parallax
 0.25.0 and image-io 0.13.1 from published crates.
+
+## New in 0.9.7
+
+- Open AI Models with the current browser image selected, including when an
+  existing dialog is still preparing a model or processing another image.
+- Clearly label the current image and use **Change image…** for an optional
+  replacement. Unsupported image formats remain visible with an explanation.
+- Clear the old preview and saved-image shortcut when switching source images.
+
+See the [0.9.7 release notes](docs/releases/v0.9.7.md).
 
 ## New in 0.9.6
 
@@ -854,8 +865,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.9.6 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.6/seiza-0.9.6-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.6/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.9.7 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.7/seiza-0.9.7-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.7/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -921,7 +932,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.6
+  -p:SeizaVersion=0.9.7
 ```
 
 The installer is written to `dist`. See the
