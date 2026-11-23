@@ -1250,6 +1250,7 @@ public sealed partial class MainPage : Page, IDisposable
             ImageSourceHeader? sourceHeader = await Task.Run(() => ImageSourceService.TryReadHeader(path), cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
             string? sidecarWarning = null;
+            bool restoredSidecar = false;
             if (isNewImage && processingOverride is null)
             {
                 processing = ColorWorkflowService.InitialProcessingFromHeader(sourceHeader);
@@ -1257,7 +1258,12 @@ public sealed partial class MainPage : Page, IDisposable
                 {
                     try
                     {
-                        processing = await ProcessingSidecarService.ReadAsync(path, cancellationToken) ?? processing;
+                        FitsImageProcessingConfiguration? saved = await ProcessingSidecarService.ReadAsync(path, cancellationToken);
+                        if (saved is not null)
+                        {
+                            processing = saved;
+                            restoredSidecar = true;
+                        }
                     }
                     catch (OperationCanceledException) { throw; }
                     catch (Exception error)
@@ -1266,11 +1272,21 @@ public sealed partial class MainPage : Page, IDisposable
                     }
                 }
             }
-            RenderedImageData image = await ImageRenderService.RenderAsync(
-                path,
-                processing,
-                cancellationToken: cancellationToken, progress: new Progress<RestorationProgress>(step =>
-                { if (!_disposed && generation == _loadGeneration) ViewModel.StatusText = step.Message; }));
+            var progress = new Progress<RestorationProgress>(step =>
+            { if (!_disposed && generation == _loadGeneration) ViewModel.StatusText = step.Message; });
+            RenderedImageData image;
+            try
+            {
+                image = await ImageRenderService.RenderAsync(path, processing, cancellationToken: cancellationToken, progress: progress);
+            }
+            catch (Exception error) when (restoredSidecar && error is not OperationCanceledException && !cancellationToken.IsCancellationRequested)
+            {
+                // A portable recipe may need a model/provider that is unavailable
+                // here. Keep the image accessible without rewriting that recipe.
+                processing = ColorWorkflowService.InitialProcessingFromHeader(sourceHeader);
+                sidecarWarning = $"Saved processing could not be applied. Opened with default processing; the sidecar is unchanged. {error.Message}";
+                image = await ImageRenderService.RenderAsync(path, processing, cancellationToken: cancellationToken, progress: progress);
+            }
             cancellationToken.ThrowIfCancellationRequested();
             if (_disposed || generation != _loadGeneration)
             {
