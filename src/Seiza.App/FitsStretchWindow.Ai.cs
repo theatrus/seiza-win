@@ -35,14 +35,21 @@ public sealed partial class FitsStretchWindow
         AiToggle.IsOn = ai is not null;
         _isUpdating = false;
         BuildAiControls();
+        RefreshAiState();
     }
 
     private void AiToggle_Toggled(object sender, RoutedEventArgs e)
     {
         if (_isUpdating) return;
         _ai = AiToggle.IsOn ? _retainedAi : null;
-        BuildAiControls();
+        RefreshAiState();
+        AiSettings.IsExpanded = _ai is not null;
         DraftChanged();
+    }
+
+    private void RefreshAiState()
+    {
+        AiSettings.Visibility = _ai is null ? Visibility.Collapsed : Visibility.Visible;
     }
 
     private void ChangeAi(Func<AiProcessing, AiProcessing> change)
@@ -54,17 +61,16 @@ public sealed partial class FitsStretchWindow
 
     private void BuildAiControls()
     {
-        AiParameterPanel.Children.Clear();
-        AiParameterPanel.Visibility = _ai is null ? Visibility.Collapsed : Visibility.Visible;
-        if (_ai is null) return;
+        // Construct once. Reparenting controls from an unrealized Expander when
+        // toggling off/on can raise a WinUI fatal XAML exception.
         void Strength(string label, double value, double min, double max, Action<double> changed)
         {
             var slider = new Slider { Header = $"{label} ({value:P0})", Minimum = min, Maximum = max, Value = value, StepFrequency = 0.01 };
             slider.ValueChanged += (_, args) => { slider.Header = $"{label} ({args.NewValue:P0})"; changed(args.NewValue); };
             AiParameterPanel.Children.Add(slider);
         }
-        Strength("Grain reduction", _ai.High, 0, 1, value => ChangeAi(ai => ai with { High = value }));
-        Strength("Mottle reduction", _ai.Low, 0, 1, value => ChangeAi(ai => ai with { Low = value }));
+        Strength("Grain reduction", _retainedAi.High, 0, 1, value => ChangeAi(ai => ai with { High = value }));
+        Strength("Mottle reduction", _retainedAi.Low, 0, 1, value => ChangeAi(ai => ai with { Low = value }));
         var saveLinear = new Button { Content = "Save linear AI FITS…" };
         saveLinear.Click += async (_, _) => await ModelActionAsync(async token =>
         {
@@ -118,10 +124,6 @@ public sealed partial class FitsStretchWindow
         AiParameterPanel.Children.Add(_aiOutlineToggle);
         RefreshRegionLabel();
         var advanced = new StackPanel { Spacing = 10 };
-        // A fresh panel owns each control; do not reuse a parented ComboBox.
-        if (_aiModel.Parent is Panel old) old.Children.Remove(_aiModel);
-        if (_aiModelStatus.Parent is Panel oldStatus) oldStatus.Children.Remove(_aiModelStatus);
-        _aiModel = new ComboBox { Header = "Model", HorizontalAlignment = HorizontalAlignment.Stretch };
         _aiModel.ItemsSource = new[] { new AiModelChoice(null) }.Concat(_retainedAi.Model is { } name ? [new AiModelChoice(name)] : []);
         _aiModel.SelectedIndex = _retainedAi.Model is null ? 0 : 1;
         _aiModel.SelectionChanged += (_, _) => { if (!_isUpdating && _aiModel.SelectedItem is AiModelChoice choice) ChangeAi(ai => ai with { Model = choice.Name }); };
@@ -187,7 +189,13 @@ public sealed partial class FitsStretchWindow
             if (folder is null) return;
             var model = await RestorationService.ImportAsync(folder.Path, token);
             ChangeAi(ai => ai with { Model = model.Name });
-            BuildAiControls();
+            _isUpdating = true;
+            try
+            {
+                _aiModel.ItemsSource = new[] { new AiModelChoice(null), new AiModelChoice(model.Name) };
+                _aiModel.SelectedIndex = 1;
+            }
+            finally { _isUpdating = false; }
             _aiModelStatus.Text = $"Using {model.Name}.";
         });
         advanced.Children.Add(import);

@@ -8,9 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.10.0 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.10.0/seiza-0.10.0-windows-x86_64.msi)
-· [0.10.0 release notes](docs/releases/v0.10.0.md)
-· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.10.0/SHA256SUMS.txt)
+[Download Seiza for Windows 0.10.1 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.10.1/seiza-0.10.1-windows-x86_64.msi)
+· [0.10.1 release notes](docs/releases/v0.10.1.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.10.1/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -145,8 +145,21 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.10.0 uses Seiza/C ABI 0.56.0, stacking 0.64.0, parallax
+0.10.1 uses Seiza/C ABI 0.56.0, stacking 0.64.0, parallax
 0.26.0 and image-io 0.13.1 from published crates.
+
+## New in 0.10.1
+
+- Processing settings are remembered in a `.seiza.json` sidecar beside each image
+  and restored when you reopen it. Save changes, paste, undo and redo update the
+  recipe; previews and Cancel do not modify it. Keep the sidecar with the image
+  when moving or renaming it (for example, `M31.xisf.seiza.json`).
+- AI noise reduction settings fold away so the following steps stay visible.
+  Switching noise reduction off and back on preserves its settings without crashing.
+- Choose a selected rectangle or the full image for AI previews, and hide the
+  rectangle outline without rerunning inference.
+
+See the [0.10.1 release notes](docs/releases/v0.10.1.md).
 
 ## New in 0.10.0
 
@@ -879,8 +892,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.10.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.10.0/seiza-0.10.0-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.10.0/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.10.1 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.10.1/seiza-0.10.1-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.10.1/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -946,7 +959,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.10.0
+  -p:SeizaVersion=0.10.1
 ```
 
 The installer is written to `dist`. See the

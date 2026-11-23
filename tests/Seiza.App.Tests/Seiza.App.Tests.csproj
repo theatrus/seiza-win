@@ -124,6 +124,7 @@
     <Compile Include="..\..\src\Seiza.App\Models\StarAnalysisOptions.cs" Link="Models\StarAnalysisOptions.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\SeizaJsonSerializerContext.cs" Link="Models\SeizaJsonSerializerContext.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\AtomicOutputFile.cs" Link="Services\AtomicOutputFile.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ProcessingSidecarService.cs" Link="Services\ProcessingSidecarService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationPreparationService.cs" Link="Services\CalibrationPreparationService.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationCachePaths.cs" Link="Services\CalibrationCachePaths.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\CalibrationService.cs" Link="Services\CalibrationService.cs" />

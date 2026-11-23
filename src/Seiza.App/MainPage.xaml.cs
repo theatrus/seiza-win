@@ -530,10 +530,12 @@ public sealed partial class MainPage : Page, IDisposable
             var processing = new FitsImageProcessingConfiguration(
                 requestedStack,
                 requestedBackground,
-                requestedDeconvolution, ai: window.ResultAi);
+                requestedDeconvolution, ai: window.ResultAi)
+            { PreserveDisplaySamples = currentProcessing.PreserveDisplaySamples };
             bool changed = !_processingHistory.Current.Equals(processing);
             if (!changed)
             {
+                await SaveProcessingSidecarAsync(path, processing);
                 return;
             }
 
@@ -547,6 +549,7 @@ public sealed partial class MainPage : Page, IDisposable
                 {
                     InspectorControl.ShowMetadata(_currentMetadata, CurrentProcessing());
                 }
+                await SaveProcessingSidecarAsync(path, processing);
             }
         }
         finally
@@ -569,14 +572,22 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void UndoStretch_Click(object sender, RoutedEventArgs e)
     {
-        if (_currentPath is null || !_processingHistory.Undo())
+        if (_currentPath is null || ViewModel.IsLoading || !_processingHistory.Undo())
         {
             return;
         }
-        if (!await LoadImageAsync(
-            _currentPath,
+        string path = _currentPath;
+        FitsImageProcessingConfiguration processing = _processingHistory.Current.Clone();
+        Task<bool> load = LoadImageAsync(
+            path,
             preserveSolution: true,
-            processingOverride: _processingHistory.Current))
+            processingOverride: processing);
+        int generation = _loadGeneration;
+        if (await load)
+        {
+            await SaveProcessingSidecarAsync(path, processing);
+        }
+        else if (generation == _loadGeneration)
         {
             _processingHistory.Redo();
         }
@@ -585,14 +596,22 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void RedoStretch_Click(object sender, RoutedEventArgs e)
     {
-        if (_currentPath is null || !_processingHistory.Redo())
+        if (_currentPath is null || ViewModel.IsLoading || !_processingHistory.Redo())
         {
             return;
         }
-        if (!await LoadImageAsync(
-            _currentPath,
+        string path = _currentPath;
+        FitsImageProcessingConfiguration processing = _processingHistory.Current.Clone();
+        Task<bool> load = LoadImageAsync(
+            path,
             preserveSolution: true,
-            processingOverride: _processingHistory.Current))
+            processingOverride: processing);
+        int generation = _loadGeneration;
+        if (await load)
+        {
+            await SaveProcessingSidecarAsync(path, processing);
+        }
+        else if (generation == _loadGeneration)
         {
             _processingHistory.Undo();
         }
@@ -995,14 +1014,17 @@ public sealed partial class MainPage : Page, IDisposable
 
     private async void PasteAdjustments_Click(object sender, RoutedEventArgs e)
     {
-        if (_currentPath is null || !SupportsAstronomyProcessing(_currentMetadata))
+        if (_currentPath is null || ViewModel.IsLoading || !SupportsAstronomyProcessing(_currentMetadata))
         {
             return;
         }
 
+        string path = _currentPath;
+        int generation = _loadGeneration;
         try
         {
             string? json = await ClipboardService.GetProcessingJsonAsync();
+            if (generation != _loadGeneration || _disposed) return;
             if (json is null)
             {
                 ViewModel.ErrorMessage = "The clipboard doesn’t contain Seiza processing settings.";
@@ -1013,13 +1035,15 @@ public sealed partial class MainPage : Page, IDisposable
                 FitsImageProcessingConfiguration.FromClipboardJson(json);
             if (processing.Equals(CurrentProcessing()))
             {
+                await SaveProcessingSidecarAsync(path, processing);
                 return;
             }
 
-            if (await LoadImageAsync(_currentPath, preserveSolution: true, processingOverride: processing))
+            if (await LoadImageAsync(path, preserveSolution: true, processingOverride: processing))
             {
                 _processingHistory.Replace(processing);
                 _isInspectorOpen = true;
+                await SaveProcessingSidecarAsync(path, processing);
             }
             UpdateVisualState();
         }
@@ -1225,8 +1249,23 @@ public sealed partial class MainPage : Page, IDisposable
         {
             ImageSourceHeader? sourceHeader = await Task.Run(() => ImageSourceService.TryReadHeader(path), cancellationToken);
             cancellationToken.ThrowIfCancellationRequested();
+            string? sidecarWarning = null;
             if (isNewImage && processingOverride is null)
+            {
                 processing = ColorWorkflowService.InitialProcessingFromHeader(sourceHeader);
+                if (ImageFileService.IsAstronomyImage(path))
+                {
+                    try
+                    {
+                        processing = await ProcessingSidecarService.ReadAsync(path, cancellationToken) ?? processing;
+                    }
+                    catch (OperationCanceledException) { throw; }
+                    catch (Exception error)
+                    {
+                        sidecarWarning = $"Couldn’t read {Path.GetFileName(ProcessingSidecarService.PathFor(path))}. Opened with default processing. {error.Message}";
+                    }
+                }
+            }
             RenderedImageData image = await ImageRenderService.RenderAsync(
                 path,
                 processing,
@@ -1258,6 +1297,7 @@ public sealed partial class MainPage : Page, IDisposable
             InspectorControl.SourcePixels.SetSource(path);
             InspectorControl.ShowSourceCommentary(sourceHeader);
             ViewModel.CompleteLoading(path, image.Metadata);
+            if (sidecarWarning is not null) ViewModel.ErrorMessage = sidecarWarning;
             _ownerWindow?.SetDocumentTitle(Path.GetFileName(path));
 
             FitImageToWindow();
@@ -1312,6 +1352,16 @@ public sealed partial class MainPage : Page, IDisposable
         }
         _bitmap = nextBitmap;
         ImageCanvas.Invalidate();
+    }
+
+    private async Task SaveProcessingSidecarAsync(string path, FitsImageProcessingConfiguration processing)
+    {
+        try { await ProcessingSidecarService.SaveAsync(path, processing); }
+        catch (Exception error)
+        {
+            if (!_disposed && string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+                ViewModel.ErrorMessage = $"Processing applied, but couldn’t save {Path.GetFileName(ProcessingSidecarService.PathFor(path))}. These changes won’t be remembered when reopened. {error.Message}";
+        }
     }
 
     private FitsImageProcessingConfiguration CurrentProcessing(bool interactivePreview = false)
