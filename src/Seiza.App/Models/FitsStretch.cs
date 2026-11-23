@@ -366,17 +366,20 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         FitsStretchStack stretchStack,
         FitsBackgroundConfiguration? backgroundConfiguration,
         FitsDeconvolutionConfiguration? deconvolution = null,
-        bool interactivePreview = false)
+        bool interactivePreview = false,
+        AiProcessing? ai = null)
     {
         StretchStack = stretchStack.Clone();
         BackgroundConfiguration = backgroundConfiguration?.Clone();
         Deconvolution = deconvolution?.Clone();
         InteractivePreview = interactivePreview;
+        Ai = ai;
     }
 
     public FitsStretchStack StretchStack { get; }
     public FitsBackgroundConfiguration? BackgroundConfiguration { get; }
     public FitsDeconvolutionConfiguration? Deconvolution { get; }
+    public AiProcessing? Ai { get; }
     public bool InteractivePreview { get; }
     public bool PreserveDisplaySamples { get; set; }
 
@@ -388,13 +391,15 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         StretchStack,
         BackgroundConfiguration,
         Deconvolution,
-        interactivePreview ?? InteractivePreview) { PreserveDisplaySamples = PreserveDisplaySamples };
+        interactivePreview ?? InteractivePreview, Ai) { PreserveDisplaySamples = PreserveDisplaySamples };
 
-    public string ToJson()
+    public string ToJson() => ToJson(includeAi: false);
+
+    public string ToJson(bool includeAi)
     {
         string? validationMessage = StretchStack.ValidationMessage ??
             BackgroundConfiguration?.ValidationMessage ??
-            Deconvolution?.ValidationMessage;
+            Deconvolution?.ValidationMessage ?? Ai?.ValidationMessage;
         if (validationMessage is not null)
         {
             throw new InvalidOperationException(validationMessage);
@@ -443,6 +448,11 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
                 writer.WriteNumber("max_correction", Deconvolution.MaxCorrection);
                 writer.WriteEndObject();
             }
+            if (includeAi && Ai is not null)
+            {
+                writer.WritePropertyName("aiNoiseReduction");
+                Ai.WriteJson(writer);
+            }
             if (InteractivePreview)
             {
                 writer.WriteBoolean("interactive_preview", true);
@@ -454,7 +464,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
 
     public string ToClipboardJson()
     {
-        using JsonDocument processing = JsonDocument.Parse(ToJson());
+        using JsonDocument processing = JsonDocument.Parse(ToJson(includeAi: true));
         using var stream = new MemoryStream();
         using (var writer = new Utf8JsonWriter(stream, new JsonWriterOptions { Indented = true }))
         {
@@ -502,7 +512,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
     public bool Equals(FitsImageProcessingConfiguration? other) => other is not null &&
         StretchStack.Equals(other.StretchStack) &&
         Equals(BackgroundConfiguration, other.BackgroundConfiguration) &&
-        Equals(Deconvolution, other.Deconvolution) &&
+        Equals(Deconvolution, other.Deconvolution) && Equals(Ai, other.Ai) &&
         InteractivePreview == other.InteractivePreview && PreserveDisplaySamples == other.PreserveDisplaySamples;
 
     public override bool Equals(object? obj) => Equals(obj as FitsImageProcessingConfiguration);
@@ -511,7 +521,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         StretchStack,
         BackgroundConfiguration,
         Deconvolution,
-        InteractivePreview, PreserveDisplaySamples);
+        InteractivePreview, PreserveDisplaySamples, Ai);
 
     private static FitsImageProcessingConfiguration FromJsonElement(JsonElement root)
     {
@@ -603,7 +613,8 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         var result = new FitsImageProcessingConfiguration(
             new FitsStretchStack(stages),
             backgroundConfiguration,
-            deconvolution);
+            deconvolution,
+            ai: root.TryGetProperty("aiNoiseReduction", out var ai) ? AiProcessing.ReadJson(ai) : null);
         result.PreserveDisplaySamples = root.TryGetProperty("sample_domain", out JsonElement domain) &&
             domain.TryGetProperty("type", out JsonElement type) && type.GetString() == "physical-linear" &&
             domain.TryGetProperty("normalization", out JsonElement normalization) &&
@@ -612,7 +623,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
             normalization.TryGetProperty("white", out JsonElement white) && white.GetDouble() == 1;
         string? validationMessage = result.StretchStack.ValidationMessage ??
             result.BackgroundConfiguration?.ValidationMessage ??
-            result.Deconvolution?.ValidationMessage;
+            result.Deconvolution?.ValidationMessage ?? result.Ai?.ValidationMessage;
         if (validationMessage is not null)
         {
             throw new FormatException(validationMessage);

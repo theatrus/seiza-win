@@ -160,7 +160,7 @@ internal sealed class ParallaxSession : INotifyPropertyChanged, IDisposable
             Directory.CreateDirectory(_directory);
             if (ImageFileService.IsAstronomyImage(_sourcePath))
             {
-                RenderedImage16Data source = await Task.Run(() => SeizaCore.Render16(_sourcePath, _processing));
+                RenderedImage16Data source = await ImageRenderService.Render16Async(_sourcePath, _processing);
                 StorageFile file = await StorageFile.GetFileFromPathAsync(CreateSnapshotPath());
                 await ImageExportService.Save16Async(source, new(file, new(ImageExportFormat.Png, ImageExportBitDepth.Sixteen, false)));
                 Width = source.Width; Height = source.Height;

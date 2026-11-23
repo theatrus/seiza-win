@@ -48,6 +48,20 @@ internal static partial class NativeMethods
         [MarshalAs(UnmanagedType.U1)] bool center, delegate* unmanaged[Cdecl]<nuint, nuint, nuint, nuint, nint, void> progress,
         SafeCancelSignalHandle cancel, nint context, out nint error);
 
+    [LibraryImport(LibraryName, EntryPoint = "seiza_noise_model_denoise_file_region", StringMarshalling = StringMarshalling.Utf8)]
+    internal static unsafe partial nint RunRestorationRegion(SafeNoiseModelHandle model, string input,
+        nuint x, nuint y, nuint width, nuint height,
+        delegate* unmanaged[Cdecl]<nuint, nuint, nuint, nuint, nint, void> progress,
+        SafeCancelSignalHandle cancel, nint context, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_file_restoration_write_preview_in_context", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint BlendRestorationPreviewInContext(SafeRestorationHandle result, string source, string output,
+        float high, float low, float scalePx, out nint error);
+
+    [LibraryImport(LibraryName, EntryPoint = "seiza_file_restoration_write_preview_linear", StringMarshalling = StringMarshalling.Utf8)]
+    internal static partial nint BlendRestorationPreviewLinear(SafeRestorationHandle result, string output,
+        float high, float low, float scalePx, out nint error);
+
     [LibraryImport(LibraryName, EntryPoint = "seiza_file_restoration_write", StringMarshalling = StringMarshalling.Utf8)]
     internal static partial nint BlendRestoration(SafeRestorationHandle result, string output, string? original,
         float high, float low, float scalePx, out nint error);

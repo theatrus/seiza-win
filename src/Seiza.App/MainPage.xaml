@@ -29,8 +29,6 @@
             <CommandBar.SecondaryCommands>
                 <AppBarButton Click="NewWindow_Click" Label="New window" />
                 <AppBarButton x:Name="ParallaxVideoButton" Click="ParallaxVideo_Click" Label="Parallax video…" IsEnabled="False" />
-                <AppBarButton Click="RestoreImage_Click" Label="AI Models…"
-                              ToolTipService.ToolTip="Restore a linear FITS or XISF stack with a Seiza noise model" />
                 <AppBarSeparator />
                 <AppBarButton Click="CheckForUpdates_Click" Label="Check for updates…" />
                 <AppBarSeparator />
@@ -216,8 +214,8 @@
                 x:Name="UndoStretchButton"
                 Click="UndoStretch_Click"
                 IsEnabled="False"
-                Label="Undo stretch"
-                ToolTipService.ToolTip="Undo the last stretch change (Ctrl+Z)">
+                Label="Undo processing"
+                ToolTipService.ToolTip="Undo the last processing change (Ctrl+Z)">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE7A7;" />
                 </AppBarButton.Icon>
@@ -229,8 +227,8 @@
                 x:Name="RedoStretchButton"
                 Click="RedoStretch_Click"
                 IsEnabled="False"
-                Label="Redo stretch"
-                ToolTipService.ToolTip="Redo the last stretch change (Ctrl+Shift+Z)">
+                Label="Redo processing"
+                ToolTipService.ToolTip="Redo the last processing change (Ctrl+Shift+Z)">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE7A6;" />
                 </AppBarButton.Icon>
@@ -242,7 +240,7 @@
                 x:Name="StretchButton"
                 Click="Stretch_Click"
                 IsEnabled="False"
-                Label="Stretch"
+                Label="Processing"
                 ToolTipService.ToolTip="Processing controls are available for FITS and XISF images">
                 <AppBarButton.Icon>
                     <FontIcon Glyph="&#xE790;" />
@@ -666,6 +664,11 @@
                 </StackPanel>
             </Border>
 
+            <InfoBar x:Name="ProcessingRegionBanner" IsOpen="True" IsClosable="False"
+                Visibility="Collapsed" VerticalAlignment="Bottom" HorizontalAlignment="Center" Margin="16"
+                Message="Drag a preview rectangle on the image (up to 2048 × 2048 pixels).">
+                <InfoBar.ActionButton><Button Content="Cancel selection" Click="CancelProcessingRegion_Click" /></InfoBar.ActionButton>
+            </InfoBar>
             <Border
                 x:Name="SymmetryPickerBanner"
                 Margin="16"

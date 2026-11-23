@@ -4,13 +4,16 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Automation;
 using Microsoft.UI.Xaml.Controls;
 using Seiza.App.Models;
+using Seiza.App.Services;
 using Windows.Graphics;
 
 namespace Seiza.App;
 
 internal sealed record FitsStretchPreviewRequest(
     FitsImageProcessingConfiguration Processing,
-    CancellationToken CancellationToken);
+    CancellationToken CancellationToken,
+    ProcessingRegion? Region = null,
+    IProgress<RestorationProgress>? Progress = null);
 
 public sealed partial class FitsStretchWindow : Window
 {
@@ -50,7 +53,9 @@ public sealed partial class FitsStretchWindow : Window
         FitsBackgroundConfiguration? background,
         FitsDeconvolutionConfiguration? deconvolution,
         bool supportsColor,
-        bool preserveColor = false)
+        bool preserveColor = false,
+        AiProcessing? ai = null,
+        ProcessingRegion? previewRegion = null)
     {
         InitializeComponent();
         _preserveColor = preserveColor;
@@ -84,6 +89,7 @@ public sealed partial class FitsStretchWindow : Window
         _isUpdating = false;
         ColorPanel.Visibility = supportsColor ? Visibility.Visible : Visibility.Collapsed;
         RefreshEditor();
+        InitializeAi(ai, previewRegion ?? ProcessingRegion.Center(768, 768));
     }
 
     internal Func<FitsStretchPreviewRequest, Task>? PreviewRequested { get; set; }
@@ -882,7 +888,7 @@ public sealed partial class FitsStretchWindow : Window
             .Select(stage => stage.ValidationMessage)
             .FirstOrDefault(candidate => candidate is not null) ??
             _background?.ValidationMessage ??
-            _deconvolution?.ValidationMessage;
+            _deconvolution?.ValidationMessage ?? _ai?.ValidationMessage;
         SaveButton.IsEnabled = message is null;
         ValidationInfoBar.Message = message ?? string.Empty;
         ValidationInfoBar.IsOpen = message is not null;
@@ -913,8 +919,10 @@ public sealed partial class FitsStretchWindow : Window
                 new FitsStretchStack(_stages),
                 _background,
                 _deconvolution,
-                interactivePreview: true);
-            await PreviewRequested(new FitsStretchPreviewRequest(processing, cancellationToken));
+                interactivePreview: true, ai: _ai);
+            await PreviewRequested(new FitsStretchPreviewRequest(processing, cancellationToken,
+                _ai is null ? null : _aiRegion, new Progress<RestorationProgress>(step =>
+                { if (generation == _previewGeneration && !cancellationToken.IsCancellationRequested) SetPreviewStatus(true, step.Message); })));
             if (generation == _previewGeneration && !cancellationToken.IsCancellationRequested)
             {
                 SetPreviewStatus(false, string.Empty);
@@ -966,6 +974,9 @@ public sealed partial class FitsStretchWindow : Window
         CancelPreview();
         PreviewRequested = null;
         PickSymmetryPointRequested = null;
+        PickPreviewRegionRequested = null;
+        SaveLinearAiRequested = null;
+        _modelCancellation?.Cancel();
         _completion.TrySetResult(false);
     }
 

@@ -85,6 +85,8 @@ public sealed partial class ImageInspector : UserControl
                 ? current.Type.Title()
                 : $"{processing.StretchStack.Stages.Count} stages · {current.Type.Title()}";
             ImageDetails.Add(new("Stretch", stretch));
+            if (processing.Ai is { } ai)
+                ImageDetails.Add(new("AI noise reduction", $"Grain {ai.High:P0} · mottle {ai.Low:P0}"));
             if (SupportsColorStretch(metadata))
             {
                 ImageDetails.Add(new("Color", current.ColorStrategy.Title()));
