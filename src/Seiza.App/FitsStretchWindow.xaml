@@ -30,10 +30,21 @@
             <StackPanel Spacing="16">
                 <StackPanel Spacing="10">
                     <TextBlock Style="{ThemeResource BodyStrongTextBlockStyle}" Text="Linear processing" />
-                    <ToggleSwitch x:Name="AiToggle" Header="AI noise reduction" OffContent="Off" OnContent="On" Toggled="AiToggle_Toggled" />
-                    <TextBlock Text="Reduce grain and mottle in the linear image before background correction, deconvolution and stretching. The recommended model installs automatically."
-                        TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
-                    <StackPanel x:Name="AiParameterPanel" Spacing="10" />
+                    <Border Padding="12" CornerRadius="8" BorderThickness="1"
+                        BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
+                        Background="{ThemeResource CardBackgroundFillColorDefaultBrush}">
+                        <StackPanel Spacing="10">
+                            <ToggleSwitch x:Name="AiToggle" Header="AI noise reduction" OffContent="Off" OnContent="On" Toggled="AiToggle_Toggled" />
+                            <Expander x:Name="AiSettings" Header="Noise reduction settings and preview" IsExpanded="False"
+                                HorizontalAlignment="Stretch" HorizontalContentAlignment="Stretch">
+                                <StackPanel Spacing="10">
+                                    <TextBlock Text="Reduce grain and mottle before the following steps. The recommended model installs automatically."
+                                        TextWrapping="Wrap" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                                    <StackPanel x:Name="AiParameterPanel" Spacing="10" />
+                                </StackPanel>
+                            </Expander>
+                        </StackPanel>
+                    </Border>
 
                     <ToggleSwitch
                         x:Name="BackgroundToggle"
@@ -47,6 +58,8 @@
                         Text="Fit and correct a smooth background in linear astronomy samples before deconvolution and stretching."
                         TextWrapping="Wrap" />
                     <StackPanel x:Name="BackgroundParameterPanel" Spacing="10" />
+
+                    <Rectangle Height="1" Margin="0,6" Fill="{ThemeResource DividerStrokeColorDefaultBrush}" />
 
                     <ToggleSwitch
                         x:Name="DeconvolutionToggle"
@@ -219,7 +232,7 @@
             </Grid>
             <TextBlock Grid.Row="1"
                 Foreground="{ThemeResource TextFillColorSecondaryBrush}"
-                Text="Save changes applies the steps to the full image. Export saves the processed result."
+                Text="Save changes remembers these steps beside the image. Export saves the processed result."
                 TextWrapping="Wrap"
                 VerticalAlignment="Center" />
             <Button

@@ -491,7 +491,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
         JsonElement root = document.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
         {
-            throw new FormatException("The clipboard does not contain a Seiza processing object.");
+            throw new FormatException("The data does not contain a Seiza processing object.");
         }
 
         JsonElement processing = root;
@@ -502,7 +502,7 @@ internal sealed class FitsImageProcessingConfiguration : IEquatable<FitsImagePro
                 version.GetInt32() != 1 ||
                 !root.TryGetProperty("processing", out processing))
             {
-                throw new FormatException("This Seiza processing clipboard format is not supported.");
+                throw new FormatException("This Seiza processing format is not supported.");
             }
         }
 
