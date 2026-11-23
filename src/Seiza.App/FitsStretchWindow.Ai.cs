@@ -91,10 +91,17 @@ public sealed partial class FitsStretchWindow
         _aiModel.SelectedIndex = _retainedAi.Model is null ? 0 : 1;
         _aiModel.SelectionChanged += (_, _) => { if (!_isUpdating && _aiModel.SelectedItem is AiModelChoice choice) ChangeAi(ai => ai with { Model = choice.Name }); };
         advanced.Children.Add(_aiModel);
-        var backend = new ComboBox { Header = "Device", HorizontalAlignment = HorizontalAlignment.Stretch,
-            ItemsSource = new[] { "Automatic", "DirectML", "CPU" } };
-        backend.SelectedIndex = _retainedAi.Backend switch { "directml" => 1, "cpu" => 2, _ => 0 };
-        backend.SelectionChanged += (_, _) => ChangeAi(ai => ai with { Backend = backend.SelectedIndex switch { 1 => "directml", 2 => "cpu", _ => null } });
+        var backends = new List<RestorationBackend> { new("", "Automatic"), new("directml", "DirectML"), new("cpu", "CPU") };
+        // Keep an imported recipe's explicit provider visible, including a custom runtime's providers.
+        if (_retainedAi.Backend is { } provider && backends.All(choice => choice.Name != provider))
+            backends.Add(new(provider, provider));
+        var backend = new ComboBox { Header = "Device", HorizontalAlignment = HorizontalAlignment.Stretch, ItemsSource = backends };
+        backend.SelectedItem = backends.First(choice => choice.Name == (_retainedAi.Backend ?? ""));
+        backend.SelectionChanged += (_, _) =>
+        {
+            if (backend.SelectedItem is RestorationBackend choice)
+                ChangeAi(ai => ai with { Backend = choice.Name.Length == 0 ? null : choice.Name });
+        };
         advanced.Children.Add(backend);
         var precision = new ComboBox { Header = "Precision", ItemsSource = new[] { "Automatic", "32-bit float", "16-bit float" } };
         precision.SelectedIndex = _retainedAi.Precision switch { "f32" => 1, "f16" => 2, _ => 0 };
