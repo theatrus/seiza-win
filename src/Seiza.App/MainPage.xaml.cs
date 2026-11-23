@@ -497,6 +497,7 @@ public sealed partial class MainPage : Page, IDisposable
         window.PreviewRequested = request => PreviewStretchAsync(path, request);
         window.PickSymmetryPointRequested = BeginSymmetryPointPicker;
         window.PickPreviewRegionRequested = BeginProcessingRegionPicker;
+        window.PreviewOutlineChanged = () => ImageCanvas.Invalidate();
         window.SaveLinearAiRequested = async (ai, progress, token) =>
         {
             var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(window.AppWindow.Id)
@@ -553,6 +554,7 @@ public sealed partial class MainPage : Page, IDisposable
             window.PreviewRequested = null;
             window.PickSymmetryPointRequested = null;
             window.PickPreviewRegionRequested = null;
+            window.PreviewOutlineChanged = null;
             window.SaveLinearAiRequested = null;
             EndProcessingRegionPicker();
             EndSymmetryPointPicker(showEditor: false);

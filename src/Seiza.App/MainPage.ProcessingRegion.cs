@@ -24,7 +24,7 @@ public sealed partial class MainPage
     {
         Rect Destination(ProcessingRegion region) => new(_offset.X + region.X * _scale,
             _offset.Y + region.Y * _scale, region.Width * _scale, region.Height * _scale);
-        if (_processingPreviewRegion is { } preview)
+        if (_processingPreviewRegion is { } preview && _stretchWindow?.ShowPreviewOutline == true)
             drawing.DrawRectangle(Destination(preview), Microsoft.UI.Colors.DeepSkyBlue, 2);
         if (_regionDrag is { } drag) drawing.DrawRectangle(Destination(drag), Microsoft.UI.Colors.DeepSkyBlue, 2);
     }

@@ -921,7 +921,7 @@ public sealed partial class FitsStretchWindow : Window
                 _deconvolution,
                 interactivePreview: true, ai: _ai);
             await PreviewRequested(new FitsStretchPreviewRequest(processing, cancellationToken,
-                _ai is null ? null : _aiRegion, new Progress<RestorationProgress>(step =>
+                _ai is not null && _useAiPreviewRegion ? _aiRegion : null, new Progress<RestorationProgress>(step =>
                 { if (generation == _previewGeneration && !cancellationToken.IsCancellationRequested) SetPreviewStatus(true, step.Message); })));
             if (generation == _previewGeneration && !cancellationToken.IsCancellationRequested)
             {
@@ -975,6 +975,7 @@ public sealed partial class FitsStretchWindow : Window
         PreviewRequested = null;
         PickSymmetryPointRequested = null;
         PickPreviewRegionRequested = null;
+        PreviewOutlineChanged = null;
         SaveLinearAiRequested = null;
         _modelCancellation?.Cancel();
         _completion.TrySetResult(false);

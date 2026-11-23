@@ -64,6 +64,9 @@ uses the center 768 × 768 pixels. Choose **Select preview rectangle…** and dr
 on the image to inspect another area, up to 2048 × 2048 pixels. Preview inference
 is cached: changing strengths or downstream processing reuses the residuals.
 The rectangle is preview-only; **Save changes** applies AI across the full image.
+Choose **Preview area > Full image** to preview the entire frame, or uncheck
+**Show rectangle outline** to hide the border without rerunning processing.
+Switching back to **Selected rectangle** keeps the area you selected.
 Undo, redo and copied adjustments retain the AI settings.
 
 **Export** saves the full processed image, including AI and the remaining steps.
@@ -76,7 +79,7 @@ models, or choose backend, precision, tile size and noise scale. The bundled
 runtime supports DirectML; its device index selects the GPU. Advanced runtime
 overrides still use `SEIZA_ONNXRUNTIME` before launch.
 
-![AI noise reduction in the Processing steps with preview region selection](docs/images/ai-processing-layer.png)
+![AI noise reduction with preview area and rectangle outline controls](docs/images/ai-preview-controls.jpg)
 
 ## Parallax videos and tours
 

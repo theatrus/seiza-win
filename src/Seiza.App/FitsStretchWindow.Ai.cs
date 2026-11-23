@@ -11,6 +11,10 @@ public sealed partial class FitsStretchWindow
     private AiProcessing? _ai;
     private AiProcessing _retainedAi = new();
     private ProcessingRegion? _aiRegion;
+    private bool _useAiPreviewRegion = true;
+    private bool _showAiPreviewOutline = true;
+    private Button? _selectAiRegion;
+    private CheckBox? _aiOutlineToggle;
     private bool _modelBusy;
     private CancellationTokenSource? _modelCancellation;
     private ComboBox _aiModel = new() { Header = "Model", HorizontalAlignment = HorizontalAlignment.Stretch };
@@ -18,6 +22,8 @@ public sealed partial class FitsStretchWindow
 
     internal AiProcessing? ResultAi => _ai;
     internal Action? PickPreviewRegionRequested { get; set; }
+    internal bool ShowPreviewOutline => _showAiPreviewOutline;
+    internal Action? PreviewOutlineChanged { get; set; }
     internal Func<AiProcessing, IProgress<RestorationProgress>, CancellationToken, Task<bool>>? SaveLinearAiRequested { get; set; }
 
     private void InitializeAi(AiProcessing? ai, ProcessingRegion region)
@@ -70,11 +76,25 @@ public sealed partial class FitsStretchWindow
         });
         AiParameterPanel.Children.Add(new TextBlock { Text = "Export saves all processing steps. Save linear AI FITS keeps only noise reduction, before background correction and stretch.", TextWrapping = TextWrapping.Wrap });
         AiParameterPanel.Children.Add(saveLinear);
+        var previewArea = new ComboBox
+        {
+            Header = "Preview area",
+            ItemsSource = new[] { "Selected rectangle", "Full image" },
+            SelectedIndex = _useAiPreviewRegion ? 0 : 1,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+        };
+        previewArea.SelectionChanged += (_, _) =>
+        {
+            _useAiPreviewRegion = previewArea.SelectedIndex == 0;
+            RefreshRegionLabel();
+            DraftChanged();
+        };
+        AiParameterPanel.Children.Add(previewArea);
         var regionText = new TextBlock { TextWrapping = TextWrapping.Wrap };
         _regionText = regionText;
-        RefreshRegionLabel();
         AiParameterPanel.Children.Add(regionText);
         var select = new Button { Content = "Select preview rectangle…" };
+        _selectAiRegion = select;
         select.Click += (_, _) =>
         {
             CancelPreview();
@@ -82,6 +102,21 @@ public sealed partial class FitsStretchWindow
             PickPreviewRegionRequested?.Invoke();
         };
         AiParameterPanel.Children.Add(select);
+        _aiOutlineToggle = new CheckBox
+        {
+            Content = "Show rectangle outline",
+            IsChecked = _showAiPreviewOutline,
+        };
+        void OutlineChanged(object sender, RoutedEventArgs args)
+        {
+            _showAiPreviewOutline = _aiOutlineToggle.IsChecked == true;
+            // This changes only the overlay, including while an inference is in flight.
+            PreviewOutlineChanged?.Invoke();
+        }
+        _aiOutlineToggle.Checked += OutlineChanged;
+        _aiOutlineToggle.Unchecked += OutlineChanged;
+        AiParameterPanel.Children.Add(_aiOutlineToggle);
+        RefreshRegionLabel();
         var advanced = new StackPanel { Spacing = 10 };
         // A fresh panel owns each control; do not reuse a parented ComboBox.
         if (_aiModel.Parent is Panel old) old.Children.Remove(_aiModel);
@@ -192,8 +227,12 @@ public sealed partial class FitsStretchWindow
     private TextBlock? _regionText;
     private void RefreshRegionLabel()
     {
-        if (_regionText is not null && _aiRegion is { } region)
-            _regionText.Text = $"Preview: {region.Width:N0} × {region.Height:N0} pixels at ({region.X:N0}, {region.Y:N0}). Saving applies AI to the full image.";
+        if (_selectAiRegion is not null) _selectAiRegion.IsEnabled = _useAiPreviewRegion;
+        if (_aiOutlineToggle is not null) _aiOutlineToggle.IsEnabled = _useAiPreviewRegion;
+        if (_regionText is not null)
+            _regionText.Text = _useAiPreviewRegion && _aiRegion is { } region
+                ? $"Preview: {region.Width:N0} × {region.Height:N0} pixels at ({region.X:N0}, {region.Y:N0}). Saving applies AI to the full image."
+                : "Preview covers the full image. Processing a large image may take longer.";
     }
 
     internal void ApplyPreviewRegion(ProcessingRegion region)
