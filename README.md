@@ -8,9 +8,9 @@ a finished image into a camera tour with depth, motion, and titles. Seiza pairs
 a WinUI 3 interface and GPU-backed viewport with the shared
 [Seiza](https://github.com/theatrus/seiza) Rust imaging core.
 
-[Download Seiza for Windows 0.9.7 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.9.7/seiza-0.9.7-windows-x86_64.msi)
-· [0.9.7 release notes](docs/releases/v0.9.7.md)
-· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.7/SHA256SUMS.txt)
+[Download Seiza for Windows 0.10.0 (x64)](https://github.com/theatrus/seiza-win/releases/download/v0.10.0/seiza-0.10.0-windows-x86_64.msi)
+· [0.10.0 release notes](docs/releases/v0.10.0.md)
+· [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.10.0/SHA256SUMS.txt)
 · [Previous versions](https://github.com/theatrus/seiza-win/releases)
 
 **Also from Seiza:** [Core, CLI, and libraries](https://github.com/theatrus/seiza) ·
@@ -54,27 +54,29 @@ calibration masters independently of a light stack.
 
 ## AI Models
 
-Open a linear mono or RGB FITS or XISF stack and choose **AI Models…**
-from the toolbar's **More options** menu. The current image is already selected;
-**Change image…** is only needed to use a different file. Seiza checks the model
-catalog and automatically installs the recommended model and ONNX Runtime as needed.
-Installed models work offline. Under **Advanced processing**, choose a
-different model from the catalog, check for updates, or import a local model
-folder containing `card.json` and its graphs. Seiza downloads the selected
-model if needed. The bundled Windows runtime enables DirectML when the model
-supports it. In **Advanced processing**, choose **DirectML** and enter a DXGI
-adapter index to select a particular GPU. Set `SEIZA_ONNXRUNTIME` to use a
-different runtime DLL before launching Seiza.
+Open a linear mono or RGB FITS or XISF stack, choose **Processing** in the
+main toolbar, and turn on **AI noise reduction**. Seiza automatically installs
+the recommended model and ONNX Runtime when needed. Installed models work offline.
 
-Choose **Preview center** to run the model on the center crop. Compare with
-**Original**, then adjust **Grain reduction** and **Mottle reduction**.
-**Update preview** applies the new amounts to the existing center result.
-**Advanced processing** exposes the backend, precision, tile size, and the
-scale that splits fine grain from wider mottle. **Save full FITS…** runs the
-model across the full image and writes a linear FITS with the source geometry
-and model provenance. It is also available before previewing.
+Adjust **Grain reduction** and **Mottle reduction** in the processing steps,
+before background correction, deconvolution and stretch. The initial preview
+uses the center 768 × 768 pixels. Choose **Select preview rectangle…** and drag
+on the image to inspect another area, up to 2048 × 2048 pixels. Preview inference
+is cached: changing strengths or downstream processing reuses the residuals.
+The rectangle is preview-only; **Save changes** applies AI across the full image.
+Undo, redo and copied adjustments retain the AI settings.
 
-![AI Models with advanced controls and a completed DirectML center preview](docs/images/ai-models-directml.png)
+**Export** saves the full processed image, including AI and the remaining steps.
+**Save linear AI FITS…** saves noise reduction alone in linear floating-point
+samples, preserving source geometry and model provenance. Both use a separate
+output and leave the source unchanged.
+
+Expand **Model and device settings** to select, download, update, verify or import
+models, or choose backend, precision, tile size and noise scale. The bundled
+runtime supports DirectML; its device index selects the GPU. Advanced runtime
+overrides still use `SEIZA_ONNXRUNTIME` before launch.
+
+![AI noise reduction in the Processing steps with preview region selection](docs/images/ai-processing-layer.png)
 
 ## Parallax videos and tours
 
@@ -140,15 +142,24 @@ or add a custom image-mask plane with an explicit name and distance.
 
 See the [Windows parallax guide](docs/PARALLAX-VIDEO.md) for layer requirements,
 camera and tour controls, encoder availability and export limits. Windows
-0.9.7 uses Seiza/C ABI 0.55.0, stacking 0.63.0, parallax
-0.25.0 and image-io 0.13.1 from published crates.
+0.10.0 uses Seiza/C ABI 0.56.0, stacking 0.64.0, parallax
+0.26.0 and image-io 0.13.1 from published crates.
+
+## New in 0.10.0
+
+- Make AI noise reduction part of the visible **Processing** steps, with grain
+  and mottle strengths, automatic setup and expandable model/device settings.
+- Drag a preview rectangle and reuse cached inference while adjusting the recipe.
+- Apply the recipe to the full image, retain it in undo/redo and copied settings,
+  and include it in image exports and parallax rendering.
+- Save a separate linear AI FITS before background correction and stretch.
+
+See the [0.10.0 release notes](docs/releases/v0.10.0.md).
 
 ## New in 0.9.7
 
 - Open AI Models with the current browser image selected, including when an
   existing dialog is still preparing a model or processing another image.
-- Clearly label the current image and use **Change image…** for an optional
-  replacement. Unsupported image formats remain visible with an explanation.
 - Clear the old preview and saved-image shortcut when switching source images.
 
 See the [0.9.7 release notes](docs/releases/v0.9.7.md).
@@ -865,8 +876,8 @@ remaining macOS and Windows integration work.
 
 ## Install
 
-Download the [Seiza for Windows 0.9.7 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.9.7/seiza-0.9.7-windows-x86_64.msi).
-Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.9.7/SHA256SUMS.txt)
+Download the [Seiza for Windows 0.10.0 x64 MSI](https://github.com/theatrus/seiza-win/releases/download/v0.10.0/seiza-0.10.0-windows-x86_64.msi).
+Its [SHA-256 checksums](https://github.com/theatrus/seiza-win/releases/download/v0.10.0/SHA256SUMS.txt)
 are published beside it. The installer places Seiza in
 `Program Files\Seiza for Windows` for every user, adds a shared Start Menu
 shortcut, and registers `.fit`, `.fits`, `.fts`, and `.xisf` with Windows
@@ -932,7 +943,7 @@ Build the self-contained all-users WiX MSI:
 ```powershell
 dotnet build packaging\windows\Seiza.App.wixproj `
   -c Release `
-  -p:SeizaVersion=0.9.7
+  -p:SeizaVersion=0.10.0
 ```
 
 The installer is written to `dist`. See the

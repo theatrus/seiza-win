@@ -458,14 +458,17 @@ public sealed partial class MainPage : Page, IDisposable
     private void ZoomOut_Click(object sender, RoutedEventArgs e) =>
         ZoomAt(new Vector2((float)ImageCanvas.ActualWidth / 2, (float)ImageCanvas.ActualHeight / 2), 0.8f);
 
-    private void RestoreImage_Click(object sender, RoutedEventArgs e) =>
-        App.ShowRestoration(_currentPath);
-
     private async void Stretch_Click(object sender, RoutedEventArgs e)
     {
         if (_stretchWindow is not null)
         {
-            if (_isPickingSymmetryPoint)
+            if (_pickingProcessingRegion)
+            {
+                EndProcessingRegionPicker();
+                _stretchWindow.AppWindow.Show();
+                _stretchWindow.Activate();
+            }
+            else if (_isPickingSymmetryPoint)
             {
                 EndSymmetryPointPicker(showEditor: true);
             }
@@ -488,10 +491,23 @@ public sealed partial class MainPage : Page, IDisposable
             currentProcessing.BackgroundConfiguration,
             currentProcessing.Deconvolution,
             SupportsColorStretch(_currentMetadata),
-            _currentMetadata!.Headers.TryGetValue("SEIZAPCC", out var marker) && marker.ToString() == "GAIA");
+            _currentMetadata!.Headers.TryGetValue("SEIZAPCC", out var marker) && marker.ToString() == "GAIA",
+            currentProcessing.Ai, ProcessingRegion.Center(_sourceWidth, _sourceHeight));
         _stretchWindow = window;
         window.PreviewRequested = request => PreviewStretchAsync(path, request);
         window.PickSymmetryPointRequested = BeginSymmetryPointPicker;
+        window.PickPreviewRegionRequested = BeginProcessingRegionPicker;
+        window.SaveLinearAiRequested = async (ai, progress, token) =>
+        {
+            var picker = new Microsoft.Windows.Storage.Pickers.FileSavePicker(window.AppWindow.Id)
+            { SuggestedFileName = Path.GetFileNameWithoutExtension(path) + "-denoised" };
+            picker.FileTypeChoices.Add("Linear FITS", [".fits"]);
+            var destination = await picker.PickSaveFileAsync();
+            if (destination is null) return false;
+            await ImageRenderService.SaveLinearAiAsync(path, destination.Path, ai,
+                progress, token);
+            return true;
+        };
 
         try
         {
@@ -513,7 +529,7 @@ public sealed partial class MainPage : Page, IDisposable
             var processing = new FitsImageProcessingConfiguration(
                 requestedStack,
                 requestedBackground,
-                requestedDeconvolution);
+                requestedDeconvolution, ai: window.ResultAi);
             bool changed = !_processingHistory.Current.Equals(processing);
             if (!changed)
             {
@@ -536,6 +552,9 @@ public sealed partial class MainPage : Page, IDisposable
         {
             window.PreviewRequested = null;
             window.PickSymmetryPointRequested = null;
+            window.PickPreviewRegionRequested = null;
+            window.SaveLinearAiRequested = null;
+            EndProcessingRegionPicker();
             EndSymmetryPointPicker(showEditor: false);
             RestoreCommittedBitmap();
             if (ReferenceEquals(_stretchWindow, window))
@@ -1176,6 +1195,7 @@ public sealed partial class MainPage : Page, IDisposable
         {
             _documentGeneration++;
             EndSymmetryPointPicker(showEditor: false);
+            EndProcessingRegionPicker();
             _stretchWindow?.Close();
             ResetStarAnalysisForImageChange();
         }
@@ -1208,7 +1228,8 @@ public sealed partial class MainPage : Page, IDisposable
             RenderedImageData image = await ImageRenderService.RenderAsync(
                 path,
                 processing,
-                cancellationToken: cancellationToken);
+                cancellationToken: cancellationToken, progress: new Progress<RestorationProgress>(step =>
+                { if (!_disposed && generation == _loadGeneration) ViewModel.StatusText = step.Message; }));
             cancellationToken.ThrowIfCancellationRequested();
             if (_disposed || generation != _loadGeneration)
             {
@@ -1270,7 +1291,7 @@ public sealed partial class MainPage : Page, IDisposable
             path,
             request.Processing,
             maxDimension: 2_048,
-            cancellationToken: request.CancellationToken);
+            cancellationToken: request.CancellationToken, region: request.Region, progress: request.Progress);
         request.CancellationToken.ThrowIfCancellationRequested();
         if (_stretchWindow is null ||
             !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
@@ -1279,8 +1300,10 @@ public sealed partial class MainPage : Page, IDisposable
         }
 
         CanvasDisplayImage nextBitmap = await CanvasDisplayImage.CreateAsync(CanvasDevice.GetSharedDevice(), image, cancellationToken: request.CancellationToken);
-        if (_stretchWindow is null || !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
+        if (request.CancellationToken.IsCancellationRequested || _stretchWindow is null || !string.Equals(path, _currentPath, StringComparison.OrdinalIgnoreCase))
         { nextBitmap.Dispose(); return; }
+        ClearProcessingRegionPreview();
+        _processingPreviewRegion = request.Region;
         if (!ReferenceEquals(_bitmap, _committedBitmap))
         {
             _bitmap?.Dispose();
@@ -1299,6 +1322,7 @@ public sealed partial class MainPage : Page, IDisposable
 
     private void SetCommittedBitmap(CanvasDisplayImage bitmap)
     {
+        ClearProcessingRegionPreview();
         if (!ReferenceEquals(_bitmap, _committedBitmap))
         {
             _bitmap?.Dispose();
@@ -1310,6 +1334,7 @@ public sealed partial class MainPage : Page, IDisposable
 
     private void RestoreCommittedBitmap()
     {
+        ClearProcessingRegionPreview();
         if (!ReferenceEquals(_bitmap, _committedBitmap))
         {
             _bitmap?.Dispose();
@@ -1337,6 +1362,7 @@ public sealed partial class MainPage : Page, IDisposable
             ? CanvasImageInterpolation.HighQualityCubic
             : CanvasImageInterpolation.NearestNeighbor;
         _bitmap.Draw(args.DrawingSession, destination, interpolation);
+        DrawProcessingRegion(args.DrawingSession);
         _overlayScene.Draw(args.DrawingSession, _overlayOptions, _scale, _scale, _offset);
     }
 
@@ -1370,6 +1396,7 @@ public sealed partial class MainPage : Page, IDisposable
             return;
         }
 
+        if (StartProcessingRegionDrag(e)) return;
         if (_isPickingSymmetryPoint)
         {
             var position = new Vector2((float)point.Position.X, (float)point.Position.Y);
@@ -1470,6 +1497,7 @@ public sealed partial class MainPage : Page, IDisposable
 
     private void ImageCanvas_PointerMoved(object sender, PointerRoutedEventArgs e)
     {
+        if (MoveProcessingRegionDrag(e)) return;
         if (_isInspectorOpen && _currentPath is not null && _scale > 0)
         {
             var pointer = e.GetCurrentPoint(ImageCanvas).Position;
@@ -1491,8 +1519,11 @@ public sealed partial class MainPage : Page, IDisposable
         e.Handled = true;
     }
 
-    private void ImageCanvas_PointerReleased(object sender, PointerRoutedEventArgs e) =>
+    private void ImageCanvas_PointerReleased(object sender, PointerRoutedEventArgs e)
+    {
+        if (FinishProcessingRegionDrag(e)) return;
         EndDrag(e.Pointer);
+    }
 
     private void ImageCanvas_PointerCaptureLost(object sender, PointerRoutedEventArgs e)
     {
@@ -1503,7 +1534,7 @@ public sealed partial class MainPage : Page, IDisposable
         object sender,
         ManipulationStartedRoutedEventArgs e)
     {
-        if (_bitmap is null || _isPickingSymmetryPoint)
+        if (_bitmap is null || _isPickingSymmetryPoint || _pickingProcessingRegion)
         {
             return;
         }
@@ -1516,7 +1547,7 @@ public sealed partial class MainPage : Page, IDisposable
         object sender,
         ManipulationDeltaRoutedEventArgs e)
     {
-        if (_bitmap is null || _isPickingSymmetryPoint)
+        if (_bitmap is null || _isPickingSymmetryPoint || _pickingProcessingRegion)
         {
             return;
         }
@@ -1735,11 +1766,7 @@ public sealed partial class MainPage : Page, IDisposable
             supportsAstronomyProcessing && _processingHistory.CanRedo && !ViewModel.IsLoading;
         StretchButton.IsEnabled =
             supportsAstronomyProcessing && !ViewModel.IsLoading;
-        StretchButton.Label = supportsAstronomyProcessing
-            ? stretchStack.Stages.Count == 1
-                ? currentStretch.Type.Title()
-                : $"{stretchStack.Stages.Count} stages"
-            : "Stretch";
+        StretchButton.Label = "Processing";
         ToolTipService.SetToolTip(
             StretchButton,
             supportsAstronomyProcessing
@@ -1956,6 +1983,7 @@ public sealed partial class MainPage : Page, IDisposable
         _thumbnailCancellation?.Cancel();
         _thumbnailCancellation = null;
         EndSymmetryPointPicker(showEditor: false);
+        EndProcessingRegionPicker();
         _stretchWindow?.Close();
         _stretchWindow = null;
         _stackWindow?.Close();
@@ -1969,6 +1997,7 @@ public sealed partial class MainPage : Page, IDisposable
             _bitmap?.Dispose();
         }
         _bitmap = null;
+        ClearProcessingRegionPreview();
         _committedBitmap?.Dispose();
         _committedBitmap = null;
         ImageCanvas.RemoveFromVisualTree();

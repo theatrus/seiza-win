@@ -18,7 +18,6 @@ internal sealed record NoiseModelCatalog(string? Recommended, PublishedNoiseMode
 internal sealed record RestorationProgress(string Message, double? Fraction = null);
 internal sealed record RestorationOptions(string? Backend, string? Precision, int? Tile, int? DeviceId);
 internal sealed record RestorationBands(double High, double Low, double Scale);
-internal sealed record RestorationPreview(RenderedImageData Original, RenderedImageData Restored, string Details);
 internal sealed record RestorationBackend(string Name, string Label)
 {
     public override string ToString() => Label;
@@ -221,15 +220,11 @@ internal static class RestorationService
         return (library.GetProperty("version").GetString()!, backends);
     });
 
-    internal static Task<SafeRestorationHandle> RunPreviewAsync(string input, InstalledNoiseModel model,
-        RestorationOptions options, IProgress<RestorationProgress> progress, CancellationToken token) =>
-        InStoreAsync(() => Run(input, model, options, preview: true, progress, token));
-
     private static unsafe SafeRestorationHandle Run(string input, InstalledNoiseModel model, RestorationOptions options,
-        bool preview, IProgress<RestorationProgress> progress, CancellationToken token)
+        bool preview, IProgress<RestorationProgress> progress, CancellationToken token, ProcessingRegion? region = null)
     {
         token.ThrowIfCancellationRequested();
-        if (!ImageFileService.IsAstronomyImage(input)) throw new InvalidOperationException("Choose a linear FITS or XISF image.");
+        if (!ImageFileTypes.IsAstronomyImage(input)) throw new InvalidOperationException("Choose a linear FITS or XISF image.");
         string request = new JsonObject
         {
             ["library"] = RestorationRuntime.GetLibraryPath(),
@@ -249,8 +244,12 @@ internal static class RestorationService
         var context = GCHandle.Alloc(new CallbackState(progress));
         try
         {
-            nint result = NativeMethods.RunRestoration(nativeModel, input, preview, &OnInferenceProgress,
-                cancellation, GCHandle.ToIntPtr(context), out error);
+            nint result = region is null
+                ? NativeMethods.RunRestoration(nativeModel, input, preview, &OnInferenceProgress,
+                    cancellation, GCHandle.ToIntPtr(context), out error)
+                : NativeMethods.RunRestorationRegion(nativeModel, input, (nuint)region.X, (nuint)region.Y,
+                    (nuint)region.Width, (nuint)region.Height, &OnInferenceProgress,
+                    cancellation, GCHandle.ToIntPtr(context), out error);
             if (token.IsCancellationRequested)
             {
                 if (result != 0) NativeMethods.FreeRestoration(result);
@@ -264,35 +263,22 @@ internal static class RestorationService
         finally { context.Free(); }
     }
 
-    internal static Task<RestorationPreview> PreviewAsync(SafeRestorationHandle result, RestorationBands bands, CancellationToken token) => Task.Run(() =>
+    internal static Task<SafeRestorationHandle> RunProcessingAsync(string input, InstalledNoiseModel model,
+        RestorationOptions options, ProcessingRegion? region, IProgress<RestorationProgress> progress, CancellationToken token) =>
+        InStoreAsync(() => Run(input, model, options, region is not null, progress, token, region));
+
+    internal static Task WriteProcessingAsync(SafeRestorationHandle result, RestorationBands bands, string output,
+        string? previewSource, CancellationToken token) => Task.Run(() =>
     {
         token.ThrowIfCancellationRequested();
-        string folder = Path.Combine(DataDirectory, $".preview-{Guid.NewGuid():N}");
-        Directory.CreateDirectory(folder);
-        try
+        if (previewSource is not null)
         {
-            string original = Path.Combine(folder, "original.fits");
-            string restored = Path.Combine(folder, "restored.fits");
-            string details = Blend(result, bands, restored, original);
-            token.ThrowIfCancellationRequested();
-            return new RestorationPreview(SeizaCore.Render(original, 768), SeizaCore.Render(restored, 768), details);
+            using var report = ReadModelResponse(NativeMethods.BlendRestorationPreviewInContext(result, previewSource, output,
+                (float)bands.High, (float)bands.Low, (float)bands.Scale, out nint error), error);
         }
-        finally { DeleteStagingDirectory(folder); }
+        else Blend(result, bands, output);
+        token.ThrowIfCancellationRequested();
     }, token);
-
-    internal static async Task SaveAsync(string input, string output, InstalledNoiseModel model, RestorationOptions options,
-        RestorationBands bands, IProgress<RestorationProgress> progress, CancellationToken token)
-    {
-        void ValidateDestination()
-        {
-            if (StackSourceIdentity.RefersToSameFile(input, output))
-                throw new SeizaCoreException("Choose a separate destination for the restored image.");
-        }
-        ValidateDestination();
-        using var result = await InStoreAsync(() => Run(input, model, options, preview: false, progress, token)).ConfigureAwait(false);
-        await Task.Run(() => AtomicOutputFile.Write(output, staging => Blend(result, bands, staging),
-            ValidateDestination, token), token).ConfigureAwait(false);
-    }
 
     private static string Blend(SafeRestorationHandle result, RestorationBands bands, string output, string? original = null)
     {

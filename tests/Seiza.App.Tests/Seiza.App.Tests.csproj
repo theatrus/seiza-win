@@ -11,6 +11,16 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="..\..\src\Seiza.App\Services\AiProcessingService.cs" Link="Services/AiProcessingService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ImageRenderService.cs" Link="Services/ImageRenderService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\RestorationService.cs" Link="Services/RestorationService.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\RestorationRuntime.cs" Link="Services/RestorationRuntime.cs" />
+    <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.Restoration.cs" Link="Interop/NativeMethods.Restoration.cs" />
+
+    <Compile Include="..\..\src\Seiza.App\Models\AiProcessing.cs" Link="Models\AiProcessing.cs" />
+    <Compile Include="..\..\src\Seiza.App\Services\ProcessingResultCache.cs" Link="Services\ProcessingResultCache.cs" />
+  </ItemGroup>
+  <ItemGroup>
     <Compile Include="..\..\src\Seiza.App\Interop\NativeMethods.ImageIo.cs" Link="Interop\NativeMethods.ImageIo.cs" />
     <Compile Include="..\..\src\Seiza.App\Models\ImageSourceData.cs" Link="Models\ImageSourceData.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageSourceService.cs" Link="Services\ImageSourceService.cs" />
@@ -62,7 +72,6 @@
     <Compile Include="..\..\src\Seiza.App\Services\ImageDirectoryScanner.cs" Link="Services\ImageDirectoryScanner.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\StackFrameImport.cs" Link="Services\StackFrameImport.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ImageFileTypes.cs" Link="Services\ImageFileTypes.cs" />
-    <Compile Include="..\..\src\Seiza.App\Services\RestorationSourceSelection.cs" Link="Services\RestorationSourceSelection.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\NaturalStringComparer.cs" Link="Services\NaturalStringComparer.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\WindowLifetimeRegistry.cs" Link="Services\WindowLifetimeRegistry.cs" />
     <Compile Include="..\..\src\Seiza.App\Services\ParallaxRequestSource.cs" Link="Services\ParallaxRequestSource.cs" />

@@ -33,6 +33,9 @@ def main():
         "seiza_denoised_blend": ([pointer, c.c_float, c.c_float, c.c_float, c.POINTER(c.c_float), c.c_size_t, error_pointer], c.c_bool),
         "seiza_denoised_free": ([pointer], None),
         "seiza_noise_model_denoise_file": ([pointer, c.c_char_p, c.c_bool, pointer, pointer, pointer, error_pointer], pointer),
+        "seiza_noise_model_denoise_file_region": ([pointer, c.c_char_p, c.c_size_t, c.c_size_t, c.c_size_t, c.c_size_t, pointer, pointer, pointer, error_pointer], pointer),
+        "seiza_file_restoration_write_preview_linear": ([pointer, c.c_char_p, c.c_float, c.c_float, c.c_float, error_pointer], pointer),
+        "seiza_file_restoration_write_preview_in_context": ([pointer, c.c_char_p, c.c_char_p, c.c_float, c.c_float, c.c_float, error_pointer], pointer),
         "seiza_file_restoration_write": ([pointer, c.c_char_p, c.c_char_p, c.c_float, c.c_float, c.c_float, error_pointer], pointer),
         "seiza_file_restoration_free": ([pointer], None),
         "seiza_cancel_signal_create": ([], pointer),
@@ -110,6 +113,19 @@ def main():
                 assert b"SEIZAMDL" in output_path.read_bytes()[:2880 * 5], "Missing model provenance"
             finally:
                 abi.seiza_file_restoration_free(restored)
+            preview = checked(abi.seiza_noise_model_denoise_file_region(model, str(source).encode(), 10, 10, 100, 80, None, None, None, c.byref(error)))
+            try:
+                crop = folder / "crop.fits"
+                context = folder / "context.fits"
+                owned(checked(abi.seiza_file_restoration_write_preview_linear(preview, str(crop).encode(), 1, 1, 5, c.byref(error))))
+                owned(checked(abi.seiza_file_restoration_write_preview_in_context(preview, str(source).encode(), str(context).encode(), 0.5, 0.8, 5, c.byref(error))))
+                assert b"MDPREV" in context.read_bytes()[:2880 * 5]
+                assert context.stat().st_size > crop.stat().st_size
+                invalid = abi.seiza_file_restoration_write(preview, str(folder / "invalid.fits").encode(), None, 1, 1, 5, c.byref(error))
+                assert not invalid and "separate model runs" in owned(error.value)
+                error.value = None
+            finally:
+                abi.seiza_file_restoration_free(preview)
             assert hashlib.sha256(source.read_bytes()).hexdigest() == original_hash
             signal = checked(abi.seiza_cancel_signal_create())
             try:

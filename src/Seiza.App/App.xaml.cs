@@ -16,7 +16,6 @@ public partial class App : Application
     private static readonly HashSet<MainWindow> DocumentWindows = [];
     private static readonly WindowLifetimeRegistry<Window> IndependentWindows = new(() => Updates.Dispose());
     private static CatalogSettingsWindow? _catalogSettingsWindow;
-    private static RestorationWindow? _restorationWindow;
     private static AppInstance? _mainInstance;
     private static AppActivationArguments? _initialActivation;
     private static string[] _initialCommandLinePaths = [];
@@ -132,21 +131,6 @@ public partial class App : Application
         var window = new ColorToolsWindow();
         RegisterIndependentWindow(window);
         window.Activate();
-    }
-
-    internal static void ShowRestoration(string? source)
-    {
-        if (_restorationWindow is null)
-        {
-            _restorationWindow = new RestorationWindow(source);
-            _restorationWindow.Closed += (_, _) => _restorationWindow = null;
-            RegisterIndependentWindow(_restorationWindow);
-        }
-        else
-        {
-            _restorationWindow.UseSource(source);
-        }
-        _restorationWindow.Activate();
     }
 
     private static void RegisterIndependentWindow(Window window)
