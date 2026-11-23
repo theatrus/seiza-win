@@ -8,9 +8,9 @@ members = [
 
 # Published Seiza dependencies are pinned together for the Windows app.
 [workspace.dependencies]
-seiza = "=0.55.0"
-seiza-cabi = "=0.55.0"
-seiza-stacking = "=0.63.0"
+seiza = "=0.56.0"
+seiza-cabi = "=0.56.0"
+seiza-stacking = "=0.64.0"
 seiza-fits = "=0.8.1"
 seiza-xisf = "=0.9.1"
 seiza-image-io = "=0.13.1"

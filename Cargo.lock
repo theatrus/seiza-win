@@ -2484,9 +2484,9 @@ dependencies = [
 
 [[package]]
 name = "seiza"
-version = "0.55.0"
+version = "0.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b700a99feac4279d09d99a45043d5b523f04800471870c54041b00ee9d6f25d7"
+checksum = "f26af5e953d0102741644d05ec24a1fbf34e544875c3c4b777daca589a3fff83"
 dependencies = [
  "directories",
  "image",
@@ -2509,9 +2509,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-analysis"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "aef0900d96d471514156d7c5de87d0727c26da6082249b937c31f0be8e5b6b93"
+checksum = "8f0f44bcfc576c9d0186834e6d1a5ada043f3c1d3925a41cd9921cc1cb6c3919"
 dependencies = [
  "seiza-fits",
  "seiza-image-io",
@@ -2539,9 +2539,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-cabi"
-version = "0.55.0"
+version = "0.56.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a13aabc896b43564bf09a8ee4abb614a9acb22473ddbf2ed7f3cbe4c2ea3beba"
+checksum = "d2e0c576ded0b70ae06e6f52795dc440f6eca129a5d22ee49f33f98e450ed981"
 dependencies = [
  "cbindgen",
  "image",
@@ -2688,9 +2688,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-model"
-version = "0.6.0"
+version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "950a91c3ba8c6d2b95f4da33f26cdc3abfbe3407c5546b951456578182189b56"
+checksum = "24ce1f6164c4a814bd83839224e1f35aebb66c365905a75b2cbcb33736922cde"
 dependencies = [
  "directories",
  "half",
@@ -2711,9 +2711,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-parallax"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0275dc87bfa8f75c984d32395c7d580ac2302b87194292901c7c386108e939a"
+checksum = "d81fb34b79992ec146ccb037e300026fc90434268e36879a1689cd07d6403e05"
 dependencies = [
  "ab_glyph",
  "image",
@@ -2730,9 +2730,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-pipeline"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cd6535e66016815e0430ef8150b5982bdf20b36ccb5dd1a0fcfaefd996ae0d39"
+checksum = "abb1d6d550df2e613f0dd597666353fa247c153a8a4dfdd47383c324448b72bf"
 dependencies = [
  "rayon",
  "seiza-calibration",
@@ -2766,9 +2766,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-satellites"
-version = "0.25.0"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e7d45d032a8e242c9d380314445ff5e767e997ad15cfab1bcd31610a3cb3e54c"
+checksum = "3c49ce97f60547e52301550ab8b259be3967c4e3c7cfa94533f76e6d5da8317a"
 dependencies = [
  "directories",
  "fs2",
@@ -2798,9 +2798,9 @@ dependencies = [
 
 [[package]]
 name = "seiza-stacking"
-version = "0.63.0"
+version = "0.64.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "95fb5ff0a2cd475ed6c280e66eb43630d0195201f206308b02b35839a5293455"
+checksum = "0808295440964a78bccf9ec393c961b738b9af14e4bfcbfa4020b4809126cb80"
 dependencies = [
  "bytemuck",
  "fs2",
