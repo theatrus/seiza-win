@@ -76,6 +76,14 @@ and store crop-relative points; older itineraries use the current crop.
 
 ### Tour-point framing
 
+Generate Tour considers LBN nebulae. Its automatic selection ranks objects
+within the filmed crop and skips targets that fill too much of the frame or
+are too close to a higher-ranked stop. For example, LBN 625 spans 60 arcminutes
+along its major axis. It can appear in a plate solve yet be too large for a
+separate stop in a narrow field. Switching off **Automatic target count** can
+include lower-ranked targets. To feature a particular object, add a stop and
+use **Pick Destination** to place it.
+
 New custom points start wide (Dolly 0%, Zoom 1×), independently of the previous
 target. Adding, duplicating, reordering and deleting stops select the relevant
 stop and seek to its arrival; the refitted preview uses that time.
