@@ -667,9 +667,9 @@ public sealed partial class ParallaxWindow : Window, IDisposable
         else if (Session.SelectedIndex is int index)
         {
             StackPanel stop = Section($"Stop {index + 1}");
-            Text(stop, "Name", () => SelectedStop()?.Name ?? string.Empty, value => Session.EditStop(s => s.Name = value));
-            Text(stop, "On-screen title", () => SelectedStop()?.Title ?? string.Empty,
-                value => Session.EditStop(s => s.Title = string.IsNullOrWhiteSpace(value) ? null : value));
+            StopText(stop, "Name", index, s => s.Name, (s, value) => s.Name = value);
+            StopText(stop, "On-screen title", index, s => s.Title,
+                (s, value) => s.Title = string.IsNullOrWhiteSpace(value) ? null : value);
             Note(stop, "Shown during this stop when Show stop titles is enabled. Leave blank for no title.");
             ImagePicker(stop, "Title card", () => SelectedStop()?.Card, path => Session.EditStop(s => s.Card = path));
             Note(stop, "An image with transparency shown during this stop in place of its title, whether or not titles are shown. Make it the video's size for sharp lettering.");
@@ -889,6 +889,33 @@ public sealed partial class ParallaxWindow : Window, IDisposable
         Number(output, "Fade stars from growth", () => Composition.FadeFrom, value => Session.Edit(c => c.FadeFrom = value), 0, step: 0.1);
         Note(output, "Stars start fading at this growth and disappear at twice it.");
         Note(output, "SDR · silent\nPreview uses a smaller frame. Export renders every frame at the selected resolution. MP4 uses Windows encoding; HEVC support depends on installed Windows codecs. PNG frames are lossless and ignore the video codec.");
+    }
+
+    private void StopText(StackPanel panel, string header, int index,
+        Func<ParallaxStop, string?> read, Action<ParallaxStop, string> write)
+    {
+        Guid id = Composition.Stops[index].Id;
+        var box = new TextBox { Header = header, Text = read(Composition.Stops[index]) ?? string.Empty };
+        AutomationProperties.SetName(box, header);
+        ParallaxComposition? lastEdit = null;
+        // Store the draft before a focus change or preview refresh can replace
+        // its text. Consecutive keystrokes in this field form one undo step.
+        box.TextChanging += (_, _) =>
+        {
+            if (_refreshing || _closed || Session.SelectedStop != id ||
+                index >= Composition.Stops.Count || Composition.Stops[index].Id != id) return;
+            var previous = Composition;
+            Session.Edit(c => write(c.Stops[index], box.Text), lastEdit);
+            if (!ReferenceEquals(previous, Composition)) lastEdit = Composition;
+        };
+        box.LostFocus += (_, _) => lastEdit = null;
+        panel.Children.Add(box);
+        _refreshControls.Add(() =>
+        {
+            string value = read(Composition.Stops[index]) ?? string.Empty;
+            if (box.Text != value && !(box.FocusState != FocusState.Unfocused &&
+                string.IsNullOrWhiteSpace(box.Text) && value.Length == 0)) box.Text = value;
+        });
     }
 
     private void BuildStopStrip()

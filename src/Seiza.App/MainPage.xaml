@@ -730,17 +730,17 @@
                 Padding="14,11"
                 HorizontalAlignment="Right"
                 VerticalAlignment="Bottom"
-                Background="#D9181C25"
-                BorderBrush="#5AFFFFFF"
+                Background="{ThemeResource SolidBackgroundFillColorBaseBrush}"
+                BorderBrush="{ThemeResource CardStrokeColorDefaultBrush}"
                 BorderThickness="1"
                 CornerRadius="8"
                 Visibility="Collapsed">
                 <StackPanel Spacing="3">
-                    <TextBlock FontWeight="SemiBold" Text="{x:Bind ViewModel.SolveTitleText, Mode=OneWay}" />
+                    <TextBlock FontWeight="SemiBold" Foreground="{ThemeResource TextFillColorPrimaryBrush}" Text="{x:Bind ViewModel.SolveTitleText, Mode=OneWay}" />
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.SolveCoordinatesText, Mode=OneWay}" />
                     <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.SolveQualityText, Mode=OneWay}" />
-                    <TextBlock Foreground="{ThemeResource TextFillColorTertiaryBrush}" Text="{x:Bind ViewModel.SolveOverlayText, Mode=OneWay}" TextWrapping="Wrap" />
-                    <TextBlock Foreground="#FFF2C66D" Text="{x:Bind ViewModel.SolveAvailabilityText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock Foreground="{ThemeResource TextFillColorSecondaryBrush}" Text="{x:Bind ViewModel.SolveOverlayText, Mode=OneWay}" TextWrapping="Wrap" />
+                    <TextBlock Foreground="{ThemeResource TextFillColorPrimaryBrush}" Text="{x:Bind ViewModel.SolveAvailabilityText, Mode=OneWay}" TextWrapping="Wrap" />
                 </StackPanel>
             </Border>
         </Grid>

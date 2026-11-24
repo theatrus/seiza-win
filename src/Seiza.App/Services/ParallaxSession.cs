@@ -188,13 +188,17 @@ internal sealed class ParallaxSession : INotifyPropertyChanged, IDisposable
     private string SnapshotPath => Path.Combine(_directory, "source.png");
     private string CreateSnapshotPath() { using (File.Create(SnapshotPath)) { } return SnapshotPath; }
 
-    public void Edit(Action<ParallaxComposition> edit)
+    public void Edit(Action<ParallaxComposition> edit, ParallaxComposition? continueUndoFrom = null)
     {
         if (_closed || IsBusy) return;
         ParallaxComposition previous = Composition, updated = previous.DeepClone();
         edit(updated);
         if (previous.ContentEquals(updated)) return;
-        _undo.Add(previous); if (_undo.Count > 100) _undo.RemoveAt(0);
+        if (!ReferenceEquals(previous, continueUndoFrom))
+        {
+            _undo.Add(previous);
+            if (_undo.Count > 100) _undo.RemoveAt(0);
+        }
         _redo.Clear(); Composition = updated;
         _protectedInputHistory.Remember(ParallaxInputPaths.FromComposition(updated));
         Invalidate(!previous.Scene.ContentEquals(updated.Scene));
